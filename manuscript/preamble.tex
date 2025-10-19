@@ -1,0 +1,46 @@
+% Preambula wspoldzielona przez wszystkie rozdzialy manuskryptu PUM1 + PUM2
+
+\usepackage{iftex}
+
+\ifLuaTeX
+  \usepackage{fontspec}
+  \defaultfontfeatures{Ligatures=TeX}
+  \setmainfont{Latin Modern Roman}
+  \setsansfont{Latin Modern Sans}
+  \setmonofont{Latin Modern Mono}
+\else
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{lmodern}
+\fi
+
+\usepackage[polish]{babel}
+\usepackage{microtype}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\usepackage{xcolor}
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+\usepackage[cache=false]{minted} % wymaga pygmentize + shell-escape
+\setminted{fontsize=\small,breaklines=true,baselinestretch=1.05}
+
+\usepackage{csquotes}
+
+\usepackage[backend=biber,style=numeric,sorting=nyt]{biblatex}
+\addbibresource{bib/refs.bib}
+
+%% Definicje pomocnicze
+\newcommand{\term}[1]{\textbf{#1}}
+\newlist{learningobjectives}{itemize}{1}
+\setlist[learningobjectives]{label=\textbullet,leftmargin=*}

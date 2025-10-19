@@ -1,0 +1,33 @@
+\chapter{Wyklad 1: Podstawy jezyka Kotlin}
+
+\begin{learningobjectives}
+  \item Przypomnisz sobie podstawowe elementy skladni Kotlin,
+  \item zrozumiesz roznice miedzy `val` i `var`,
+  \item napiszesz proste funkcje i petle kontrolujace przeplyw programu.
+\end{learningobjectives}
+
+\section{Streszczenie rozdzialu}
+Rozdzial rozwija material z `PUM1/Wyk/Wyklad1.pdf`, dodajac wiecej przykladow kodu i komentarzy. W trakcie redakcji nalezy uzupelnic pelne przyklady wraz z wynikami uruchomienia oraz sekcja \term{Najczestsze bledy} z praktyki laboratoryjnej.
+
+\section{Przyklad: interaktywna sesja Kotlin REPL}
+\begin{minted}{kotlin}
+fun main() {
+  val greeting = "Czesc"
+  var counter = 0
+
+  repeat(3) {
+    counter += 1
+    println("$greeting, to jest powtorzenie #$counter")
+  }
+}
+\end{minted}
+
+W docelowej wersji nalezy dodac opis dzialania kazdej linii oraz propozycje modyfikacji zadaniowych.
+
+\section{Zadania do samodzielnego wykonania}
+% TODO: uzupelnic o zadania na bazie Listy 1
+\begin{enumerate}[label=Z\arabic*.]
+  \item Przeksztalc powyzszy przyklad tak, aby wypisywal wyrazenia arytmetyczne oraz ich wynik.
+  \item Zaimplementuj mini quiz dzialajacy w konsoli wykorzystujacy instrukcje `when` i `try/catch`.
+\end{enumerate}
+

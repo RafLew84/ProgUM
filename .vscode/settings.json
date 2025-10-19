@@ -1,0 +1,41 @@
+{
+  "latex-workshop.latex.tools": [
+    {
+      "name": "latexmk-lua",
+      "command": "latexmk",
+      "args": [
+        "-pdf",
+        "-lualatex",
+        "-shell-escape",
+        "-interaction=nonstopmode",
+        "-synctex=1",
+        "%DOC%"
+      ]
+    },
+    { "name": "biber", "command": "biber", "args": ["%DOCFILE%"] }
+  ],
+  "latex-workshop.latex.recipes": [
+    { "name": "latexmk (LuaLaTeX)", "tools": ["latexmk-lua"] },
+    {
+      "name": "LuaLaTeX ➜ Biber ➜ LuaLaTeX×2",
+      "tools": ["latexmk-lua", "biber", "latexmk-lua", "latexmk-lua"]
+    }
+  ],
+  "latex-workshop.latex.recipe.default": "latexmk (LuaLaTeX)",
+  "latex-workshop.view.pdf.viewer": "tab",
+  "latex-workshop.latex.autoBuild.run": "onSave",
+  "latex-workshop.latex.clean.fileTypes": [
+    "*.aux",
+    "*.bbl",
+    "*.bcf",
+    "*.blg",
+    "*.fdb_latexmk",
+    "*.fls",
+    "*.log",
+    "*.out",
+    "*.run.xml",
+    "*.toc",
+    "*-blx.bib",
+    "*.synctex.gz"
+  ]
+}
