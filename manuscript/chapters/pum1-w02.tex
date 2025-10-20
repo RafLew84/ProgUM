@@ -1,0 +1,71 @@
+\chapter{Wyklad 2: Funkcje i funkcje wyzszego rzedu}
+
+\begin{learningobjectives}
+  \item Przypomnisz skladnie deklaracji funkcji i parametrow w Kotlinie.
+  \item Zidentyfikujesz roznice miedzy funkcjami zwyklymi, wyrazeniowymi i lambdami.
+  \item Przygotujesz grunt pod funkcje wyzszego rzedu i przekazywanie zachowania.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Powtorka: podpis funkcji, parametry domyslne, nazwane argumenty.
+  \item Funkcje jako wyrazenia; single expression functions.
+  \item Lambdy i typy funkcyjne.
+  \item Funkcje wyzszego rzedu, inline, crossinline, noinline.
+  \item Praca z kolekcjami i funkcjami standardowymi (`map`, `filter`, `fold`).
+  \item Zadania i bledy z laboratorium (Lista2, Lista3).
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item Slajdy: `PUM1/Wyk/Wyklad2.pdf` (funkcje) oraz `PUM1/Wyk/Wyklad4.pdf` dla rozwiniecia kolekcji.
+  \item Notebooki: `PUM1/Listy/Lista2.ipynb`, `PUM1/Listy/Lista3.ipynb` (sekcje dotyczace lambd i funkcji kolekcyjnych).
+  \item Dokumentacja Kotlin: sekcja "Functions" oraz "Higher-Order Functions".
+\end{itemize}
+
+\section{Struktura docelowa}
+\subsection{Deklarowanie funkcji}
+\begin{itemize}
+  \item Sygnatura, typ zwracany, parametry z wartosciami domyslnymi.
+  \item Argumenty nazwane i kolejnosc.
+  \item Funkcje lokalne i zagniezdzone.
+\end{itemize}
+
+\subsection{Funkcje jako wyrazenia}
+\begin{itemize}
+  \item Single expression functions.
+  \item Typ wywnioskowany vs jawny.
+  \item Rola `Unit` i typow zwracanych.
+\end{itemize}
+
+\subsection{Lambdy i typy funkcyjne}
+\begin{itemize}
+  \item Skrotowa i pelna skladnia lambd.
+  \item Parametr `it`, lambdy wieloliniowe.
+  \item Referencje do funkcji (`::nazwa`).
+\end{itemize}
+
+\subsection{Funkcje wyzszego rzedu}
+\begin{itemize}
+  \item Funkcje przyjmujace i zwracajace funkcje.
+  \item `inline`, `crossinline`, `noinline` - kiedy maja znaczenie.
+  \item Praca z kolekcjami: `map`, `filter`, `flatMap`, `fold`, `reduce`.
+\end{itemize}
+
+\subsection{Case study z Listy}
+\begin{itemize}
+  \item Zadanie z `Lista2`: przetwarzanie danych tekstowych (TODO: wskazac konkretny zeszyt zadań).
+  \item Zadanie z `Lista3`: transformacje kolekcji i walidacje.
+  \item Najczestsze bledy: mutowanie kolekcji, `return` z lambdy, uzycie `forEach` vs `map`.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item \textbf{Przyklad A}: aplikacja konsolowa podsumowujaca oceny (TODO: przygotowac kod i komentarz).
+  \item \textbf{Przyklad B}: pipeline przetwarzania danych z API (TODO: bazowac na json w `Listy`).
+  \item Zadania domowe: trzy krotkie problemy na map/filter/reduce (TODO: opisac).
+  \item Pytania kontrolne: roznica `inline`/`noinline`, co zwraca `fold`, kiedy preferowac `sequence`.
+\end{itemize}
+
+% TODO: W kolejnym etapie uzupelnic tekst akapitami, wstawic kod z minted oraz dodac cytowania do dokumentacji.
+

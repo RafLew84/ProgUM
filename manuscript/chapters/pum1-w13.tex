@@ -1,0 +1,61 @@
+\chapter{Wyklad 13: Wzorce projektowe - behawioralne}
+
+\begin{learningobjectives}
+  \item Poznasz wzorce behawioralne i ich adaptacje w Kotlinie.
+  \item Zastosujesz wzorce do organizacji logiki interakcji i przeplywu danych.
+  \item Przeanalizujesz przypadki uzycia w projekcie katalogowym.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Observer, Strategy, Command, Chain of Responsibility.
+  \item State, Memento, Mediator i ich adaptacje w Kotlinie.
+  \item Implementacje z wykorzystaniem Flow i coroutines.
+  \item Integracja wzorcow z Compose i MVVM.
+  \item Antywzorce i pułapki implementacyjne.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM1/Wyk/Wyklad13.pdf.
+  \item \texttt{PUM2/Listy/W5-SharedFlow\_basic.ipynb}.
+  \item refactoring.guru/design-patterns (sekcja behavioural).
+\end{itemize}
+
+\subsection{Przeglad wzorcow}
+\begin{itemize}
+  \item Observer w Flow i LiveData.
+  \item Strategy dla polityk filtrowania danych.
+  \item Command/UseCase jako enkapsulacja operacji.
+\end{itemize}
+
+\subsection{Stan i interakcje}
+\begin{itemize}
+  \item State pattern dla ekranow i dialogow.
+  \item Memento dla operacji undo/redo.
+  \item Mediator dla koordynacji komponentow UI.
+\end{itemize}
+
+\subsection{Implementacje w Kotlinie}
+\begin{itemize}
+  \item Uzycie sealed class i instrukcji when.
+  \item Coroutines i Channels jako event bus.
+  \item Testowanie wzorcow behawioralnych.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Projekt logiki filtrow w katalogu produktow.
+  \item Zadanie: Chain of Responsibility dla walidacji.
+  \item Checklist: rozpoznawanie antywzorcow w modulach UI.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: implementacja Strategy dla sortowania listy (TODO).
+  \item Przyklad B: Chain of Responsibility dla walidacji formularza (TODO).
+  \item Zadania: adaptacja wzorca Observer do Flow (TODO).
+  \item Pytania: roznica Strategy i State, kiedy zastosowac Mediator (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

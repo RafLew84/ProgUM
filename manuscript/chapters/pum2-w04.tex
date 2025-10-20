@@ -1,0 +1,61 @@
+\chapter{Wyklad 4: Flow i reaktywne zarzadzanie stanem}
+
+\begin{learningobjectives}
+  \item Zrozumiesz podstawy przeplywu danych w Kotlin Flow.
+  \item Zbudujesz reaktywne pipeline'y dla UI w Compose.
+  \item Przygotujesz strategie obslugi bledow i backpressure.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Flow cold vs hot - koncepcje podstawowe.
+  \item Operatorzy transformacji i kontrola przeplywu.
+  \item Buffering, conflation, backpressure.
+  \item Integracja z Compose i ViewModel.
+  \item Testowanie Flow i deterministyczne scenariusze.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM2/Wyk/Wyklad5.pdf.
+  \item \texttt{PUM2/Listy/W5-Flow\_basics.ipynb}.
+  \item kotlinlang.org/docs/flow.html.
+\end{itemize}
+
+\subsection{Podstawy Flow}
+\begin{itemize}
+  \item Flow builders: flowOf, flow, callbackFlow.
+  \item Collect i terminal operators.
+  \item Flow vs Sequence - kiedy ktore rozwiazanie.
+\end{itemize}
+
+\subsection{Transformacje i operatory}
+\begin{itemize}
+  \item map, filter, flatMapLatest, combine.
+  \item buffer, conflate, distinctUntilChanged.
+  \item Error handling w pipeline i retry.
+\end{itemize}
+
+\subsection{Integracja z UI}
+\begin{itemize}
+  \item StateFlow, SharedFlow jako hot streams.
+  \item collectAsState i lifecycle aware collect.
+  \item Testowanie przeplywu danych w ViewModel.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Przetwarzanie danych katalogu (filtrowanie, sortowanie).
+  \item Zadanie: zestaw operatorow do transformacji wynikow API.
+  \item Checklist: best practices Flow.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: pipeline filtrowania i sortowania (TODO).
+  \item Przyklad B: combine wielu zrodel danych (TODO).
+  \item Zadania: testy Flow z Turbine (TODO).
+  \item Pytania: roznica cold/hot, kiedy uzyc buffer (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

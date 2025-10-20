@@ -1,0 +1,61 @@
+\chapter{Wyklad 6: Kanaly i komunikacja asynchroniczna}
+
+\begin{learningobjectives}
+  \item Zrozumiesz role kanalow w Kotlin Coroutines.
+  \item Zaprojektujesz komunikacje asynchroniczna pomiedzy komponentami.
+  \item Poznasz techniki selekcji i multiplexingu dla strumieni danych.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Channel basics: send, receive, close.
+  \item Typy kanalow: rendezvous, buffered, conflated.
+  \item select i multiplexing.
+  \item Porownanie channel vs SharedFlow.
+  \item Zastosowania w aplikacjach mobilnych.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM2/Wyk/Wyklad7.pdf.
+  \item \texttt{PUM2/Listy/W7-Channels\_basics.ipynb}, \texttt{PUM2/Listy/W7-Channels\_select\_basics.ipynb}.
+  \item kotlinlang.org/docs/channels.html.
+\end{itemize}
+
+\subsection{Podstawy kanalow}
+\begin{itemize}
+  \item Tworzenie i wykorzystywanie Channel.
+  \item send/receive, close, iteration.
+  \item Backpressure i buffer.
+\end{itemize}
+
+\subsection{Zaawansowane wzorce}
+\begin{itemize}
+  \item select i multiplexing.
+  \item Ticker, pipeline, fan-in i fan-out.
+  \item Porownanie z SharedFlow i event bus.
+\end{itemize}
+
+\subsection{Praktyka mobilna}
+\begin{itemize}
+  \item Komunikacja worker -> UI.
+  \item Streamowanie danych sieciowych i sensorow.
+  \item Testowanie i deterministyczny scheduling.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Kanal powiadomien i logowania.
+  \item Analiza bledow: missed signals i resource leaks.
+  \item Checklist: czyszczenie zasobow i lifecycle.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: fan-in dla zapytan sieciowych (TODO).
+  \item Przyklad B: select dla priorytetyzacji zadan (TODO).
+  \item Zadania: testy kanalow z runTest (TODO).
+  \item Pytania: kiedy preferowac SharedFlow zamiast Channel (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

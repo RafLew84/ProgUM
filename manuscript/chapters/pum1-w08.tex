@@ -1,0 +1,62 @@
+\chapter{Wyklad 8: Fundamenty aplikacji Android i cykl zycia}
+
+\begin{learningobjectives}
+  \item Przypomnisz cykl zycia kluczowych komponentow Android.
+  \item Zaplanujesz zaleznosci pomiedzy Activity, ViewModel i Compose.
+  \item Zdefiniujesz strategie reagowania na zmiany cyklu zycia i konfiguracji.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Struktura projektu Android (manifest, moduly, zaleznosci).
+  \item Activity, Fragment, ViewModel i ich cykl zycia.
+  \item LifecycleOwner, observers, SavedStateHandle.
+  \item Integracja z Compose: setContent, remember, effect handlers.
+  \item Obsuga back stack, rotation, proces-die i recovery.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM1/Wyk/Wyklad8.pdf.
+  \item PUM1/Listy/Lista5.ipynb.
+  \item developer.android.com/guide/components/activities/activity-lifecycle.
+\end{itemize}
+
+\subsection{Struktura aplikacji}
+\begin{itemize}
+  \item Manifest, permissions, konfiguracja gradle.
+  \item Rola Application i dependency injection.
+  \item Organizacja modulow projektu.
+\end{itemize}
+
+\subsection{Lifecycle i ViewModel}
+\begin{itemize}
+  \item LifecycleOwner, obserwatorzy i eventy.
+  \item ViewModel, SavedStateHandle, integracja z repozytoriami.
+  \item Compose: remember, LaunchedEffect, DisposableEffect.
+\end{itemize}
+
+\subsection{Zmiany konfiguracji}
+\begin{itemize}
+  \item UI state vs saved instance state.
+  \item ViewModel i state hoisting.
+  \item Testowanie scenariuszy rotate/background.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Analiza zadania: aktywnosc z Compose i ViewModel.
+  \item Lista kontrolna przed releasem (permissions, lifecycle observers).
+  \item Porownanie Compose i legacy XML pod katem cyklu zycia.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: rejestrowanie obserwatora lifecycle (TODO).
+  \item Przyklad B: implementacja screen state z SavedStateHandle (TODO).
+  \item Zadania: symulacja scenariuszy background/foreground (TODO).
+  \item Pytania: roznica onPause vs onStop, jak Compose integruje sie z cyklem zycia (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+

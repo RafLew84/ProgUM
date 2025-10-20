@@ -1,0 +1,61 @@
+\chapter{Wyklad 2: Structured concurrency i obsluga wyjatkow}
+
+\begin{learningobjectives}
+  \item Zrozumiesz zasady structured concurrency w Kotlinie.
+  \item Nauczysz sie propagowac i przechwytywac wyjatki w coroutines.
+  \item Zaprojektujesz strategie anulowania i cleanup w asynchronicznych operacjach.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Hierarchia scope i kontrola lifecycle.
+  \item coroutineScope, supervisorScope, SupervisorJob.
+  \item Exception handling i CoroutineExceptionHandler.
+  \item Zasady anulowania i cleanup.
+  \item Testowanie scenariuszy bledow.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM2/Wyk/Wyklad3.pdf.
+  \item \texttt{PUM2/Listy/W3-Coroutines\_demo.ipynb}.
+  \item kotlinlang.org/docs/exception-handling.html.
+\end{itemize}
+
+\subsection{Structured concurrency}
+\begin{itemize}
+  \item Hierarchia scope i propagacja anulowania.
+  \item roznica coroutineScope i supervisorScope.
+  \item Granice odpowiedzialnosci modulow.
+\end{itemize}
+
+\subsection{Obsluga wyjatkow}
+\begin{itemize}
+  \item CoroutineExceptionHandler i propagacja bledow.
+  \item try/catch w suspend funkcjach.
+  \item Retry, exponential backoff, circuit breaker.
+\end{itemize}
+
+\subsection{Anulowanie i cleanup}
+\begin{itemize}
+  \item Cooperative cancellation i sprawdzanie isActive.
+  \item finally blok i withContext(NonCancellable).
+  \item Timeout i sprzatanie zasobow.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Manager zapytan sieciowych.
+  \item Analiza bledow w strumieniach Flow.
+  \item Checklist: guidelines obslugi bledow.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: supervisorScope dla wielu zapytan (TODO).
+  \item Przyklad B: wzorzec retry dla requestu API (TODO).
+  \item Zadania: implementacja cancellation-safe repository (TODO).
+  \item Pytania: roznica coroutineScope/supervisorScope, jak dziala handler (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

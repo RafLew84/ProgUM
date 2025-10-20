@@ -1,0 +1,61 @@
+\chapter{Wyklad 8: Room - model danych, CRUD i migracje}
+
+\begin{learningobjectives}
+  \item Poznasz komponenty Room (Entity, DAO, Database).
+  \item Zaprojektujesz lokalna baze danych wraz z relacjami.
+  \item Przygotujesz strategie migracji i testowania zmian schematu.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Entity, DAO, Database - podstawowe elementy.
+  \item Zapytania, relacje, transakcje.
+  \item Migracje i seed danych.
+  \item Integracja z Flow i coroutines.
+  \item Testy instrumentacyjne i jednostkowe.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM2/Wyk/Wyklad9.pdf.
+  \item \texttt{PUM2/Listy/W9-Room\_basics.ipynb}.
+  \item developer.android.com/training/data-storage/room.
+\end{itemize}
+
+\subsection{Model danych}
+\begin{itemize}
+  \item Entity annotations, primary keys, indexes.
+  \item Relacje one-to-many i many-to-many.
+  \item Strategia normalizacji vs denormalizacji.
+\end{itemize}
+
+\subsection{DAO}
+\begin{itemize}
+  \item Query, Insert, Update, Delete.
+  \item Typy zwracane: Flow, suspend, PagingSource.
+  \item Transakcje, concurrency, walidacja danych.
+\end{itemize}
+
+\subsection{Migracje}
+\begin{itemize}
+  \item AutoMigrations oraz migracje manualne.
+  \item Seed danych, fallback to destructive.
+  \item Testowanie migracji i weryfikacja schematu.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Projekt tabel katalogu i powiazanych rekordow.
+  \item Zadanie: dodanie relacji ulubionych i historii.
+  \item Checklist: integracja z Repository i Flow.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: schema Room dla aplikacji katalogowej (TODO).
+  \item Przyklad B: migracja dodajaca kolumne i przenoszaca dane (TODO).
+  \item Zadania: test Room z inMemoryDatabaseBuilder (TODO).
+  \item Pytania: roznica auto vs manual migration, jak laczyc Room z Flow (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

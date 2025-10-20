@@ -1,0 +1,61 @@
+\chapter{Wyklad 5: StateFlow, SharedFlow i transformacje strumieni}
+
+\begin{learningobjectives}
+  \item Rozroznisz StateFlow i SharedFlow w zastosowaniach UI.
+  \item Zastosujesz transformacje strumieni w wielowatkowych scenariuszach.
+  \item Zaprojektujesz strategie udostepniania stanu w aplikacji. 
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item StateFlow vs LiveData - porownanie i migracja.
+  \item SharedFlow, replay, extraBufferCapacity.
+  \item stateIn, shareIn, flowOn.
+  \item combine, zip, flattenMerge.
+  \item Testowanie strumieni hot.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM2/Wyk/Wyklad6.pdf.
+  \item \texttt{PUM2/Listy/W6-stateIn\_shareIn\_basics.ipynb}, \texttt{PUM2/Listy/W6-flowOn\_basics.ipynb}.
+  \item kotlinlang.org/docs/shared-flow.html.
+\end{itemize}
+
+\subsection{StateFlow}
+\begin{itemize}
+  \item Zastosowania w ViewModel i Compose.
+  \item UI state, redukcja i initial value.
+  \item Konwersja LiveData -> StateFlow.
+\end{itemize}
+
+\subsection{SharedFlow}
+\begin{itemize}
+  \item Konfiguracja replay i buffer.
+  \item Event bus, side effects, lost events.
+  \item Porownanie z Channel i LiveData.
+\end{itemize}
+
+\subsection{Transformacje strumieni}
+\begin{itemize}
+  \item stateIn, shareIn, flowOn.
+  \item combine i zip, flattenMerge i concurrency.
+  \item Obsuga backpressure i synchronizacja.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Obsluga eventow UI i state.
+  \item Zadanie: implementacja globalnego event bus.
+  \item Testowanie z Turbine i runTest.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: stateIn w ViewModel do udostepniania stanu (TODO).
+  \item Przyklad B: SharedFlow jako event bus (TODO).
+  \item Zadania: porownanie LiveData i StateFlow w projekcie (TODO).
+  \item Pytania: kiedy preferowac SharedFlow, jak dobrac replay (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

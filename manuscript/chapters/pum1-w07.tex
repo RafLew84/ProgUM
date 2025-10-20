@@ -1,0 +1,62 @@
+\chapter{Wyklad 7: Inicjalizacja i delegowanie wlasnosci}
+
+\begin{learningobjectives}
+  \item Opanujesz mechanizmy inicjalizacji w Kotlinie (lazy, lateinit, init).
+  \item Wykorzystasz property delegation do kontrolowania stanu i walidacji.
+  \item Przygotujesz wzorce inicjalizacji dla komponentow Android i Compose.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Kolejnosc inicjalizacji i bezpieczenstwo w Kotlinie.
+  \item lateinit vs lazy, inicjalizacja na zadanie.
+  \item Delegowane wlasciwosci: observable, vetoable, notNull.
+  \item Delegacja do map i pamieci trwalej.
+  \item Inicjalizacja ViewModel i zaleznosci w Androidzie.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM1/Wyk/Wyklad7.pdf.
+  \item PUM1/Listy/Lista4.ipynb.
+  \item kotlinlang.org/docs/delegated-properties.html.
+\end{itemize}
+
+\subsection{Mechanizmy inicjalizacji}
+\begin{itemize}
+  \item Primary i secondary constructors, init blocks.
+  \item lateinit, lazy i scenariusze uzycia.
+  \item Bezpieczenstwo w wielowatkowosci i synchronizacja.
+\end{itemize}
+
+\subsection{Delegowane wlasciwosci}
+\begin{itemize}
+  \item observable, vetoable, notNull.
+  \item Delegacja do map (np. argumenty fragmentow).
+  \item Tworzenie wlasnych delegatow.
+\end{itemize}
+
+\subsection{Inicjalizacja w Android/Compose}
+\begin{itemize}
+  \item ViewModel i SavedStateHandle.
+  \item Delegacja stanu w Compose (remember, rememberSaveable).
+  \item Zarzadzanie cyklem zycia i cleanup.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Zadanie: konfiguracja ustawien aplikacji i lazy inicjalizacja zasobow.
+  \item Analiza bledow race condition przy lazy.
+  \item Checklist inicjalizacji komponentow.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: delegacja observable dla stanu UI (TODO).
+  \item Przyklad B: wlasny delegat do przechowywania w SharedPreferences (TODO).
+  \item Zadania: refaktoryzacja inicjalizacji w zadaniu laboratoryjnym (TODO).
+  \item Pytania: kiedy uzywac lateinit, jak zapewnic thread safety (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+

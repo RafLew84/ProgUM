@@ -1,0 +1,62 @@
+\chapter{Wyklad 5: Klasy, data/sealed classes i dziedziczenie}
+
+\begin{learningobjectives}
+  \item Utrwalisz zasady projektowania klas w Kotlinie.
+  \item Zastosujesz data class, sealed class oraz enum class w modelu domenowym.
+  \item Zaprojektujesz hierarchie odpornych na bledy struktur danych dla aplikacji mobilnej.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Konstrukcja klas, konstruktory, wlasciwosci i inicjalizacja.
+  \item Data class i sealed class jako fundament modelu domenowego.
+  \item Dziedziczenie, interfejsy, klasy abstrakcyjne.
+  \item Null safety, kopiowanie obiektow i immutability.
+  \item Modele danych w przeplywie API -> domena -> UI.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM1/Wyk/Wyklad5.pdf.
+  \item PUM1/Listy/Lista3.ipynb.
+  \item kotlinlang.org/docs/classes.html.
+\end{itemize}
+
+\subsection{Konstrukcja klas}
+\begin{itemize}
+  \item Primary i secondary constructors, init blocks.
+  \item Widocznosc pol i enkapsulacja.
+  \item Composition over inheritance w praktyce.
+\end{itemize}
+
+\subsection{Typy specjalne}
+\begin{itemize}
+  \item Data class: componentN, copy, equals/hashCode.
+  \item Sealed class vs enum class, modelowanie stanow i zdarzen.
+  \item Inline/value class (wzmianka) i optymalizacja.
+\end{itemize}
+
+\subsection{Model domenowy}
+\begin{itemize}
+  \item Mapowanie DTO -> domain -> ui state.
+  \item Null safety, sealed hierarchie dla error handling.
+  \item Testowanie modeli i rozszerzen.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Projekt stanow ekranow Compose.
+  \item Zadania z Listy: praca z data class i dziedziczeniem.
+  \item Lista kontrolna atrybutow i walidacji danych.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: struktura modelu domenowego aplikacji katalogowej (TODO).
+  \item Przyklad B: sealed interface do obslugi wynikow API (TODO).
+  \item Zadania: refaktoryzacja hierarchii klas w zadaniu laboratoryjnym (TODO).
+  \item Pytania: kiedy preferowac sealed class, jak dziala copy w data class (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+

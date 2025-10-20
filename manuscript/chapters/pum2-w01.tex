@@ -1,0 +1,61 @@
+\chapter{Wyklad 1: Wprowadzenie do wielowatkowosci i coroutines}
+
+\begin{learningobjectives}
+  \item Przypomnisz podstawy wielowatkowosci i zagrozen w Androidzie.
+  \item Poznasz fundamenty Kotlin Coroutines i korzysci structured concurrency.
+  \item Zaprojektujesz proste przypadki uzycia coroutines w aplikacji mobilnej.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Wielowatkowosc w Android: UI thread, ANR, worker threads.
+  \item Kotlin Coroutines: scope, context, job, dispatcher.
+  \item Uruchamianie i anulowanie coroutines.
+  \item Buildery launch, async, withContext.
+  \item Integracja z ViewModel i Compose.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM2/Wyk/Wyklad2.pdf.
+  \item \texttt{PUM2/Listy/W2-Podstawy\_Coroutine.ipynb}.
+  \item kotlinlang.org/docs/coroutines-overview.html.
+\end{itemize}
+
+\subsection{Dlaczego coroutines}
+\begin{itemize}
+  \item Problemy tradycyjnych watkow i callback hell.
+  \item Koncepcje suspending functions, continuations.
+  \item Porownanie z RxJava i handlerami.
+\end{itemize}
+
+\subsection{Podstawy API}
+\begin{itemize}
+  \item CoroutineScope, Job, Dispatcher.
+  \item launch, async, withContext.
+  \item Anulowanie i obsluga bledow.
+\end{itemize}
+
+\subsection{Integracja z aplikacja}
+\begin{itemize}
+  \item ViewModelScope, lifecycleScope.
+  \item rememberCoroutineScope i Compose.
+  \item Najlepsze praktyki dla UI thread.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Zadanie: pobieranie danych w tle i aktualizacja UI.
+  \item Analiza bledow ANR i timeouts.
+  \item Checklist: safe coroutine usage w projekcie.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: pobranie danych w coroutine z aktualizacja UI (TODO).
+  \item Przyklad B: implementacja timeout z withTimeout (TODO).
+  \item Zadania: refaktoryzacja zadan laboratoryjnych na coroutines (TODO).
+  \item Pytania: roznica launch i async, rola dispatcherow (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

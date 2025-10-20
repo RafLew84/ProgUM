@@ -1,0 +1,61 @@
+\chapter{Wyklad 7: Persistencja ustawien - SharedPreferences i DataStore}
+
+\begin{learningobjectives}
+  \item Porownasz SharedPreferences i DataStore w kontekscie przechowywania ustawien.
+  \item Zaprezentujesz strategie migracji ustawien i bezpiecznego przechowywania konfiguracji.
+  \item Zaprojektujesz warstwe ustawien dla aplikacji mobilnej. 
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item SharedPreferences API i ograniczenia.
+  \item DataStore Preferences i Proto.
+  \item Migracje danych pomiedzy mechanizmami.
+  \item Integracja z ViewModel/Compose.
+  \item Bezpieczenstwo i testowanie ustawien.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM2/Wyk/Wyklad8.pdf.
+  \item \texttt{PUM2/Listy/W8-PreferencesDataStore\_basics.ipynb}, \texttt{PUM2/Listy/W8-SharedPreferences\_basics.ipynb}.
+  \item developer.android.com/topic/libraries/architecture/datastore.
+\end{itemize}
+
+\subsection{SharedPreferences}
+\begin{itemize}
+  \item API, commit vs apply.
+  \item Scope i watek IO.
+  \item Ograniczenia i concurrency.
+\end{itemize}
+
+\subsection{DataStore}
+\begin{itemize}
+  \item Preferences DataStore - dane klucz wartosc.
+  \item Proto DataStore - schema i walidacja.
+  \item Migracje oraz fallback.
+\end{itemize}
+
+\subsection{Integracja z aplikacja}
+\begin{itemize}
+  \item Flow i DataStore.
+  \item UI binding w Compose.
+  \item Testowanie ustawien i mock DataStore.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Migracja SharedPreferences -> DataStore.
+  \item Zadanie: konfiguracja theme i language.
+  \item Checklist: backup, security, multi process.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: DataStore Preferences dla ustawien UI (TODO).
+  \item Przyklad B: Proto schema dla konfiguracji zaawansowanych (TODO).
+  \item Zadania: napisz migracje SharedPreferences -> DataStore (TODO).
+  \item Pytania: roznica commit/apply, kiedy wybrac Proto (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

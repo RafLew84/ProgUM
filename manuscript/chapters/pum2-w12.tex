@@ -1,0 +1,62 @@
+\chapter{Wyklad 12: Offline caching i Single Source of Truth}
+
+\begin{learningobjectives}
+  \item Zrozumiesz wzorzec Single Source of Truth i jego zalety.
+  \item Zaprojektujesz warstwe cache laczaca Room i Retrofit.
+  \item Przygotujesz strategie synchronizacji danych offline/online.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Definicja SSOT i oczekiwane korzysci.
+  \item Network Bound Resource pattern.
+  \item Synchronizacja i polityki odswiezania.
+  \item Mutex, concurrency, atomic updates.
+  \item Error handling i fallback.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM2/Wyk/Wyklad13.pdf.
+  \item PUM2/Listy/W13-OfflineCachingBasics.ipynb, PUM2/Listy/W13-ActorDesignPatternOfflineCachingBasics.ipynb.
+  \item developer.android.com/topic/performance/vitals/offline.
+\end{itemize}
+
+\subsection{Single Source of Truth}
+\begin{itemize}
+  \item Definicja i oczekiwane korzysci.
+  \item Powiazanie Room i zrodel sieciowych.
+  \item Schemat przeplywu danych w SSOT.
+\end{itemize}
+
+\subsection{Offline caching}
+\begin{itemize}
+  \item NetworkBoundResource wzorzec.
+  \item Polityki odswiezania: stale while revalidate, timed refresh.
+  \item Mutex, synchronizacja, atomic updates.
+\end{itemize}
+
+\subsection{Synchronizacja}
+\begin{itemize}
+  \item Strategie sync: push, pull, hybrid.
+  \item Rozwiazywanie konfliktow danych.
+  \item Monitoring, retry, metrics.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Cache dla katalogu produktow.
+  \item Zadanie: implementacja strumienia SSOT.
+  \item Checklist: fallback, logowanie, obserwowalnosc.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: NetworkBoundResource implementacja (TODO).
+  \item Przyklad B: offline refresh flow z Mutex (TODO).
+  \item Zadania: scenariusze sync do testow (TODO).
+  \item Pytania: definicja SSOT, jak rozwiazywac konflikty (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+

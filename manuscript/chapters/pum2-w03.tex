@@ -1,0 +1,61 @@
+\chapter{Wyklad 3: Architektura aplikacji - MVVM i warstwy logiki}
+
+\begin{learningobjectives}
+  \item Utrwalisz role warstw w architekturze MVVM.
+  \item Nauczysz sie rozdzielac logike domenowa od prezentacji.
+  \item Przygotujesz schemat architektury dla projektu kursowego.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Warstwy: presentation, domain, data.
+  \item ViewModel, UseCase, Repository.
+  \item Komunikacja z Compose i Flow.
+  \item Testowalnosc i dependency injection.
+  \item Struktura folderow i modulow.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM2/Wyk/Wyklad4.pdf.
+  \item \texttt{PUM2/Listy/W4-ViewModel\_basics.ipynb}, \texttt{PUM2/Listy/W4-Repository\_basics.ipynb}.
+  \item developer.android.com/topic/architecture.
+\end{itemize}
+
+\subsection{Warstwy architektury}
+\begin{itemize}
+  \item Presentation, domain, data - granice odpowiedzialnosci.
+  \item Przeplyw danych i dependency direction.
+  \item Organizacja modulow w projekcie.
+\end{itemize}
+
+\subsection{MVVM w praktyce}
+\begin{itemize}
+  \item ViewModel i UI state.
+  \item UseCase/Interactor jako command.
+  \item Repository pattern i data sources.
+\end{itemize}
+
+\subsection{Testowanie i DI}
+\begin{itemize}
+  \item Testy jednostkowe warstw.
+  \item Mockowanie repository, fake data sources.
+  \item Integracja z Hilt i modulami DI.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Mapa modulow aplikacji katalogowej.
+  \item Zadanie: zaprojektuj kontrakt interfejsu dla repository.
+  \item Checklist: zasady clean architecture.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: diagram warstw z przeplywem danych (TODO).
+  \item Przyklad B: implementacja prostego UseCase (TODO).
+  \item Zadania: ocena architektury sample app (TODO).
+  \item Pytania: rola domain layer, jak unikac naruszenia granic (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

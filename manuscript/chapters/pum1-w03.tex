@@ -1,0 +1,62 @@
+\chapter{Wyklad 3: Zarzadzanie pamiecia i garbage collection w JVM}
+
+\begin{learningobjectives}
+  \item Poznasz model pamieci JVM oraz typowe zrodla wyciekow w aplikacjach Kotlin.
+  \item Zrozumiesz mechanizmy garbage collection w ART i ich wplyw na wydajnosc.
+  \item Przygotujesz liste praktyk ograniczajacych zuzycie pamieci w aplikacjach mobilnych.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Model pamieci (heap vs stack) i cykl zycia obiektow.
+  \item Garbage collection w JVM i ART: algorytmy, generacje, pauzy.
+  \item Profilowanie pamieci w Android Studio oraz narzedzia do wykrywania wyciekow.
+  \item Najczestsze wycieki: konteksty, singletony, zasoby UI, coroutines.
+  \item Integracja z Compose i zarzadzanie stanem bez wyciekow.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM1/Wyk/Wyklad3.pdf.
+  \item PUM1/Listy/Lista3.ipynb.
+  \item developer.android.com/topic/performance/memory.
+\end{itemize}
+
+\subsection{Model pamieci i GC}
+\begin{itemize}
+  \item Heap, stack, referencje mocne i slabe.
+  \item Algorytmy GC: mark and sweep, generational, tuning.
+  \item Wplyw kolekcji i obiektow danych na zuzycie pamieci.
+\end{itemize}
+
+\subsection{Diagnostyka wyciekow}
+\begin{itemize}
+  \item Profiler w Android Studio i sygnaly ostrzegawcze.
+  \item LeakCanary i analiza heap dump.
+  \item Monitorowanie pamieci w Compose i w widokach bazujacych na View.
+\end{itemize}
+
+\subsection{Strategie optymalizacji}
+\begin{itemize}
+  \item Unikanie cyklicznych referencji oraz static context.
+  \item Zarzadzanie cyklem zycia coroutine i scope.
+  \item Lazy inicjalizacja, pooling zasobow, cache.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Analiza zadania z Listy: wykrycie i naprawa wycieku.
+  \item Plan testow regresyjnych pod katem pamieci.
+  \item Lista kontrolna przed publikacja aplikacji.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: diagnoza wycieku w komponencie Compose (TODO).
+  \item Przyklad B: porownanie zuzycia pamieci dla listy lazy i eager (TODO).
+  \item Zadania: przygotuj test profilowania pamieci dla projektu laboratoryjnego (TODO).
+  \item Pytania: roznica miedzy soft a weak reference, kiedy GC powoduje pauzy (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+

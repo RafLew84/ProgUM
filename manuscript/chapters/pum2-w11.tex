@@ -1,0 +1,61 @@
+\chapter{Wyklad 11: Czysta architektura i warstwa domeny}
+
+\begin{learningobjectives}
+  \item Zdefiniujesz role warstwy domeny w clean architecture.
+  \item Zaprojektujesz UseCase i kontrakty interfejsow.
+  \item Przygotujesz plan testow jednostkowych dla domeny.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Clean architecture rings: domain, data, presentation.
+  \item UseCase, entity, repository interface.
+  \item Mapowanie DTO -> domain -> UI state.
+  \item Error handling i Result wrappers.
+  \item Testowanie domeny.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM2/Wyk/Wyklad12.pdf.
+  \item \texttt{PUM2/Listy/W12-DomainLayer\_basics.ipynb}.
+  \item blog.unclebob.com/2012/08/13/the-clean-architecture/.
+\end{itemize}
+
+\subsection{Warstwa domeny}
+\begin{itemize}
+  \item Entities, value objects, domain services.
+  \item UseCase jako orkiestracja logiki.
+  \item Repository interfaces i granice.
+\end{itemize}
+
+\subsection{Mapowanie danych}
+\begin{itemize}
+  \item DTO -> domain -> ui state.
+  \item Result<T> i error mapping.
+  \item Walidacja danych i invariants.
+\end{itemize}
+
+\subsection{Testowanie}
+\begin{itemize}
+  \item Testy UseCase.
+  \item Fake/mocked repository.
+  \item Contract tests dla domeny.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Warstwa domeny katalogu produktow.
+  \item Zadanie: UseCase getProductDetails.
+  \item Checklist: boundaries i dependencies.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: UseCase z operatorem invoke (TODO).
+  \item Przyklad B: Result wrapper i mapowanie bledow (TODO).
+  \item Zadania: testy UseCase z fake repository (TODO).
+  \item Pytania: kiedy dzielic UseCase, jak modelowac bledy w domenie (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

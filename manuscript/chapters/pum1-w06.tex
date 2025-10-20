@@ -1,0 +1,62 @@
+\chapter{Wyklad 6: Obiekty, interfejsy i kompozycja}
+
+\begin{learningobjectives}
+  \item Zrozumiesz zastosowania obiektow singleton oraz companion object w Kotlinie.
+  \item Wykorzystasz interfejsy i delegacje do budowy modulowego kodu.
+  \item Porownasz podejscie kompozycji i dziedziczenia w projektowaniu komponentow.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Obiekty w Kotlinie: object declaration, object expression.
+  \item Companion object, fabryki i testowalnosc.
+  \item Interfejsy: metody domyslne, interfejsy funkcyjne.
+  \item Delegacja: by keyword, delegowane wlasciwosci.
+  \item Kompozycja jako alternatywa dla dziedziczenia.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM1/Wyk/Wyklad6.pdf.
+  \item PUM1/Listy/Lista4.ipynb.
+  \item kotlinlang.org/docs/object-declarations.html.
+\end{itemize}
+
+\subsection{Obiekty i companion}
+\begin{itemize}
+  \item Singletony i object expression.
+  \item Companion object jako fabryka i punkt konfiguracji.
+  \item Testowalnosc, zamiana na interfejs i DI.
+\end{itemize}
+
+\subsection{Interfejsy}
+\begin{itemize}
+  \item Domyslne implementacje i dziedziczenie wielokrotne przez interfejsy.
+  \item Interfejsy funkcyjne i adaptery SAM.
+  \item Rozdzielanie kontraktow na male interfejsy.
+\end{itemize}
+
+\subsection{Delegacja i kompozycja}
+\begin{itemize}
+  \item Delegowane wlasciwosci (lazy, observable, vetoable).
+  \item Delegacja implementacji interfejsow przez by.
+  \item Kompozycja jako sposob laczenia zachowan.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Projekt modulow uslug w aplikacji.
+  \item Analiza zadania: wstrzykiwanie implementacji przez interfejs.
+  \item Checklist: unikanie god object i naduzywania singletonow.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: konfiguracja loggera przy pomocy companion object (TODO).
+  \item Przyklad B: delegacja odpowiedzialnosci do komponentu cache (TODO).
+  \item Zadania: implementacja interfejsu repozytorium z delegacja (TODO).
+  \item Pytania: roznice object vs class, zastosowania property delegation (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+

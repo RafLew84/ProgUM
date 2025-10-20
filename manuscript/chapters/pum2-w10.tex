@@ -1,0 +1,61 @@
+\chapter{Wyklad 10: Wstrzykiwanie zaleznosci z Hilt}
+
+\begin{learningobjectives}
+  \item Poznasz fundamenty Dagger/Hilt w Androidzie.
+  \item Zbudujesz modul DI dla warstw MVVM i komponentow Compose.
+  \item Zaprojektujesz testowalna konfiguracje zaleznosci.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Podstawy DI: komponenty, moduly, scope.
+  \item Hilt setup: Application, modules, entry points.
+  \item Wstrzykiwanie ViewModel, Repository, UseCase.
+  \item Qualifier, provides, binds.
+  \item Testowanie z Hilt i zamiana zaleznosci.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM2/Wyk/Wyklad11.pdf.
+  \item \texttt{PUM2/Listy/W11-DI\_basics.ipynb}.
+  \item developer.android.com/training/dependency-injection/hilt-android.
+\end{itemize}
+
+\subsection{Wprowadzenie do Hilt}
+\begin{itemize}
+  \item Konfiguracja i moduly.
+  \item Component hierarchy i scope.
+  \item EntryPoint i provision w Compose.
+\end{itemize}
+
+\subsection{Definiowanie zaleznosci}
+\begin{itemize}
+  \item @Provides vs @Binds.
+  \item Qualifiers i named dependencies.
+  \item Injection w ViewModel i w Composables.
+\end{itemize}
+
+\subsection{Testowanie}
+\begin{itemize}
+  \item Hilt test application.
+  \item Zamiana bindingow w testach.
+  \item Instrumented tests z Hilt.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Moduly DI katalogu produktow.
+  \item Zadanie: modul Retrofit/Room/Hilt.
+  \item Checklist: scope leaks, initialization.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: modul DI dla repository (TODO).
+  \item Przyklad B: test z zamiana zaleznosci (TODO).
+  \item Zadania: konfiguracja Hilt w projekcie startowym (TODO).
+  \item Pytania: roznica Provides/Binds, jak dziala ViewModelComponent (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

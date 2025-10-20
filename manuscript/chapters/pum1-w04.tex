@@ -1,0 +1,62 @@
+\chapter{Wyklad 4: Kolekcje i operacje funkcyjne}
+
+\begin{learningobjectives}
+  \item Porownasz kolekcje niemutowalne i mutowalne w Kotlinie.
+  \item Zastosujesz operacje funkcyjne do przetwarzania danych w aplikacjach mobilnych.
+  \item Zaprojektujesz pipeline danych wykorzystujacy sekwencje oraz Flow.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Hierarchia kolekcji Kotlin i typy specjalistyczne.
+  \item Operatory map, filter, fold oraz sekwencje leniwe.
+  \item Kolekcje jako strumienie danych w MVVM i Compose.
+  \item Integracja z Flow oraz zrodlami danych offline i online.
+  \item Wydajnosc i minimalizacja kopii w strukturach danych.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM1/Wyk/Wyklad4.pdf.
+  \item PUM1/Listy/Lista2.ipynb.
+  \item kotlinlang.org/docs/collections-overview.html.
+\end{itemize}
+
+\subsection{Przeglad kolekcji}
+\begin{itemize}
+  \item List, Set, Map - warianty mutowalne i niemutowalne.
+  \item Specjalistyczne implementacje (LinkedHashMap, sorted set).
+  \item Kiedy wybrac sequence zamiast kolekcji eager.
+\end{itemize}
+
+\subsection{Operacje funkcyjne}
+\begin{itemize}
+  \item map, filter, flatMap, fold, reduce, groupBy.
+  \item Tworzenie lancuchow operacji i unikanie side effects.
+  \item Optymalizacja: intermediate vs terminal operations.
+\end{itemize}
+
+\subsection{Kolekcje w architekturze}
+\begin{itemize}
+  \item Przetwarzanie danych w ViewModel przed ekspozycja na UI.
+  \item Flow i kolekcje - konwersja pomiedzy typami.
+  \item Przekazywanie wynikow do interfejsu Compose.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Zadanie z Listy: agregacja wynikow API.
+  \item Porownanie podejsc imperative i declarative.
+  \item Testowanie funkcji operujacych na kolekcjach.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: pipeline przetwarzania danych produktow (TODO).
+  \item Przyklad B: wykorzystanie sequence do operacji na pliku CSV (TODO).
+  \item Zadania: napisz funkcje rozszerzajaca kolekcje z walidacja (TODO).
+  \item Pytania: kiedy preferowac lazy kolekcje, jak unikac side effects w lambdach (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+

@@ -1,0 +1,61 @@
+\chapter{Wyklad 14: Aplikacje hybrydowe, SharedPreferences i widzety}
+
+\begin{learningobjectives}
+  \item Zrozumiesz role aplikacji hybrydowych i WebView w ekosystemie Android.
+  \item Porownasz SharedPreferences i DataStore oraz zaplanujesz migracje ustawien.
+  \item Przygotujesz plan wdrozenia widzetu na pulpit z kontrola aktualizacji.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Aplikacje hybrydowe, WebView, bridge JavaScript.
+  \item SharedPreferences i DataStore - podobienstwa i roznice.
+  \item Widzet na pulpit: AppWidgetProvider, RemoteViews, aktualizacje.
+  \item Bezpieczenstwo danych lokalnych i polityki sklepu.
+  \item Zastosowania w projekcie kursowym (np. ulubione produkty).
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM1/Wyk/Wyklad14.pdf.
+  \item \texttt{PUM2/Listy/W8-SharedPreferences\_basics.ipynb}, \texttt{PUM2/Listy/W8-PreferencesDataStore\_basics.ipynb}.
+  \item developer.android.com/guide/topics/appwidgets.
+\end{itemize}
+
+\subsection{Aplikacje hybrydowe}
+\begin{itemize}
+  \item WebView konfiguracja i bezpieczenstwo.
+  \item JavaScriptInterface i komunikacja z Kotlinem.
+  \item Strategie offline dla aplikacji hybrydowych.
+\end{itemize}
+
+\subsection{SharedPreferences vs DataStore}
+\begin{itemize}
+  \item API SharedPreferences, commit vs apply.
+  \item DataStore Preferences i Proto, migracje.
+  \item Przechowywanie ustawien w Compose i ViewModel.
+\end{itemize}
+
+\subsection{Widgety na pulpit}
+\begin{itemize}
+  \item AppWidgetProvider, RemoteViews, konfiguracja layoutu.
+  \item Aktualizacje periodiczne i event driven.
+  \item Integracja z danymi i testowanie widgetow.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Widget ulubionych produktow.
+  \item Zadanie: personalizacja ustawien UI i synchronizacja.
+  \item Checklist: wydajnosc, bateria, zasady publikacji.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: implementacja widgetu listy ulubionych (TODO).
+  \item Przyklad B: migracja SharedPreferences do DataStore (TODO).
+  \item Zadania: dodanie trybu offline dla WebView (TODO).
+  \item Pytania: kiedy wybrac DataStore Proto, jak zabezpieczyc JavaScriptInterface (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

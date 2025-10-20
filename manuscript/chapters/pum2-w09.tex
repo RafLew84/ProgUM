@@ -1,0 +1,61 @@
+\chapter{Wyklad 9: Retrofit i integracja z API zewnetrznymi}
+
+\begin{learningobjectives}
+  \item Skonfigurujesz Retrofit do pracy z API i serializerami.
+  \item Zastosujesz interceptory OkHttp oraz strategie retry.
+  \item Zabezpieczysz klucze API i obsluzysz bledy sieciowe.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Retrofit setup i konwertery.
+  \item OkHttp interceptors, logging, timeouts.
+  \item Autoryzacja i zarzadzanie kluczami API.
+  \item Error handling, retry, exponential backoff.
+  \item Integracja z Repository i coroutines.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item PUM2/Wyk/Wyklad10.pdf.
+  \item \texttt{PUM2/Listy/W10-Retrofit\_basics.ipynb}, \texttt{PUM2/Listy/W10-Header\_basics.ipynb}.
+  \item square.github.io/retrofit.
+\end{itemize}
+
+\subsection{Konfiguracja Retrofit}
+\begin{itemize}
+  \item BaseUrl, converter, call adapter.
+  \item Moshi vs Kotlinx serialization.
+  \item Coroutine support i suspend functions.
+\end{itemize}
+
+\subsection{OkHttp i interceptory}
+\begin{itemize}
+  \item Logging, header i auth interceptors.
+  \item Timeouts, caching, retry policy.
+  \item Monitoring i metrics.
+\end{itemize}
+
+\subsection{Bezpieczenstwo i bledy}
+\begin{itemize}
+  \item Przechowywanie kluczy API i secrets management.
+  \item Error mapping, sealed wynik operacji.
+  \item Retry, exponential backoff, circuit breaker.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Integracja API produktow.
+  \item Zadanie: obsluga bledow i fallback offline.
+  \item Checklist: monitoring, logging, analytics.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: Retrofit service z interceptorem autoryzacji (TODO).
+  \item Przyklad B: wrapper na wyniki zapytan (TODO).
+  \item Zadania: implementacja retry z exponential backoff (TODO).
+  \item Pytania: rola call adapter, jak chronic klucze API (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
