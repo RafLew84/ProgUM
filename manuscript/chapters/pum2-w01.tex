@@ -11,7 +11,7 @@ Ten wątek jest odpowiedzialny za wszystko, co użytkownik widzi i z czym wchodz
 \item \textbf{Obsługa zdarzeń}: Reagowanie na kliknięcia, przewijanie, wpisywanie tekstu.
 \item \textbf{Animacje}: Płynne przesuwanie elementów po ekranie.
 \end{itemize}
-Wątek UI to w zasadzie nieskończona pętla zdarzeń, która musi działać z prędkością co najmniej 60 klatek na sekundę (nowsze modele posiadają odświeżanie na poziomie 144 Hz). Jeśli kiedykolwiek przestanie pracować – choćby na ułamek sekundy – użytkownik natychmiast to zauważy. Aplikacja \textit{zacina się, laguje}. Dla ekranów ekranów 60 Hz mamy do dyspozycji około 16 ms na wykonanie wszystkich operacji (włącznie z renderowaniem UI)(\ref{fig:figura-render}).
+Wątek UI to w zasadzie nieskończona pętla zdarzeń, która musi działać z prędkością co najmniej 60 klatek na sekundę (nowsze modele posiadają odświeżanie na poziomie 144 Hz). Jeśli kiedykolwiek przestanie pracować – choćby na ułamek sekundy – użytkownik natychmiast to zauważy. Aplikacja \textit{zacina się, laguje}. Dla ekranów 60 Hz mamy do dyspozycji około 16 ms na wykonanie wszystkich operacji (włącznie z renderowaniem UI)(\ref{fig:figura-render}).
 
 \begin{figure}[htbp]
     \includegraphics[width=0.7\textwidth]{fig/pum2-w01-fig1.png}
@@ -114,7 +114,7 @@ Wywołujemy \texttt{Thread.sleep(10000)}, czyli blokujemy wątek UI na 10 sekund
 \item Użytkownik, wykonując jakąkolwiek interakcję z ekranem, nie otrzyma żadnej odpowiedzi.
 \end{itemize}
 
-System operacyjny Android szybko zauważa, że nasza aplikacja nie odpowiada na zdarzenia. Po kilku sekundach wyświetla komunikat: \textit{Aplikacja nie odpowiada} (ANR - Application Non Responding)(\ref{fig:figura-anr}).
+System operacyjny Android szybko zauważa, że nasza aplikacja nie odpowiada na zdarzenia. Po kilku sekundach wyświetla komunikat: \textit{Aplikacja nie odpowiada} (ANR - Application Not Responding)(\ref{fig:figura-anr}).
 
 \begin{figure}[htbp]
     \includegraphics[width=0.7\textwidth]{fig/pum2-w01-fig2.png}
@@ -197,7 +197,7 @@ W tym modelu jeden kucharz (jeden wątek) żongluje wieloma przepisami (korutyna
 
 \subsection{Wątek roboczy}
 
-Musimy wyjaśnienić czym jest przepis w naszej analogi; jest to byt, który naywamy funkcją z możliwością zawieszenia wykonania (\texttt{suspend fun})
+Musimy wyjaśnić, czym jest przepis w naszej analogii; jest to byt, który nazywamy funkcją z możliwością zawieszenia wykonania (\texttt{suspend fun})
 
 Zobaczmy czym różni się korutyna od \texttt{suspend fun}. \texttt{suspend fun} ma się tak do korutyny, jak klasa ma się do instancji tej klasy; możemy mieć wiele instancji tej samej klasy:
 \begin{itemize}
@@ -205,7 +205,7 @@ Zobaczmy czym różni się korutyna od \texttt{suspend fun}. \texttt{suspend fun
 \item korutyna to instancja lub aktywne wykonanie tego planu. Powstaje, gdy bierzesz \texttt{suspend fun} (lub dowolny blok kodu \texttt{suspend}) i faktycznie go uruchamiasz. Korutyna ma stan (aktywna, zawieszona, anulowana). To jest ten \textit{pracownik}, który wykonuje kroki z planu.
 \end{itemize}
 
-Kiedy piszesz w kodzie \texttt{scope.launch \{... \}} (zaraz wyjaśnimy czym jest \texttt{scope}), ten blok kodu \texttt{launch} (nazywany konstruktorem korutyny) tworzy i uruchamia nową korutynę (nową \textit{instancję} pracy). Ta nowa, żywa korutyna zaczyna wykonywać kod wewnątrz bloku \texttt{\{...\}}. Może działać nastęująco:
+Kiedy piszesz w kodzie \texttt{scope.launch \{... \}} (zaraz wyjaśnimy czym jest \texttt{scope}), ten blok kodu \texttt{launch} (nazywany konstruktorem korutyny) tworzy i uruchamia nową korutynę (nową \textit{instancję} pracy). Ta nowa, żywa korutyna zaczyna wykonywać kod wewnątrz bloku \texttt{\{...\}}. Może działać następująco:
 \begin{enumerate}
 \item Korutyna (instancja) wywołuje \texttt{suspend fun} (plan).
 \item Ta \texttt{suspend fun} (np. \texttt{delay}) mówi do korutyny: \textit{muszę teraz poczekać 1 sekundę. Możesz mnie zawiesić.}
@@ -218,7 +218,7 @@ Słowo kluczowe \texttt{suspend} \textbf{nie oznacza}, że funkcja automatycznie
 
 Wracając do pytania: kto gotuje wodę gdy kucharz pójdzie np. kroić warzywa?
 
-W tej analogii kucharz będzie naszym \textbf{wątkiem UI} (\textbf{wątkiem głównym}), którego nie chcemy blokować długimi operacjami. Ale nie jest on jedynym pracownikiem kuchni, są również \textbf{pomocnicy kuchennego} (\textbf{wątki robocze/poboczne}). Nasza analogia wygląda teraz następująco:
+W tej analogii kucharz będzie naszym \textbf{wątkiem UI} (\textbf{wątkiem głównym}), którego nie chcemy blokować długimi operacjami. Ale nie jest on jedynym pracownikiem kuchni, są również \textbf{pomocnicy kuchenni} (\textbf{wątki robocze/poboczne}). Nasza analogia wygląda teraz następująco:
 
 \begin{enumerate}
 \item Szef Kuchni (Wątek UI) \textbf{bierze przepis} (korutynę). Czyta pierwszy punkt: \textit{Gotuj wodę przez 5 minut} (np. pobierz dane z sieci, co robi \texttt{suspend fun}).
@@ -278,7 +278,7 @@ Jeśli \texttt{CoroutineScope} to Kuchnia, to:
 \item \texttt{Job} (zwracany przez \texttt{launch}): To Bilet Konkretnego Zamówienia. Jest przypięty do tablicy korkowej Kierownika. Jeśli Kierownik zdejmie bilet z tablicy i podrze go (anulowanie), kucharz natychmiast przestaje nad nim pracować.
 \end{itemize}
 
-\section{Rozwiążanie problemu ANR}
+\section{Rozwiązanie problemu ANR}
 
 Wróćmy do przykładu z początku rozdziału. W poprzedniej wersji, gdy klikaliśmy przycisk, który wywoływał \texttt{Thread.sleep(10000)}, cała aplikacja zawieszała się. Suwak (Slider) przestawał działać, przyciski nie reagowały, a po chwili system wyświetlał błąd ANR. Zaimplementujmy kod rozwiązujący ten problem, rozpoczniemy od dodania \textit{przepisu}, czyli funkcji \texttt{suspend}
 
