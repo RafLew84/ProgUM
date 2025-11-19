@@ -1,61 +1,375 @@
-\chapter{Wyklad 1: Wprowadzenie do wielowatkowosci i coroutines}
+\chapter{Wprowadzenie do wielowatkowosci i coroutines (Wyklad 1)}
 
-\begin{learningobjectives}
-  \item Przypomnisz podstawy wielowatkowosci i zagrozen w Androidzie.
-  \item Poznasz fundamenty Kotlin Coroutines i korzysci structured concurrency.
-  \item Zaprojektujesz proste przypadki uzycia coroutines w aplikacji mobilnej.
-\end{learningobjectives}
+\section{Problem Zamrożonego UI i \textit{Piekło Callbacków}}
+Zanim zagłębimy się w to, czym są korutyny, musimy zrozumieć, z jakim fundamentalnym problemem musimy mierzyć się od samych początków Androida. Ten problem ma swoje źródło w jednej, kluczowej koncepcji: \textbf{Wątku Głównym}.
 
-\section{Mapa rozdzialu}
+Każda aplikacja na Androida, którą uruchamiasz, \textit{żyje i umiera} w jednym, głównym procesie. Wewnątrz tego procesu istnieje jeden, niezwykle ważny wątek, znany jako \textbf{Wątek Główny} (Main Thread) lub \textbf{Wątek UI} (UI Thread).
+
+Ten wątek jest odpowiedzialny za wszystko, co użytkownik widzi i z czym wchodzi w interakcję:
 \begin{itemize}
-  \item Wielowatkowosc w Android: UI thread, ANR, worker threads.
-  \item Kotlin Coroutines: scope, context, job, dispatcher.
-  \item Uruchamianie i anulowanie coroutines.
-  \item Buildery launch, async, withContext.
-  \item Integracja z ViewModel i Compose.
+\item \textbf{Rysowanie interfejsu}: Aktualizowanie widoków, wywoływanie funkcji \texttt{@Composable}.
+\item \textbf{Obsługa zdarzeń}: Reagowanie na kliknięcia, przewijanie, wpisywanie tekstu.
+\item \textbf{Animacje}: Płynne przesuwanie elementów po ekranie.
+\end{itemize}
+Wątek UI to w zasadzie nieskończona pętla zdarzeń, która musi działać z prędkością co najmniej 60 klatek na sekundę (nowsze modele posiadają odświeżanie na poziomie 144 Hz). Jeśli kiedykolwiek przestanie pracować – choćby na ułamek sekundy – użytkownik natychmiast to zauważy. Aplikacja \textit{zacina się, laguje}. Dla ekranów ekranów 60 Hz mamy do dyspozycji około 16 ms na wykonanie wszystkich operacji (włącznie z renderowaniem UI)(\ref{fig:figura-render}).
+
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w01-fig1.png}
+    \caption{Czas renderowania okna głównego.}
+    \label{fig:figura-render}
+\end{figure}
+
+Co się stanie, gdy wciśniemy w ten pędzący mechanizm kij? Przeanalizujmy przykład:
+
+\begin{minted}{kotlin}
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            AnrappTheme {
+                BlockingUiDemoScreen()
+            }
+        }
+    }
+}
+
+@Composable
+fun BlockingUiDemoScreen() {
+    var statusText by remember { mutableStateOf("Naciśnij przycisk, aby rozpocząć operację.") }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp).background(Color.Cyan),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Demonstracja Blokowania Wątku UI",
+            style = MaterialTheme.typography.headlineMedium,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(50.dp))
+
+        Text(
+            text = statusText,
+            fontSize = 18.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.height(80.dp)
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Button(
+            onClick = {
+                statusText = "Operacja rozpoczęta..."
+
+                try {
+                    Thread.sleep(10000)
+                } catch (e: InterruptedException) {
+                }
+
+                statusText = "Operacja zakończona!"
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Uruchom 10-sekundową operację blokującą")
+        }
+        Spacer(modifier = Modifier.height(40.dp))
+
+        var sliderPosition by remember { mutableStateOf(0f) }
+        Text("Spróbuj poruszyć tym suwakiem, gdy operacja trwa:")
+        Slider(
+            value = sliderPosition,
+            onValueChange = { sliderPosition = it }
+        )
+    }
+}
+\end{minted}
+
+Zwróćmy uwagę, że mamy w ui przycisk i suwak. Wewnątrz funkcji \texttt{onClick} przycisku mamy kod:
+
+\begin{minted}{kotlin}
+Button(
+    onClick = {
+        statusText = "Operacja rozpoczęta..."
+
+        try {
+            Thread.sleep(10000)
+        } catch (e: InterruptedException) {
+        }
+
+        statusText = "Operacja zakończona!"
+    },
+    modifier = Modifier.fillMaxWidth()
+) {
+    Text("Uruchom 10-sekundową operację blokującą")
+}
+\end{minted}
+
+Wywołujemy \texttt{Thread.sleep(10000)}, czyli blokujemy wątek UI na 10 sekund. W tym czasie:
+\begin{itemize}
+\item Przycisk nie pokaże animacji kliknięcia.
+\item Inne animacje na ekranie będą zamrożone.
+\item Użytkownik, wykonując jakąkolwiek interakcję z ekranem, nie otrzyma żadnej odpowiedzi.
 \end{itemize}
 
-\section{Material zrodlowy}
+System operacyjny Android szybko zauważa, że nasza aplikacja nie odpowiada na zdarzenia. Po kilku sekundach wyświetla komunikat: \textit{Aplikacja nie odpowiada} (ANR - Application Non Responding)(\ref{fig:figura-anr}).
+
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w01-fig2.png}
+    \caption{Błąd ANR.}
+    \label{fig:figura-anr}
+\end{figure}
+
+Wszystkie długotrwałe operacje: pobieranie danych z sieci, odczyt z bazy danych, skomplikowane obliczenia – muszą odbywać się \textbf{w tle}.
+
+Przez lata, zanim pojawiły się korutyny, \textit{praca w tle} oznaczała ręczne zarządzanie wątkami. Jeśli programista chciał pobrać dane z sieci po kliknięciu przycisku, jego plan działania musiał wyglądać tak:
+\begin{enumerate}
+\item W \texttt{onClick} (Wątek UI): Utwórz nowy, ręczny obiekt \texttt{Thread}.
+\item W metodzie \texttt{run()} nowego wątku (Wątek Tła): Wykonaj czasochłonną operację sieciową.
+\item Po zakończeniu operacji: Zdobądź wynik (np. dane użytkownika).
+\item Problem: Nie możesz zaktualizować UI (np. \texttt{TextView}) z tego Wątku Tła. Spowoduje to awarię aplikacji.
+\item Rozwiązanie: Utwórz obiekt Handler powiązany z Wątkiem UI.
+\item Użyj \texttt{handler.post \{... \}}, aby \textit{wysłać} wynik z powrotem do Wątku UI, który jako jedyny może bezpiecznie zaktualizować interfejs.
+\end{enumerate}
+
+Ten proces był skomplikowany, ale jeszcze gorsze stawało się, gdy operacje były od siebie zależne. Wyobraźmy sobie pobranie danych użytkownika, następnie na ich podstawie pobranie jego zdjęcia, a na końcu zapisanie go w bazie:
+
+\begin{minted}{java}
+button.setOnClickListener(v -> {
+    // 1. Przechodzimy do tła, by pobrać użytkownika
+    new Thread(() -> {
+        User user = api.fetchUser("123");
+        
+        // 2. Musimy znowu przejść do tła, by pobrać zdjęcie
+        new Thread(() -> {
+            ProfilePicture pic = api.fetchPicture(user.getPictureUrl());
+            
+            // 3. I jeszcze raz do tła, by zapisać w bazie
+            new Thread(() -> {
+                database.save(pic);
+                
+                // 4. Wracamy do Wątku UI, by pokazać sukces
+                mainThreadHandler.post(() -> {
+                    imageView.setImage(pic);
+                    textView.setText("Gotowe!");
+                });
+            }).start();
+        }).start();
+    }).start();
+});
+\end{minted}
+
+To, co widzimy powyżej, to \textit{Piekło Callbacków} (\textit{Callback Hell}). Kod staje się piramidą zagnieżdżonych wywołań. Jest praktycznie nieczytelny, niemożliwy do testowania, a obsługa błędów w każdym z tych kroków staje się koszmarem.
+
+To jest właśnie problem, który doprowadził do rewolucji. Potrzebowaliśmy sposobu na pisanie kodu asynchronicznego, który wyglądałby jak prosty kod synchroniczny; bez callbacków i bez ręcznego zarządzania wątkami.
+
+\section{Korutyny}
+
+\subsection{Wstęp}
+
+Po zidentyfikowaniu fundamentalnego problemu blokowania \textbf{Wątku Głównego}, naturalne pytanie brzmi: \textit{Jaka jest alternatywa?}. Przez lata próbowaliśmy wielu rozwiązań, ale dopiero Kotlin wprowadził model, który zrewolucjonizował programowanie na Androida. Mowa o korutynach.
+
+Aby zrozumieć ich siłę, musimy precyzyjnie zdefiniować, czym są i czym nie są.
+
+Najczęściej spotkasz się z definicją korutyny jako \textit{lekkiego wątku} (\textit{lightweight thread}). Jest to użyteczne uproszczenie, pomaga zrozumieć, że korutyny, podobnie jak wątki, wykonują jakąś pracę w tle. Jednak to porównanie jest też mylące, ponieważ pomija ich najważniejszą cechę. \textbf{UWAGA!!!} - Korutyna nie jest wątkiem.
+
+Lepszą, bardziej precyzyjną definicją jest: \textit{zawieszalne (suspendable) obliczenie}.
+
+Pomyśl o korutynie nie jak o pracowniku, ale jak o zadaniu lub jednostce pracy, którą można w dowolnym momencie wstrzymać (zawiesić) i wznowić w przyszłości, nie blokując przy tym pracownika (wątku), który ją wykonuje.
+
+Kluczowa Różnica: Korutyna kontra Wątek
 \begin{itemize}
-  \item PUM2/Wyk/Wyklad2.pdf.
-  \item \texttt{PUM2/Listy/W2-Podstawy\_Coroutine.ipynb}.
-  \item kotlinlang.org/docs/coroutines-overview.html.
+\item \textbf{Wątek (Thread)} jest zarządzany przez System Operacyjny (OS). Jest \textit{ciężki}, jego utworzenie i utrzymanie zużywa znaczące zasoby systemowe. Przełączanie się między wątkami jest operacją kosztowną dla procesora, ponieważ system musi zapisać stan jednego wątku i wczytać stan drugiego.
+\item \textbf{Korutyna (Coroutine)} jest zarządzana przez środowisko uruchomieniowe Kotlina. Jest \textit{lekka}, to w zasadzie tylko obiekt w pamięci, który śledzi stan wykonywanego zadania. Tysiące, a nawet miliony korutyn mogą być uruchomione i zarządzane przez jeden wątek. Przełączanie się między korutynami jest niemal darmowe.
 \end{itemize}
 
-\subsection{Dlaczego coroutines}
+Korutyna \textbf{nie jest wątkiem}. Korutyna \textbf{wykonuje się na wątku}.
+
+Wyobraźmy sobie kuchnię (naszą aplikację) i kucharza (Wątek).
+
+\textbf{Scenariusz 1: Kucharz} jako Tradycyjny Wątek (Model Blokujący) Kucharz (Wątek UI) bierze przepis (zadanie). Pierwszy punkt przepisu brzmi: \textit{Gotuj wodę przez 5 minut}. Kucharz włącza kuchenkę, a następnie stoi bezczynnie przez 5 minut, wpatrując się w garnek. W tym czasie w kuchni panuje chaos. Dzwoni telefon (interakcja użytkownika), przychodzą nowi goście (animacje) - ale kucharz jest zablokowany. Nie może zrobić nic innego, dopóki woda się nie zagotuje. To jest właśnie to, co robi \texttt{Thread.sleep()}.
+
+\textbf{Scenariusz 2: Kucharz z Korutynami} (Model Nieblokujący) Ten sam kucharz (ten sam Wątek UI) bierze ten sam przepis (teraz jako korutynę). Czyta: \textit{Gotuj wodę przez 5 minut}. Kucharz nastawia wodę do gotowania (inicjuje operację wejścia/wyjścia), a następnie zawiesza (suspend) ten przepis i odkłada go na bok. Ponieważ jego ręce są wolne, natychmiast przechodzi do innego zadania - na przykład zaczyna kroić warzywa (obsługuje kliknięcie) lub przyprawiać sałatkę (rysuje animację). Kiedy po 5 minutach słyszy gwizdek czajnika (operacja w tle się zakończyła), kucharz wznawia (resume) pierwszy przepis i kontynuuje od miejsca, w którym skończył.
+
+W tym modelu jeden kucharz (jeden wątek) żongluje wieloma przepisami (korutynami) jednocześnie, nigdy nie marnując czasu na bezczynne czekanie. Dodajmy tutaj że to, co nazywamy \textit{zawieszeniem (suspend)}, to nie jest \textit{pauza} dla całej pracy. To jest \textit{pauza} dla tej \textbf{konkretnej korutyny na tym konkretnym wątku}. To, kto rzeczywiście wykonuje pracę przy gotowaniu wody, rozwiążemy za chwilę.
+
+\subsection{Wątek roboczy}
+
+Musimy wyjaśnienić czym jest przepis w naszej analogi; jest to byt, który naywamy funkcją z możliwością zawieszenia wykonania (\texttt{suspend fun})
+
+Zobaczmy czym różni się korutyna od \texttt{suspend fun}. \texttt{suspend fun} ma się tak do korutyny, jak klasa ma się do instancji tej klasy; możemy mieć wiele instancji tej samej klasy:
 \begin{itemize}
-  \item Problemy tradycyjnych watkow i callback hell.
-  \item Koncepcje suspending functions, continuations.
-  \item Porownanie z RxJava i handlerami.
+\item \texttt{suspend fun} to definicja lub plan (blueprint). To tylko definicja kroków, które mają zostać wykonane. Sama w sobie nie robi nic. Nie jest \textit{aktywna}. Nie ma stanu \textit{działam} lub \textit{jestem zawieszona}
+\item korutyna to instancja lub aktywne wykonanie tego planu. Powstaje, gdy bierzesz \texttt{suspend fun} (lub dowolny blok kodu \texttt{suspend}) i faktycznie go uruchamiasz. Korutyna ma stan (aktywna, zawieszona, anulowana). To jest ten \textit{pracownik}, który wykonuje kroki z planu.
 \end{itemize}
 
-\subsection{Podstawy API}
+Kiedy piszesz w kodzie \texttt{scope.launch \{... \}} (zaraz wyjaśnimy czym jest \texttt{scope}), ten blok kodu \texttt{launch} (nazywany konstruktorem korutyny) tworzy i uruchamia nową korutynę (nową \textit{instancję} pracy). Ta nowa, żywa korutyna zaczyna wykonywać kod wewnątrz bloku \texttt{\{...\}}. Może działać nastęująco:
+\begin{enumerate}
+\item Korutyna (instancja) wywołuje \texttt{suspend fun} (plan).
+\item Ta \texttt{suspend fun} (np. \texttt{delay}) mówi do korutyny: \textit{muszę teraz poczekać 1 sekundę. Możesz mnie zawiesić.}
+\item Korutyna (instancja) przechodzi w stan \textit{zawieszona}. \textbf{Zwalnia} \textit{kucharza} (wątek), który może iść robić coś innego (np. obsługiwać UI).
+\item Po 1 sekundzie \texttt{delay} się kończy.
+\item Korutyna (instancja) jest wznawiana na \textbf{dowolnym wolnym wątku} i kontynuuje pracę od następnej linii.
+\end{enumerate}
+
+Słowo kluczowe \texttt{suspend} \textbf{nie oznacza}, że funkcja automatycznie wykonuje się na wątku w tle! Oznacza jedynie, że funkcja \textbf{może zostać zawieszona}. Jeśli wewnątrz funkcji \texttt{suspend} wykonasz kosztowną operację (np. ciężkie obliczenia matematyczne) bez \textbf{jawnego przełączenia dyspozytora} (o dyspozytorach nieco później), nadal \textbf{zablokujesz wątek wywołujący} (w tym przypadku Wątek UI).
+
+Wracając do pytania: kto gotuje wodę gdy kucharz pójdzie np. kroić warzywa?
+
+W tej analogii kucharz będzie naszym \textbf{wątkiem UI} (\textbf{wątkiem głównym}), którego nie chcemy blokować długimi operacjami. Ale nie jest on jedynym pracownikiem kuchni, są również \textbf{pomocnicy kuchennego} (\textbf{wątki robocze/poboczne}). Nasza analogia wygląda teraz następująco:
+
+\begin{enumerate}
+\item Szef Kuchni (Wątek UI) \textbf{bierze przepis} (korutynę). Czyta pierwszy punkt: \textit{Gotuj wodę przez 5 minut} (np. pobierz dane z sieci, co robi \texttt{suspend fun}).
+\item Szef Kuchni \textbf{nie gotuje wody osobiście}. To strata jego cennego czasu (musi obsługiwać UI).
+\item Zamiast tego, woła \textbf{Pomocnika Kuchennego}. Daje mu garnek z wodą i mówi: \textit{Nastaw to na gazie (wykonaj operację sieciową). Jak się zagotuje, daj mi znać}.
+\item Ten Pomocnik idzie i faktycznie \textbf{wykonuje pracę}. Patrzy na garnek (czeka na odpowiedź sieci).
+\item Szef Kuchni (Wątek UI), natychmiast po wydaniu polecenia, zawiesza (\texttt{suspend}) ten przepis - odkłada go na bok z notatką \textit{czekam na wodę od pomocnika}.
+\item Ponieważ jego ręce są wolne, Szef Kuchni (Wątek UI) natychmiast przechodzi do krojenia warzyw (obsługuje kliknięcie) i przyprawiania sałatki (rysuje animację).
+\item Po 5 minutach Pomocnik (wątek IO) kończy pracę. Przybiega do Szefa Kuchni i mówi: \textit{Woda dla przepisu nr 5 jest gotowa!} (sygnał zwrotny trafia z powrotem do Wątku Głównego).
+\item Szef Kuchni (Wątek UI), gdy tylko skończy kroić sałatkę, bierze zawieszony przepis nr 5 i wznawia (\texttt{resume}) go od następnego kroku.
+\end{enumerate}
+
+\subsection{CoroutineScope}
+
+Kucharz nie może pracować w próżni, potrzebuje kuchni; przestrzeni przystosowanej do obsługiwania zadań kucharza, oraz posiadającej przygotowanych pomocników. \textit{Kuchnia} to środowisko, w którym przepisy są realizowane, podobnie, nie możesz po prostu uruchomić korutyny \textit{w powietrzu}; musisz ją uruchomić wewnątrz jakiegoś \texttt{CoroutineScope}. Nową korutynę tworzymy i włączamy za pomocą metody \texttt{launch} i możemy to zrobić tylko na \texttt{CoroutineScope}; przykładowo \texttt{scope.launch\{\}}. Wtedy mówimy: \textit{Chcę, aby ten przepis (korutyna) został wykonany w tej kuchni (scope)}.
+
+Każda Kuchnia (\texttt{CoroutineScope}) ma swój regulamin i swoje zasoby. Ten \textit{regulamin} to obiekt o typie \texttt{CoroutineContext} (Kontekst Korutyny). Posiada on zestaw atrybutów dla tej konkretnej kuchni. Dwa najważniejsze elementy w tym kontekście to:
 \begin{itemize}
-  \item CoroutineScope, Job, Dispatcher.
-  \item launch, async, withContext.
-  \item Anulowanie i obsluga bledow.
+\item \texttt{Job} (Szef Zmiany): To jest komponent odpowiedzialny za cykl życia.
+\item \texttt{Dispatcher} (Szef Kucharzy): To jest komponent odpowiedzialny za przydzielanie pracy.
 \end{itemize}
 
-\subsection{Integracja z aplikacja}
+\texttt{Dispatcher} (Szef Kucharzy), który jest częścią \texttt{CoroutineContext} danej Kuchni, posiada \textbf{własnych pomocników} (własną pulę wątków) wątki. \texttt{Dispatcher} to w zasadzie strateg planowania. Mówi on, na którym wątku (lub puli wątków) dany \textit{przepis} (korutyna) ma być w danym momencie wykonywany. Mamy kilku głównych \textit{Szefów Kucharzy} (Dispatcherów), których możemy wybrać:
 \begin{itemize}
-  \item ViewModelScope, lifecycleScope.
-  \item rememberCoroutineScope i Compose.
-  \item Najlepsze praktyki dla UI thread.
+\item \texttt{Dispatchers.Main}: Ten \textit{Szef} ma pod sobą tylko jednego, specjalistycznego kucharza - Wątek UI. Każde zadanie, które mu dasz, zostanie wykonane tylko przez ten jeden wątek. Idealny do aktualizowania interfejsu.
+\item \texttt{Dispatchers.IO}: Ten \textit{Szef} zarządza dużą, współdzieloną pulą wątków (pulą kucharzy) zoptymalizowaną do zadań wejścia-wyjścia (operacje sieciowe, dyskowe). Kiedy dajesz mu 100 przepisów (korutyn), on efektywnie rozdziela je między dostępnych kucharzy w swojej puli.
+\item \texttt{Dispatchers.Default}: Ten \textit{Szef} również zarządza pulą wątków, ale jest ona zoptymalizowana pod zadania obciążające procesor (np. sortowanie ogromnej listy).
 \end{itemize}
 
-\subsection{Case study}
+Kiedy korutyna (przepis) uruchomiona na \texttt{Dispatchers.IO} musi poczekać na odpowiedź z sieci (zawiesza się, \texttt{suspend}), \textbf{zwraca} \textit{pomocnika} (wątek) \textbf{z powrotem do puli}, aby ten mógł zająć się innym zadaniem. Kiedy odpowiedź z sieci wraca, korutyna jest wznawiana i dostaje \textbf{dowolnego} wolnego pomocnika (wątek) z puli \texttt{Dispatchers.IO}, aby kontynuować pracę. Korutyna nie ma puli wątków. Korutyna używa puli wątków udostępnianej przez jej \texttt{Dispatcher}.
+
+Drugim kluczowym elementem \texttt{CoroutineScope} jest \texttt{Job} (w naszej analogii będzie to odpowiednik Szefa Zmiany). Śledzi wszystkie korutyny aktualnie gotowane w danym zakresie (kuchni). Działa jak \textit{rodzic} dla wszystkich korutyn uruchomionych w tym \texttt{scope}. Kiedy uruchamiasz korutynę za pomocą \texttt{launch}, funkcja ta zwraca właśnie obiekt \texttt{Job}.
+
+\begin{minted}{kotlin}
+val job = scope.launch {... }
+\end{minted}
+
+\texttt{Job} to jedyny sposób, aby dowiedzieć się, co dzieje się z korutyną. Działa jak interaktywny bilet zamówienia w restauracji. Przechowuje on aktualny stan \textit{wykonania przepisu}:
 \begin{itemize}
-  \item Zadanie: pobieranie danych w tle i aktualizacja UI.
-  \item Analiza bledow ANR i timeouts.
-  \item Checklist: safe coroutine usage w projekcie.
+\item New: Zamówienie przyjęte, ale jeszcze nie zaczęte.
+\item Active: Kucharz właśnie nad tym pracuje (lub czeka na wodę).
+\item Completed: Danie gotowe.
+\item Cancelled: Klient wyszedł, wyrzucamy składniki do kosza.
+\item Dzięki Job możesz programowo zapytać: \texttt{job.isActive} (czy jeszcze pracujemy?) lub \texttt{job.isCancelled}.
 \end{itemize}
 
-\section{Elementy do rozbudowy}
+Jest to funkcja, która odróżnia korutyny od zwykłych wątków. W świecie korutyn każdy \texttt{Job} może mieć rodzica i dzieci. Kiedy tworzysz \texttt{CoroutineScope}, ma on w sobie \textit{Główny Job} (Szefa Zmiany). Kiedy w tym \texttt{Scope} uruchamiasz \texttt{launch}, powstaje nowy \texttt{Job}, który automatycznie staje się dzieckiem \textit{Głównego Joba}. Tworzy to \textbf{nierozerwalne drzewo zależności}. Działają tu dwie żelazne zasady \textbf{Ustrukturyzowanej Współbieżności}:
 \begin{itemize}
-  \item Przyklad A: pobranie danych w coroutine z aktualizacja UI (TODO).
-  \item Przyklad B: implementacja timeout z withTimeout (TODO).
-  \item Zadania: refaktoryzacja zadan laboratoryjnych na coroutines (TODO).
-  \item Pytania: roznica launch i async, rola dispatcherow (TODO).
+\item \textbf{Zasada Anulowania (W dół)}: Jeśli anulujesz Rodzica (np. zamkniesz ekran i anulujesz \texttt{viewModelScope}), wszystkie \textit{dzieci} są automatycznie anulowane (Canceled). Szef Zmiany mówi: \textit{Zamykamy kuchnię!}, więc wszyscy kucharze natychmiast przestają gotować swoje dania. Nikt nie zostaje w pracy po godzinach.
+\item \textbf{Zasada Oczekiwania (W górę)}: Rodzic nie może zakończyć pracy (Completed), dopóki wszystkie jego dzieci nie skończą. Szef Zmiany nie może wyjść do domu, dopóki ostatni pomocnik nie skończy zmywać naczyń.
 \end{itemize}
 
-% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+Podsumowanie w naszej analogii:
+Jeśli \texttt{CoroutineScope} to Kuchnia, to:
+\begin{itemize}
+\item \texttt{Job} (w Scope): To Kierownik Zmiany. Pilnuje, żeby nikt nie pracował, gdy restauracja jest zamknięta.
+\item \texttt{Job} (zwracany przez \texttt{launch}): To Bilet Konkretnego Zamówienia. Jest przypięty do tablicy korkowej Kierownika. Jeśli Kierownik zdejmie bilet z tablicy i podrze go (anulowanie), kucharz natychmiast przestaje nad nim pracować.
+\end{itemize}
+
+\section{Rozwiążanie problemu ANR}
+
+Wróćmy do przykładu z początku rozdziału. W poprzedniej wersji, gdy klikaliśmy przycisk, który wywoływał \texttt{Thread.sleep(10000)}, cała aplikacja zawieszała się. Suwak (Slider) przestawał działać, przyciski nie reagowały, a po chwili system wyświetlał błąd ANR. Zaimplementujmy kod rozwiązujący ten problem, rozpoczniemy od dodania \textit{przepisu}, czyli funkcji \texttt{suspend}
+
+\begin{minted}{kotlin}
+// Zmiana 1: Słowo kluczowe 'suspend'
+suspend fun fetchDataFromServer(): String {
+    println("Korutyna:...")
+    // Zmiana 2: 'delay' zamiast 'Thread.sleep'
+    delay(10000) // delay jest również funkcja suspend
+    println("Korutyna:...")
+    return "Dane pobrane pomyślnie!"
+}
+\end{minted}
+
+To, co nazywamy \textit{zawieszeniem} (suspend), to nie jest \textit{pauza} dla całej pracy. To jest \textit{pauza} dla \textbf{tej konkretnej korutyny na tym konkretnym wątku}.
+\begin{itemize}
+\item \texttt{Thread.sleep} mówi do Wątku UI: \textit{Stój i nic nie rób przez 10 sekund}.
+\item \texttt{delay} mówi do Wątku UI: \textit{Odkładam to zadanie na półkę na 10 sekund. Ty idź zajmij się czymś innym (np. rysowaniem suwaka). Wrócimy do tego później}.
+\end{itemize}
+
+Wewnątrz \texttt{Composable} (\texttt{CoroutineSolutionScreen}) pojawia się nowa linijka:
+
+\begin{minted}{kotlin}
+    val scope = rememberCoroutineScope()
+\end{minted}
+
+Jest to niezbędne, ponieważ funkcja \texttt{onClick} przycisku jest zwykłą funkcją (nie jest \texttt{suspend}). Nie możemy z niej bezpośrednio wywołać \texttt{fetchDataFromServer} ani \texttt{delay}. Potrzebujemy \textit{bramy} lub \textit{pomostu}, który pozwoli nam wejść w świat asynchroniczny. Tym pomostem jest CoroutineScope powiązany z cyklem życia tego ekranu.
+
+Warto zauważyć, że \texttt{CoroutineScope} uzyskany przez \texttt{rememberCoroutineScope()} w Jetpack Compose domyślnie wykorzystuje \texttt{Dispatchers.Main} (a konkretnie \texttt{Main.immediate}). Oznacza to, że kod wewnątrz \texttt{launch} wykonuje się \textbf{na wątku głównym}.
+
+Zakres \texttt{rememberCoroutineScope()} jest ściśle powiązany z punktem w kompozycji, w którym został wywołany. Jeśli użytkownik opuści ten ekran (komponent zostanie usunięty z drzewa UI), \texttt{scope} zostanie automatycznie anulowany. Dzięki temu wszelkie trwające w nim operacje (np. nasze 10-sekundowe pobieranie danych) zostaną natychmiast przerwane, zapobiegając wyciekom pamięci i marnowaniu zasobów.
+
+Wewnątrz \texttt{onClick} widzimy:
+
+\begin{minted}{kotlin}
+Button(onClick = {
+statusText = "Operacja rozpoczęta..." // 1. Natychmiastowa aktualizacja UI
+
+scope.launch { // 2. Start korutyny (Fire-and-forget)
+        val result = fetchDataFromServer() // 3. Punkt zawieszenia (suspend)
+        statusText = result // 4. Wznowienie i aktualizacja UI
+    }
+})
+\end{minted}
+
+Co tu się dzieje krok po kroku?
+\begin{itemize}
+\item Użytkownik klika.
+\item Tekst zmienia się na \"Operacja rozpoczęta...\".
+\item \texttt{scope.launch} tworzy nową korutynę.
+\item Korutyna wchodzi do \texttt{fetchDataFromServer}, dochodzi do \texttt{delay(10000)} i zawiesza się.
+\item Wątek UI jest wolny! Przez te 10 sekund Wątek Główny obsługuje przesuwanie suwaka (Slider), animacje i inne kliknięcia.
+\item Po 10 sekundach korutyna \textit{budzi się}, przypisuje wynik do \texttt{result} i aktualizuje \texttt{statusText}.
+\end{itemize}
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{p{3cm} p{5cm} p{5cm}}
+        \hline
+        \textbf{Cecha} & \textbf{Stara Wersja (Thread.sleep)} & \textbf{Nowa Wersja (delay + Korutyny)} \\
+        \hline
+        Reakcja na przycisk 
+            & Przycisk pozostaje wciśnięty (zamrożony). 
+            & Przycisk klika się normalnie, pokazuje animację \textit{ripple}. \\
+        Suwak (Slider) 
+            & Zablokowany. Nie można go przesunąć. 
+            & Płynny. Możesz nim ruszać przez całe 10 sekund oczekiwania. \\
+        Wątek UI 
+            & Zablokowany (Blocked). Kucharz stoi nad garnkiem. 
+            & Wolny (Free). Kucharz nastawił minutnik i kroi warzywa. \\
+        Ryzyko ANR 
+            & Bardzo wysokie (system zabije aplikację). 
+            & Zerowe (aplikacja jest responsywna). \\
+        Styl kodu 
+            & Sekwencyjny (linia po linii). 
+            & Sekwencyjny! Mimo asynchroniczności, kod czyta się tak samo łatwo. \\
+        \hline
+    \end{tabular}
+    \caption{Porównanie starej wersji (Thread.sleep) i nowej wersji (delay + Korutyny)}
+\end{table}
+
+\section{Podsumowanie}
+
+Współczesne programowanie aplikacji mobilnych to nieustanna walka o płynność. Każda aplikacja na Androida posiada jeden, newralgiczny zasób: Wątek Główny (UI Thread). Jest on odpowiedzialny za wszystko, co widzi użytkownik - od rysowania interfejsu po obsługę dotyku. Jego zablokowanie, choćby na ułamek sekundy, jest niedopuszczalne i prowadzi do niesławnego błędu \textit{Application Not Responding} (ANR).
+
+Tradycyjne podejście do wielowątkowości, oparte na ręcznym tworzeniu wątków (\texttt{Thread}) i obsłudze callbacków, często prowadziło do kodu trudnego w utrzymaniu i podatnego na błędy. Odpowiedzią Kotlina na te wyzwania są korutyny.
+
+Korutyny często nazywa się \textit{lekkimi wątkami}, ale precyzyjniejsza definicja to \textit{zawieszalne obliczenie} (suspendable computation). W klasycznym modelu (blokującym), gdy kucharz czeka na zagotowanie wody, stoi bezczynnie nad garnkiem. W modelu opartym na korutynach, kucharz \textit{zawiesza} to zadanie - nastawia minutnik i w międzyczasie zajmuje się krojeniem warzyw. Dzięki temu jeden wątek może obsługiwać wiele korutyn jednocześnie, nigdy nie marnując czasu na bezczynne oczekiwanie.
+
+Kluczem do tego mechanizmu jest słowo kluczowe \texttt{suspend}. Oznacza ono funkcję, która może zostać wstrzymana (zapauzowana) bez blokowania wątku, na którym jest wykonywana. Gdy korutyna napotyka funkcję zawieszającą (np. \texttt{delay} lub zapytanie sieciowe), zapisuje swój stan i zwalnia wątek, oddając go do dyspozycji innym zadaniom (np. odświeżaniu UI). Gdy operacja w tle się zakończy, korutyna jest wznawiana dokładnie w miejscu, w którym skończyła. Ważne jest jednak zrozumienie, że samo \texttt{suspend} nie oznacza automatycznego przeniesienia pracy do innego wątku - daje jedynie możliwość zawieszenia.
+
+Korutyny w Kotlinie nie działają w próżni. Aby je uruchomić, musimy skorzystać z \texttt{CoroutineScope} (np. \texttt{viewModelScope} lub \texttt{rememberCoroutineScope}). Definiuje on \textit{czas życia} korutyny. Mechanizm ten, zwany Ustrukturyzowaną Współbieżnością, tworzy hierarchię rodzic-dziecko. Każda uruchomiona korutyna (\texttt{launch}) zwraca obiekt \texttt{Job}, który jest przypisany do swojego zakresu. Gwarantuje to bezpieczeństwo aplikacji: jeśli użytkownik zamknie ekran (anulując zakres-rodzica), wszystkie podrzędne operacje (pobieranie danych, liczniki) zostaną automatycznie anulowane. Zapobiega to wyciekom pamięci i wykonywaniu niepotrzebnej pracy w tle.
+
+Podsumowując, korutyny pozwalają pisać kod asynchroniczny w sposób sekwencyjny i czytelny, jednocześnie zapewniając bezpieczeństwo zasobów i responsywność aplikacji, której oczekują użytkownicy.

@@ -1,72 +1,722 @@
-\chapter{Wyklad 0: Organizacja kursu i nawigacja Compose}
+\chapter{Organizacja kursu i nawigacja Compose (Wykład 0)}
 
-\begin{learningobjectives}
-  \item Zrozumiesz zasady zaliczenia PUM2 oraz wymagane narzedzia.
-  \item Przygotujesz srodowisko Android Studio na potrzeby zaawansowanych zajec (Compose + Hilt + Firebase).
-  \item Zaplanujesz aplikacje przykladowa wykorzystywana w dalszych rozdzialach, ze szczegolnym naciskiem na Compose Navigation.
-\end{learningobjectives}
-
-\section{Mapa rozdzialu}
-\begin{itemize}
-  \item Organizacja PUM2: cele, harmonogram, forma zaliczenia, roznice wzgledem PUM1.
-  \item Przeglad narzedzi: Android Studio (aktualna wersja), emulator, Firebase CLI, Postman/Insomnia.
-  \item Konfiguracja projektu startowego: Compose Material 3, Hilt, modul app.
-  \item Compose Navigation: podstawowe pojecia (NavHost, NavController, graf, destynacje, argumenty), integracja z scaffold.
-  \item Przeglad notebookow `Listy` dedykowanych nawigacji (\texttt{W1-Drawer.ipynb}, \texttt{W1-Nested\_graph.ipynb}).
-  \item Plan rozwoju aplikacji "Catalog App" w trakcie PUM2.
-\end{itemize}
-
-\section{Material zrodlowy}
-\begin{itemize}
-  \item Slajdy: `PUM2/Wyk/Wyklad1.pdf` (organizacja + Compose Navigation) oraz `PUM1/Wyk/Wyklad11.pdf` jako powtorka.
-  \item Notebooki: \texttt{PUM2/Listy/W1-Drawer.ipynb}, \texttt{PUM2/Listy/W1-Nested\_graph.ipynb}.
-  \item Dokumentacja: Compose Navigation (developer.android.com/jetpack/compose/navigation).
-\end{itemize}
-
-\section{Struktura docelowa}
+\section{Podstawowe informacje o kursie}
 \subsection{Organizacja kursu}
+Zajęcia obejmują łącznie 75 godzin pracy studenta, z czego 15 godzin przeznaczonych jest na wykłady (45 minutowy wykład na tydzień), a 30 godzin na zajęcia laboratoryjne. Dodatkowo przewidziano 30 godzin pracy własnej studenta, niezbędnej do samodzielnego opracowania materiału, przygotowania projektów oraz pogłębiania wiedzy. Kurs kończy się uzyskaniem 3 punktów ECTS. 
+
+W trakcie zajęć wykorzystywane są materiały dydaktyczne dostępne pod adresem: \url{https://github.com/RafLew84/ProgUM}.  Obowiązkowa i zalecana literatura:
 \begin{itemize}
-  \item Cele PUM2: przejscie od podstaw Compose do pelnej aplikacji produkcyjnej.
-  \item Zasady zaliczenia, wymagania projektowe i laboratoryjne.
-  \item Repozytoria oraz sposoby dzielenia sie kodem (Git, GitHub Classroom, itp.).
+\item Dokumentację języka Kotlin (\url{https://kotlinlang.org/docs/home.html}
+) 
+\item oficjalne kursy programowania aplikacji mobilnych dostępne na platformie Android Developers (\url{https://developer.android.com/courses}).
 \end{itemize}
 
-\subsection{Srodowisko pracy}
+\subsection{Zasady zaliczenia}
 \begin{itemize}
-  \item Wersje narzedzi (Android Studio, gradle, Kotlin, Java, Firebase CLI).
-  \item Konfiguracja emulatora i urzadzen fizycznych.
-  \item Kontrola konfiguracji (gradle.properties, signing configs, sekretne klucze API).
+  \item Warunkiem zaliczenia laboratorium jest uzyskanie \textbf{oceny pozytywnej z list zadań}.
+  \item Na zajęcia przewidzianych jest \textbf{5 list zadań}.
+  \item Z każdej listy wystawiana jest \textbf{osobna ocena}.
+  \item \textbf{Nie jest konieczne} zaliczenie wszystkich list aby otrzymać ocenę pozytywną z laboratorium. Dopuszczalne jest nieoddanie/niezaliczenie \textbf{jednej listy} - za tą listę otrzymuje się ocenę 2,0.
+  \item Każda lista posiada informację o \textbf{liczbie} punktów wymaganych na konkretną ocenę
+  \item Każda lista posiada \textbf{termin zwrotu}.
+  \item Za \textbf{każdy tydzień opóźnienia} otrzymana ocena jest \textbf{obniżana o 1,0}.
+  \item Listy oddawane są \textbf{podczas zajęć laboratoryjnych}. 
+  \item Do każdej listy prowadzący \textbf{zadaje 4 pytania}.
+  \item Liczba punktów za listę jest przyznawana na podstawie \textbf{poprawności wykonania zadań} oraz \textbf{odpowiedzi ustnej}.
+  \item Ocena końcowa jest \textbf{średnią arytmetyczną} ze \textbf{wszystkich ocen} z list.
+  \item Na ocenę 3,0 \textbf{wymagana jest} średnia co najmniej 3,0.
+  \item Na zajęciach laboratoryjnych dopuszczalne są \textbf{trzy nieobecności nieusprawiedliwione}.
 \end{itemize}
 
-\subsection{Projekt startowy}
+\subsection{Treści Programowe}
+\begin{enumerate}
+  \item Zasady zaliczenia, Treści Programowe, Zaawansowana Nawigacja.
+  \item Wprowadzenie do Wielowątkowości: Coroutines. Wątek główny.
+  \item Coroutines. Współbieżność, Równoległość, Asynchroniczność.
+  \item Podstawy Architektury Aplikacji: Wzorce MVx (MVC, MVP, MVVM).
+  \item Reaktywne Zarządzanie Stanem: Flow, StateFlow, SharedFlow.
+  \item Zaawansowane Zarządzanie Stanem: withContext, StateIn, ShareIn, FlowOn, combine.
+  \item Coroutines: Kanały - Asynchroniczna Wymiana Danych Między Coroutines.
+  \item Zapis Danych do Pliku: SharedPreferences, DataStore.
+  \item Baza Danych SQLite + ROOM: Entity, Dao, Database, CRUD, Operacje Asynchroniczne.
+  \item Praca z Zewnętrznymi Źródłami Danych: Retrofit2, Operacje Asynchroniczne.
+  \item Wstrzykiwanie Zależności: Dagger, Hilt.
+  \item Czysta Architektura - Warstwa Domeny i Wzorzec Use Case.
+  \item Wzorzec Single Source of Truth - Strategia Offline Caching.
+  \item Backend w Chmurze: Wprowadzenie do Firebase i Firestore
+\end{enumerate}
+
+\subsection{Android Studio - Rozpoczęcie i konfiguracja projektu}
+Podczas zajęć tworzymy projekty w Android Studio, w Kotlinie, z interfejsem budowanym w Jetpack Compose (bez widoków XML). Najprościej zacząć od kreatora: \texttt{New Project $\rightarrow$ Empty Activity}. Ustaw \texttt{Language: Kotlin}, \texttt{Minimum SDK: 28+} i zaakceptuj ustawienia. Taki szablon tworzy gotowy projekt z poprawną konfiguracją Compose i przykładowym \texttt{setContent \{ … \}}. 
+
+\textbf{UWAGA!!!} Nie używaj Empty Views Activity - to rozpoczyna projekt oparty o \textit{widoki}, gdzie ui definiujemy jako pliki XML.
+
+\subsection{Dodawanie zależności}
+Wszystkie zależności dopisujemy w bloku \texttt{dependencies \{ … \}} pliku \texttt{build.gradle(.kts)(Module:App)}. Przykładowy plik:
+
+\textbf{UWAGA!!!!} NIE KOPIUJ PLIKÓW KONFIGURACYJNYCH - zawierają informacje UNIKALNE DLA PROJEKTU !!!!
+
+\begin{minted}{kotlin}
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+}
+
+android {
+    namespace = "com.example.test"
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = "com.example.test"
+        minSdk = 28
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+    buildFeatures {
+        compose = true
+    }
+}
+
+dependencies {
+    // tutaj dodajemy zależności
+
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.ui.test.manifest)
+}
+\end{minted}
+
+\textbf{UWAGA!!!} Pamiętaj aby wykonać \textbf{synchronizację} (\ref{fig:figura-1}) projektu po jakiejkolwiek zmianie w plikach z katalogu \texttt{gradle}
+
+\begin{figure}[htbp]
+    \includegraphics{fig/pum2-w00-fig1.png}
+    \caption{Okno programu z widokiem na plik konfiguracyjny.}
+    \label{fig:figura-1}
+\end{figure}
+
+\subsection{Szuflada Nawigacyjna}
+W tej części skupimy się na praktycznej implementacji nawigacji w aplikacji Jetpack Compose. Zakładając, znajomość podstawowych bloków konstrukcyjnych: NavHost i NavController, przyjrzymy się, jak zintegrować je z zaawansowanymi komponentami Material 3, takimi jak szuflada nawigacyjna.
+
+Przeanalizujmy kod, który implementuje jeden z najczęstszych wzorców nawigacyjnych w aplikacjach mobilnych: szufladę nawigacyjną (znaną również jako \textit{hamburger menu})(\ref{fig:Figura 2}).
+
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w00-fig2.png}
+    \caption{Szuflada nawigacyjna.}
+    \label{fig:Figura 2}
+\end{figure}
+
+Załączony kod to kompletna, choć minimalistyczna, aplikacja demonstrująca łączenie komponentów \texttt{Jetpack Navigation}, \texttt{Scaffold} oraz \texttt{ModalNavigationDrawer}. Przyjrzyjmy się jej kluczowym elementom krok po kroku.
+
+Aby móc pracować z \texttt{compose navigation} musimy dodać odpowiednią \textbf{zależność} do projektu
+
+\begin{minted}{kotlin}
+dependencies {
+    implementation("androidx.navigation:navigation-compose:2.9.2")
+}
+\end{minted}
+
+Pierwszym elementem jest \textbf{centralizacja tras nawigacyjnych} w obiekcie \texttt{data object AppDestinations}.
+
+\begin{minted}{kotlin}
+data object AppDestinations {
+    const val HOME = "home"
+    const val PROFILE = "profile"
+    const val SETTINGS = "settings"
+}
+\end{minted}
+
+
+Centralizacja zapewnia bezpieczeństwo typów, ułatwia refaktoryzację (zmieniamy nazwę w jednym miejscu).
+
+W aplikajci zagnieżdżamy kilku komponentów . Hierarchia wygląda następująco:
+
+\begin{minted}{kotlin}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainApp() {
+    val navController = rememberNavController()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            DrawerContent(navController = navController, drawerState = drawerState)
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Aplikacja z Szufladą") },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            scope.launch { drawerState.apply { if (isClosed) open() else close() } }
+                        }) { Icon(Icons.Filled.Menu, contentDescription = "Menu") }
+                    }
+                )
+            }
+        ) { paddingValues ->
+            NavHost(
+                navController = navController,
+                startDestination = AppDestinations.HOME,
+                modifier = Modifier.padding(paddingValues)
+            ) {
+                composable(AppDestinations.HOME) { HomeScreen() }
+                composable(AppDestinations.PROFILE) { ProfileScreen() }
+                composable(AppDestinations.SETTINGS) { SettingsScreen() }
+            }
+        }
+    }
+}
+\end{minted}
+
+\begin{enumerate}
+  \item \texttt{ModalNavigationDrawer}: Jest to komponent najwyższego poziomu, który zarządza logiką pokazywania i ukrywania wysuwanej szuflady. Przyjmuje on dwa kluczowe parametry:
+  \begin{itemize}
+    \item \texttt{drawerState}: Stan szuflady (otwarta/zamknięta).
+    \item \texttt{drawerContent}: Funkcja kompozycyjna definiująca zawartość samej szuflady (\texttt{DrawerContent}).
+  \end{itemize}
+  \item \texttt{Scaffold}: Umieszczony wewnątrz \texttt{ModalNavigationDrawer}, \texttt{Scaffold} zapewnia standardową strukturę ekranu. W naszym przypadku używamy go do zdefiniowania \texttt{topBar} (górnego paska aplikacji).
+
+  \item \texttt{NavHost}: Na końcu, wewnątrz \texttt{Scaffold}, umieszczamy nasz \texttt{NavHost}. To on zarządza faktyczną podmianą treści ekranu (\texttt{HomeScreen, ProfileScreen} itd.). Zwróćmy uwagę na kluczowe powiązanie: \texttt{modifier = Modifier.padding(paddingValues)}. Przekazujemy tu wypełnienie (\texttt{paddingValues}) otrzymane ze \texttt{Scaffold}, co zapewnia, że nasza treść nie zostanie przysłonięta przez \texttt{TopAppBar}.
+\end{enumerate}
+
+W funkcji \texttt{MainApp} zauważymy trzy kluczowe \textbf{zmienne stanu}.
+
+\begin{minted}{kotlin}
+val navController = rememberNavController()
+val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+val scope = rememberCoroutineScope()
+\end{minted}
+
+Pierwsze dwie są oczywiste: jedna zarządza \textbf{stosem nawigacji}, druga \textbf{stanem szuflady}. Ale dlaczego potrzebujemy \texttt{scope}?
+
+Odpowiedź leży w naturze \texttt{drawerState}. Metody \texttt{drawerState.open()} i \texttt{drawerState.close()} są funkcjami zawieszającymi (\texttt{suspend functions}) - więcej o tych funkcjach w kolejnych rozdziałach. Nie można ich po prostu wywołać z dowolnego miejsca – muszą być uruchomione wewnątrz \textbf{korutyny}. Zmiana \texttt{drawerState} automatycznie spowoduje \textbf{rekompozycję} i wizualne otwarcie szuflady.
+
+\begin{minted}{kotlin}
+{scope.launch { drawerState.apply { if (isClosed) open() else close() } }})
+\end{minted}
+
+Przejdźmy do zarządzania nawigację z wnętrza szuflady. W funkcji \texttt{MainApp} dodaliśmy \texttt{ModalNavigationDrawer}, który posiada parametr \texttt{drawerContent} - jako ten parametr przekazujemy funkcję \texttt{DrawerContent}, zajrzyjmmy do jej wnętrza:
+
+\begin{minted}{kotlin}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DrawerContent(navController: NavController, drawerState: DrawerState) {
+    val scope = rememberCoroutineScope()
+
+    ModalDrawerSheet {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Menu", style = MaterialTheme.typography.headlineSmall)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Home, contentDescription = "Strona główna") },
+                label = { Text("Strona główna") },
+                selected = false,
+                onClick = {
+                    navController.navigate(AppDestinations.HOME)
+                    scope.launch { drawerState.close() }
+                }
+            )
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Person, contentDescription = "Profil") },
+                label = { Text("Profil") },
+                selected = false,
+                onClick = {
+                    navController.navigate(AppDestinations.PROFILE)
+                    scope.launch { drawerState.close() }
+                }
+            )
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Settings, contentDescription = "Ustawienia") },
+                label = { Text("Ustawienia") },
+                selected = false,
+                onClick = {
+                    navController.navigate(AppDestinations.SETTINGS)
+                    scope.launch { drawerState.close() }
+                }
+            )
+        }
+    }
+}
+\end{minted}
+
+Wewnątrz \texttt{ModalDrawerSheet} definiujemy elementy będące wyświetlane w szufladzie jako \texttt{NavigationDrawerItem}. Jest to element zaprojektowany według tego samego wzorca (\textit{slot-based-layouts}). Posiada zdefiniowane \textit{sloty} w które można wstawić elementy (\texttt{icon, label, divider}), upraszczając tworzenie całego layoutu.
+Po kliknięciu elementu w szufladzie wykonujemy dwie akcje:
 \begin{itemize}
-  \item Struktura modulow i pakietow.
-  \item Setup Compose Material 3 + theming.
-  \item Dodanie dependency Hilt, Navigation, Retrofit.
-  \item Szkic ekranu startowego i bottom navigation (jesli wykorzystywana).
+  \item \textbf{Nawigujemy}: Wywołujemy \texttt{navController.navigate()}, aby zmienić zawartość \texttt{NavHost}.
+  \item \textbf{Zamykamy szufladę}: Uruchamiamy korutynę (\texttt{scope.launch}), aby wywołać \texttt{drawerState.close()}.
 \end{itemize}
 
-\subsection{Compose Navigation}
+Jak widzimy, nawigacja w Jetpack Compose to znacznie więcej niż tylko wywoływanie \texttt{navController.navigate()}. To przemyślana integracja kontrolera nawigacji z innymi komponentami interfejsu, takimi jak \texttt{ModalNavigationDrawer}. Istotnym elementem jest zrozumienie, jak zarządzać wieloma stanami (\texttt{navController, drawerState}) oraz jak obsługiwać \textbf{asynchroniczne wywołania} (funkcje \texttt{suspend} do otwierania/zamykania szuflady) za pomocą odpowiednich narzędzi, takich jak \texttt{rememberCoroutineScope}.
+
+Na kolejnych wykładach zagłębimy się w korutyny, które są fundamentem działania tego przykładu.
+
+
+\subsubsection{pełny kod przykładu}
+
+\begin{minted}{kotlin}
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            MyApplicationTheme {
+                MainApp()
+            }
+        }
+    }
+}
+
+data object AppDestinations {
+    const val HOME = "home"
+    const val PROFILE = "profile"
+    const val SETTINGS = "settings"
+}
+
+@Composable
+fun HomeScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Strona Główna", fontSize = 24.sp)
+    }
+}
+
+@Composable
+fun ProfileScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Profil Użytkownika", fontSize = 24.sp)
+    }
+}
+
+@Composable
+fun SettingsScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Ustawienia", fontSize = 24.sp)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainApp() {
+    val navController = rememberNavController()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            DrawerContent(navController = navController, drawerState = drawerState)
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Aplikacja z Szufladą") },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            scope.launch { drawerState.apply { if (isClosed) open() else close() } }
+                        }) { Icon(Icons.Filled.Menu, contentDescription = "Menu") }
+                    }
+                )
+            }
+        ) { paddingValues ->
+            NavHost(
+                navController = navController,
+                startDestination = AppDestinations.HOME,
+                modifier = Modifier.padding(paddingValues)
+            ) {
+                composable(AppDestinations.HOME) { HomeScreen() }
+                composable(AppDestinations.PROFILE) { ProfileScreen() }
+                composable(AppDestinations.SETTINGS) { SettingsScreen() }
+            }
+        }
+    }
+}
+
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DrawerContent(navController: NavController, drawerState: DrawerState) {
+    val scope = rememberCoroutineScope()
+
+    ModalDrawerSheet {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Menu", style = MaterialTheme.typography.headlineSmall)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Home, contentDescription = "Strona główna") },
+                label = { Text("Strona główna") },
+                selected = false,
+                onClick = {
+                    navController.navigate(AppDestinations.HOME)
+                    scope.launch { drawerState.close() }
+                }
+            )
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Person, contentDescription = "Profil") },
+                label = { Text("Profil") },
+                selected = false,
+                onClick = {
+                    navController.navigate(AppDestinations.PROFILE)
+                    scope.launch { drawerState.close() }
+                }
+            )
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Settings, contentDescription = "Ustawienia") },
+                label = { Text("Ustawienia") },
+                selected = false,
+                onClick = {
+                    navController.navigate(AppDestinations.SETTINGS)
+                    scope.launch { drawerState.close() }
+                }
+            )
+        }
+    }
+}
+\end{minted}
+
+\subsection{Zagnieżdźona Nawigacja}
+
+Przejdźmy do drugiego przykładu w którym zapoznamy się z ideą tworzenia zagnieżdżonych grafów nawigacyjnych.
+
+Załóżmy, że nasza aplikacja ma więcej niż trzy proste ekrany. Prawie każda komercyjna aplikacja ma co najmniej dwa odrębne \textit{przepływy} (flows):
 \begin{itemize}
-  \item NavHost i konfiguracja grafu nawigacji.
-  \item Destynacje, parametry, deep linki.
-  \item Nested graphs, bottom navigation, drawer navigation.
-  \item Integracja z ViewModel (state hoisting, savedStateHandle).
+  \item Przepływ Uwierzytelniania: Logowanie, Rejestracja, Resetowanie Hasła.
+  \item Główny Przepływ Aplikacji: Ekran główny, Profil, Ustawienia, itd.
 \end{itemize}
 
-\subsection{Plan aplikacji przykladowej}
+Problem polega na tym, że te dwa przepływy mają zupełnie inne zasady. Co najważniejsze: gdy użytkownik pomyślnie się zaloguje, powinien przejść do ekranu głównego, a cały przepływ uwierzytelniania powinien zniknąć z historii. Naciśnięcie przycisku \textit{Wstecz} na ekranie głównym nie powinno cofać do ekranu logowania, lecz zamykać aplikację. Osiągnąć to można za pomocą zagnieżdżonej nawigacji.
+
+Przeanalizujmy prosty przykład pokazujący takie rozwiązanie. Zamiast traktować \texttt{NavHost} jak jeden wielki kontener, traktujemy go jak folder, który może zawierać zarówno pojedyncze pliki (ekrany), jak i inne foldery (zagnieżdżone grafy).
+
+Pierwszym krokiem jest zdefiniowanie tras w obiekcie \texttt{AppDestinations}:
+
+\begin{minted}{kotlin}
+data object AppDestinations {
+    // Grafy
+    const val AUTH_GRAPH = "auth_graph"
+    const val MAIN_APP_GRAPH = "main_app_graph"
+
+    // Ekrany uwierzytelniania
+    const val LOGIN = "login"
+    const val REGISTER = "register"
+    const val FORGOT_PASSWORD = "forgot_password"
+
+    // Główne ekrany aplikacji
+    const val WELCOME = "welcome"
+    const val PROFILE = "profile"
+}
+\end{minted}
+
+Zauważmy, że nasza aplikacja będzie miała dwa główne podgrafy: \texttt{AUTH\_GRAPH} i \texttt{MAIN\_APP\_GRAPH}
+
+Spójrzmy na główny \texttt{NavHost} w \texttt{SimpleNestedNavApp}. Jest on uderzająco prosty:
+
+\begin{minted}{kotlin}
+NavHost(
+    navController = navController,
+    startDestination = AppDestinations.AUTH_GRAPH
+) {
+    // Graf uwierzytelniania (logowanie, rejestracja, itp.)
+    authGraph(navController)
+
+    // Główny graf aplikacji po zalogowaniu
+    mainAppGraph(navController)
+}
+\end{minted}
+
+Zauważmy:
+\begin{enumerate}
+\item \texttt{startDestination} nie jest ekranem. Jest to \texttt{AUTH\_GRAPH}, czyli cały zagnieżdżony graf. Aplikacja uruchamia się, wchodząc do \textit{folderu} uwierzytelniania.
+\item Wewnątrz \texttt{NavHost} nie ma ani jednego composable() definiującego ekran. Zamiast tego, są tylko dwie funkcje (authGraph i mainAppGraph), które definiują całe grupy ekranów.
+\end{enumerate}
+
+Główny \texttt{NavHost} nie musi \textit{wiedzieć} nic o ekranie logowania czy profilu; musi tylko \textit{wiedzieć} o istnieniu \textit{przepływu uwierzytelniania} i \textit{przepływu głównego}.
+
+W jaki sposób definiować grafy zagnieżdżone? Służy do tego funkcja kompozycyjna \texttt{navigation()}. Standardowo tworzy się funkcje rozszerzające dla \texttt{NavGraphBuilder}:
+
+\begin{minted}{kotlin}
+fun NavGraphBuilder.authGraph(navController: NavController) {
+    navigation(
+        startDestination = AppDestinations.LOGIN,
+        route = AppDestinations.AUTH_GRAPH
+    ) {
+        composable(AppDestinations.LOGIN) {
+            LoginScreen(navController) }
+        composable(AppDestinations.REGISTER) {
+            RegisterScreen(navController) }
+        composable(AppDestinations.FORGOT_PASSWORD) {
+            ForgotPasswordScreen(navController) }
+    }
+}
+
+fun NavGraphBuilder.mainAppGraph(navController: NavController) {
+    navigation(
+        startDestination = AppDestinations.WELCOME,
+        route = AppDestinations.MAIN_APP_GRAPH
+    ) {
+        composable(AppDestinations.WELCOME) {
+            WelcomeScreen(navController) }
+        composable(AppDestinations.PROFILE) {
+            ProfileScreen(navController) }
+    }
+}
+\end{minted}
+
+Analiza tego bloku jest kluczowa:
 \begin{itemize}
-  \item Zakres funkcjonalny (lista -> szczegoly -> ulubione -> ustawienia).
-  \item Mapowanie przyszlych rozdzialow PUM2 na rozwijane funkcje.
-  \item Przygotowanie backlogu i milestone'ow (np. offline caching, DI, Firestore).
+\item \texttt{fun NavGraphBuilder.authGraph(...)}: To czysta organizacja kodu. Zamiast zaśmiecać \texttt{NavHost}, grupujemy logikę w oddzielnej funkcji.
+\item \texttt{navigation(...)}: To jest właściwy konstruktor zagnieżdżonego grafu.
+\item \texttt{route = AppDestinations.AUTH\_GRAPH}: Nadajemy całemu \textit{folderowi} nazwę. Teraz możemy nawigować \textit{do} niego.
+\item \texttt{startDestination = AppDestinations.LOGIN}: Definiujemy, który ekran jest domyślny wewnątrz tego grafu.
 \end{itemize}
 
-\section{Elementy do rozbudowy}
+Identyczną strukturę ma \texttt{mainAppGraph}, który grupuje ekrany \texttt{WELCOME} i \texttt{PROFILE}.
+
+Mamy dwa oddzielne światy: \texttt{AUTH\_GRAPH} i \texttt{MAIN\_APP\_GRAPH}. Jak przeskoczyć z jednego do drugiego i – co najważniejsze – posprzątać po sobie?
+
+Spójrzmy na funkcję \texttt{navigateToMainApp()}, wywoływaną po pomyślnym logowaniu:
+
+\begin{minted}{kotlin}
+fun NavController.navigateToMainApp() {
+    this.navigate(AppDestinations.MAIN_APP_GRAPH) {
+        popUpTo(AppDestinations.AUTH_GRAPH) {
+            inclusive = true
+        }
+    }
+}
+\end{minted}
+
+To jest najważniejszy fragment kodu w całym przykładzie. Rozbijmy go na części:
 \begin{itemize}
-  \item \textbf{Przyklad A}: konfiguracja Compose Navigation w projekcie startowym (TODO: wkleic kod `NavHost`).
-  \item \textbf{Przyklad B}: nested navigation (drawer + bottom nav) w oparciu o notebooki W1 (TODO: zrzuty i komentarz).
-  \item Lista kontrolna setupu (TODO: tabela z krokami instalacji narzedzi).
-  \item Pytania kontrolne: roznica NavGraph vs NavHost, jak przekazywac argumenty, jak testowac nawigacje.
+\item \texttt{navigate(AppDestinations.MAIN\_APP\_GRAPH)}: Mówimy \textit{nawiguj do grafu głównego}. \texttt{NavController} automatycznie skieruje nas do \texttt{startDestination} tego grafu (czyli \texttt{WELCOME}).
+\item \texttt{popUpTo(AppDestinations.AUTH\_GRAPH)}: To jest polecenie \textit{sprzątające}. Powraca na stosie aż znajdzie \texttt{AUTH\_GRAPH}
+\item \texttt{inclusive = true}: Po znalezieniu na stosie \texttt{AUTH\_GRAPH} jest on również usuwany.
 \end{itemize}
 
-% TODO: uzupelnic tresc narracyjna i przyklady kodu w kolejnych etapach.
+Co się dzieje w praktyce? Użytkownik klika \textit{Zaloguj}. \texttt{NavController}:
+\begin{itemize}
+\item Znajduje na stosie powrotu graf \texttt{AUTH\_GRAPH}.
+\item Usuwa ze stosu \texttt{LOGIN, REGISTER, FORGOT\_PASSWORD...} i sam \texttt{AUTH\_GRAPH}.
+\item Dodaje na stos \texttt{MAIN\_APP\_GRAPH} (z ekranem \texttt{WELCOME}).
+\end{itemize}
+
+Stos powrotu jest czysty. Zawiera tylko \texttt{MAIN\_APP\_GRAPH}. Jeśli użytkownik naciśnie teraz przycisk \textit{Wstecz}, nie wróci do ekranu logowania. Opuści aplikację. Osiągnęliśmy dokładnie taki przepływ, jakiego oczekują użytkownicy.
+
+Zagnieżdżona nawigacja to nie jest skomplikowana funkcja dla zaawansowanych. To podstawowe narzędzie do organizacji w każdej aplikacji, która ma więcej niż jeden logiczny przepływ. Jak widzieliśmy w kodzie, ten wzorzec zapewnia trzy kluczowe korzyści:
+\begin{enumerate}
+\item Organizację: Grupuje powiązane ekrany.
+\item Modularność: Utrzymuje główny \texttt{NavHost} czysty i pozwala definiować przepływy w oddzielnych funkcjach.
+\item Kontrolę nad Stosem Powrotu: Umożliwia nawigowanie między całymi przepływami i usuwanie ich z historii jednym poleceniem.
+\end{enumerate}
+
+\subsubsection{Pełny kod przykładu}
+
+\begin{minted}{kotlin}
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            NestedComposeGraphTheme {
+                SimpleNestedNavApp()
+            }
+        }
+    }
+}
+
+data object AppDestinations {
+    // Grafy
+    const val AUTH_GRAPH = "auth_graph"
+    const val MAIN_APP_GRAPH = "main_app_graph"
+
+    // Ekrany autentykacji
+    const val LOGIN = "login"
+    const val REGISTER = "register"
+    const val FORGOT_PASSWORD = "forgot_password"
+
+    // Główne ekrany aplikacji
+    const val WELCOME = "welcome"
+    const val PROFILE = "profile"
+}
+
+@Composable
+fun SimpleNestedNavApp() {
+    val navController = rememberNavController()
+    NavHost(
+        navController = navController,
+        startDestination = AppDestinations.AUTH_GRAPH
+    ) {
+        // Graf autentykacji (logowanie, rejestracja, itp.)
+        authGraph(navController)
+
+        // Główny graf aplikacji po zalogowaniu
+        mainAppGraph(navController)
+    }
+}
+
+fun NavGraphBuilder.authGraph(navController: NavController) {
+    navigation(
+        startDestination = AppDestinations.LOGIN,
+        route = AppDestinations.AUTH_GRAPH
+    ) {
+        composable(AppDestinations.LOGIN) {
+            LoginScreen(navController) }
+        composable(AppDestinations.REGISTER) {
+            RegisterScreen(navController) }
+        composable(AppDestinations.FORGOT_PASSWORD) {
+            ForgotPasswordScreen(navController) }
+    }
+}
+
+fun NavGraphBuilder.mainAppGraph(navController: NavController) {
+    navigation(
+        startDestination = AppDestinations.WELCOME,
+        route = AppDestinations.MAIN_APP_GRAPH
+    ) {
+        composable(AppDestinations.WELCOME) {
+            WelcomeScreen(navController) }
+        composable(AppDestinations.PROFILE) {
+            ProfileScreen(navController) }
+    }
+}
+
+@Composable
+fun LoginScreen(navController: NavController) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Logowanie", fontSize = 28.sp)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = { navController.navigateToMainApp() }) {
+            Text("Zaloguj")
+        }
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = { navController.navigate(AppDestinations.REGISTER) }) {
+            Text("Przejdź do Rejestracji")
+        }
+        Spacer(Modifier.height(12.dp))
+        TextButton(onClick = { navController.navigate(AppDestinations.FORGOT_PASSWORD) }) {
+            Text("Zapomniałem hasła")
+        }
+    }
+}
+
+@Composable
+fun RegisterScreen(navController: NavController) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Rejestracja", fontSize = 28.sp)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = { navController.navigateToMainApp() }) {
+            Text("Zarejestruj i zaloguj")
+        }
+        Spacer(Modifier.height(12.dp))
+        TextButton(onClick = { navController.popBackStack() }) {
+            Text("Wróć do logowania")
+        }
+    }
+}
+
+@Composable
+fun ForgotPasswordScreen(navController: NavController) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Resetowanie Hasła", fontSize = 24.sp, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = { navController.popBackStack() }) {
+            Text("Powrót")
+        }
+    }
+}
+@Composable
+fun WelcomeScreen(navController: NavController) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Witaj w Aplikacji! 🎉", fontSize = 28.sp)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = { navController.navigate(AppDestinations.PROFILE) }) {
+            Text("Zobacz mój profil")
+        }
+    }
+}
+
+@Composable
+fun ProfileScreen(navController: NavController) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Ekran Profilu 🧑‍💻", fontSize = 28.sp)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = { navController.popBackStack() }) {
+            Text("Wróć do ekranu powitalnego")
+        }
+    }
+}
+
+fun NavController.navigateToMainApp() {
+    this.navigate(AppDestinations.MAIN_APP_GRAPH) {
+        popUpTo(AppDestinations.AUTH_GRAPH) {
+            inclusive = true
+        }
+    }
+}
+\end{minted}

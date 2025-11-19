@@ -1,5 +1,5 @@
 # Fdb version 4
-["lualatex"] 1760971250.83301 "manuscript/main.tex" "main.pdf" "main" 1760971264.59924 2
+["lualatex"] 1763558789.87068 "manuscript/main.tex" "main.pdf" "main" 1763558802.00751 2
   "C:/Users/rlewa/AppData/Local/MiKTeX/luatex-cache/generic/fonts/otl/lmroman12-regular.luc" 1760890229.06007 127680 9c71b9e65790223d324ec4a68e6261cc ""
   "C:/Users/rlewa/AppData/Local/Programs/MiKTeX/tex/latex/base/bk12.clo" 1749467999 8285 eb2e07a9e456f2e445aaaabcc61b0d24 ""
   "C:/Users/rlewa/AppData/Local/Programs/MiKTeX/tex/latex/base/book.cls" 1749467999 23268 0045640547c14751e547e94fe4a0e0a8 ""
@@ -50,8 +50,9 @@
   "C:/Users/rlewa/AppData/Local/Programs/MiKTeX/tex/luatex/luaotfload/luaotfload-tounicode.lua" 1740607740 7529 21fe79d2526f3c3d789a9cc0366347ab ""
   "C:/Users/rlewa/AppData/Local/Programs/MiKTeX/tex/luatex/luaotfload/luaotfload-unicode.lua" 1740607740 7918 4272855a25780b80472f3b58edd95e33 ""
   "C:/Users/rlewa/AppData/Local/Programs/MiKTeX/tex/luatex/luaotfload/luaotfload.lua" 1740607740 13566 16df94dd2de231b2bca0aaa0190941fe ""
+  "ls.tex" 0 -1 0 ""
   "main.aux" 1760971242.82794 32 3985256e7290058c681f74d7a3565a19 "lualatex"
-  "manuscript/main.tex" 1760970473.79604 1050 c39c3c823f0b62be85c8cc11a469b490 ""
+  "manuscript/main.tex" 1762357007.15614 1140 8c18d0aa09b137e3299844e730dde939 ""
   "preamble.tex" 0 -1 0 ""
   (generated)
   "main.aux"
