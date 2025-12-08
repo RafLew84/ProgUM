@@ -1,61 +1,53 @@
-\chapter{Wyklad 2: Structured concurrency i obsluga wyjatkow}
+\chapter{Współbieżność i Asynchroniczność (Wykład 2)}
 
-\begin{learningobjectives}
-  \item Zrozumiesz zasady structured concurrency w Kotlinie.
-  \item Nauczysz sie propagowac i przechwytywac wyjatki w coroutines.
-  \item Zaprojektujesz strategie anulowania i cleanup w asynchronicznych operacjach.
-\end{learningobjectives}
+\section{Ustrukturyzowana Współbieżność w Praktyce}
 
-\section{Mapa rozdzialu}
+Poprzednio nauczyliśmy się, jak uruchamiać zadania w tle (\textit{nastawiać wodę}) i nie blokować przy tym kuchni. Co w sytuacji, gdy przygotowanie dania wymaga wykonania \textbf{kilku czynności na raz}, a my musimy mieć pewność, że wszystkie zostały ukończone, zanim wydamy posiłek?
+
+Tu z pomocą przychodzi funkcja \texttt{join()}, która jest fundamentem synchronizacji w świecie korutyn.
+
+Wyobraź sobie, że jesteś Szefem Kuchni (Korutyna-Rodzic). Masz przygotować główne danie: \textit{Stek z warzywami}. Nie będziesz robić wszystkiego sam.
 \begin{itemize}
-  \item Hierarchia scope i kontrola lifecycle.
-  \item coroutineScope, supervisorScope, SupervisorJob.
-  \item Exception handling i CoroutineExceptionHandler.
-  \item Zasady anulowania i cleanup.
-  \item Testowanie scenariuszy bledow.
+\item Wołasz Pomocnika nr 1: \textit{Usmaż mięso!} (zajmie to 2 sekundy).
+\item Wołasz Pomocnika nr 2: \textit{Ugotuj warzywa!} (zajmie to 3 sekundy).
 \end{itemize}
 
-\section{Material zrodlowy}
-\begin{itemize}
-  \item PUM2/Wyk/Wyklad3.pdf.
-  \item \texttt{PUM2/Listy/W3-Coroutines\_demo.ipynb}.
-  \item kotlinlang.org/docs/exception-handling.html.
-\end{itemize}
+Obaj pomocnicy ruszają do pracy w tym samym momencie (współbieżność). Główna korutyn jest wolna i może zająć się innymi sprawami. Ale nie może wydać dania dopóki nie będzie gotowe. To \textit{czekanie} wykonujemy za pomocą \texttt{join()}.
 
-\subsection{Structured concurrency}
-\begin{itemize}
-  \item Hierarchia scope i propagacja anulowania.
-  \item roznica coroutineScope i supervisorScope.
-  \item Granice odpowiedzialnosci modulow.
-\end{itemize}
+Zobaczmy kod, któy symuluje taką sytuację:
 
-\subsection{Obsluga wyjatkow}
-\begin{itemize}
-  \item CoroutineExceptionHandler i propagacja bledow.
-  \item try/catch w suspend funkcjach.
-  \item Retry, exponential backoff, circuit breaker.
-\end{itemize}
+\begin{minted}{kotlin}
+// 1. Szef Kuchni (Rodzic) rozpoczyna pracę
+scope.launch {
+    logs.add("Szef kuchni (rodzic): Zaczynamy!")
 
-\subsection{Anulowanie i cleanup}
-\begin{itemize}
-  \item Cooperative cancellation i sprawdzanie isActive.
-  \item finally blok i withContext(NonCancellable).
-  \item Timeout i sprzatanie zasobow.
-\end{itemize}
+    // 2. Zlecenie zadania Pomocnikowi 1 (Dziecko 1)
+    val jobMieso = launch {
+        delay(2000) // Symulacja smażenia
+        logs.add("Kucharz 1: Mięso usmażone (2s).")
+    }
 
-\subsection{Case study}
-\begin{itemize}
-  \item Manager zapytan sieciowych.
-  \item Analiza bledow w strumieniach Flow.
-  \item Checklist: guidelines obslugi bledow.
-\end{itemize}
+    // 3. Zlecenie zadania Pomocnikowi 2 (Dziecko 2)
+    val jobWarzywa = launch {
+        delay(3000) // Symulacja gotowania
+        logs.add("Kucharz 2: Warzywa gotowe (3s).")
+    }
 
-\section{Elementy do rozbudowy}
-\begin{itemize}
-  \item Przyklad A: supervisorScope dla wielu zapytan (TODO).
-  \item Przyklad B: wzorzec retry dla requestu API (TODO).
-  \item Zadania: implementacja cancellation-safe repository (TODO).
-  \item Pytania: roznica coroutineScope/supervisorScope, jak dziala handler (TODO).
-\end{itemize}
+    logs.add("Szef kuchni: Zadania zlecone, scope czeka na zakończenie...")
 
-% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+    // 4. synchronizacja: Szef czeka na wyniki
+    jobWarzywa.join()
+    jobMieso.join()
+
+    // 5. Finał
+    logs.add("Szef kuchni: Wszyscy skończyli! Można podawać danie.")
+}
+\end{minted}
+
+W przykłądzie widzimy koordynację zadań podrzędnych. Cały proces rozpoczyna się w momencie, gdy korutyna nadrzędna - nasz metaforyczny Szef Kuchni - uruchamia podzadania za pomocą funkcji \texttt{launch}. Jest to swego rodzaju \textit{bilet zamówienia}, który daje nam unikalny uchwyt do konkretnej, trwającej korutyny. W naszym przypadku tworzymy dwa takie uchwyty: \texttt{jobMieso} oraz \texttt{jobWarzywa}, które stają się dziećmi głównej korutyny uruchomionej w scope.
+
+Oba zadania startują niemal w tym samym momencie, co oznacza, że nie czekamy z gotowaniem warzyw do momentu, aż mięso będzie gotowe. Dzięki temu całkowity czas operacji nie jest sumą czasów poszczególnych zadań (5 sekund), lecz odpowiada czasowi najdłuższego z nich (3 sekundy). Jednak ta niezależność podzadań rodzi problem \textbf{synchronizacji}: co, jeśli Szef Kuchni zakończy swoją pracę szybciej niż jego pomocnicy? Bez odpowiedniej kontroli log \textit{Można podawać danie} pojawiłby się natychmiast po zleceniu zadań, co w naszej metaforze oznaczałoby wydanie klientowi pustego talerza, zanim składniki zdążą się ugotować.
+
+Rozwiązaniem tego problemu wyścigu (race condition) jest funkcja \texttt{join()}. Z technicznego punktu widzenia jest to funkcja zawieszająca (\texttt{suspend function}), która służy do synchronizacji cyklu życia korutyn. Kiedy korutyna nadrzędna (rodzic) napotyka instrukcję \texttt{jobWarzywa.join()}, jej wykonanie zostaje zawieszone. Należy wyraźnie podkreślić różnicę między zawieszeniem a zablokowaniem: wątek obsługujący tę korutynę nie jest blokowany i może w tym czasie wykonywać inne operacje systemowe. Mechanizm \texttt{join} wprowadza korutynę wywołującą w stan oczekiwania, który trwa dopóki obserwowany obiekt \texttt{Job} nie osiągnie stanu końcowego (Completed lub Cancelled). Dopiero gdy podzadanie faktycznie zakończy swoje działanie, maszyna stanów wznawia korutynę rodzica od kolejnej linii kodu. Dzięki jawnemu wywołaniu \texttt{join()} na obu obiektach \texttt{Job}, realizujemy kontrakt Ustrukturyzowanej Współbieżności, w którym rodzic świadomie koordynuje pracę swoich dzieci i gwarantuje, że żadna operacja nie zostanie zakończona przedwcześnie, zapewniając spójność danych i przewidywalność przepływu aplikacji.
+
+\section{Odbieranie Wyników}
