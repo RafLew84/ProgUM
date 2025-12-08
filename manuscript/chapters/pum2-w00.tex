@@ -46,7 +46,7 @@ W trakcie zajęć wykorzystywane są materiały dydaktyczne dostępne pod adrese
   \item Backend w Chmurze: Wprowadzenie do Firebase i Firestore
 \end{enumerate}
 
-\subsection{Android Studio - Rozpoczęcie i konfiguracja projektu}
+\section{Android Studio - Rozpoczęcie i konfiguracja projektu}
 Podczas zajęć tworzymy projekty w Android Studio, w Kotlinie, z interfejsem budowanym w Jetpack Compose (bez widoków XML). Najprościej zacząć od kreatora: \texttt{New Project $\rightarrow$ Empty Activity}. Ustaw \texttt{Language: Kotlin}, \texttt{Minimum SDK: 28+} i zaakceptuj ustawienia. Taki szablon tworzy gotowy projekt z poprawną konfiguracją Compose i przykładowym \texttt{setContent \{ … \}}. 
 
 \textbf{UWAGA!!!} Nie używaj Empty Views Activity - to rozpoczyna projekt oparty o \textit{widoki}, gdzie ui definiujemy jako pliki XML.
@@ -127,7 +127,7 @@ dependencies {
     \label{fig:figura-1}
 \end{figure}
 
-\subsection{Szuflada Nawigacyjna}
+\section{Szuflada Nawigacyjna}
 W tej części skupimy się na praktycznej implementacji nawigacji w aplikacji Jetpack Compose. Zakładając, znajomość podstawowych bloków konstrukcyjnych: NavHost i NavController, przyjrzymy się, jak zintegrować je z zaawansowanymi komponentami Material 3, takimi jak szuflada nawigacyjna.
 
 Przeanalizujmy kod, który implementuje jeden z najczęstszych wzorców nawigacyjnych w aplikacjach mobilnych: szufladę nawigacyjną (znaną również jako \textit{hamburger menu})(\ref{fig:Figura 2}).
@@ -287,7 +287,7 @@ Jak widzimy, nawigacja w Jetpack Compose to znacznie więcej niż tylko wywoływ
 Na kolejnych wykładach zagłębimy się w korutyny, które są fundamentem działania tego przykładu.
 
 
-\subsubsection{pełny kod przykładu}
+\subsection{pełny kod przykładu}
 
 \begin{minted}{kotlin}
 class MainActivity : ComponentActivity() {
@@ -420,7 +420,7 @@ fun DrawerContent(navController: NavController, drawerState: DrawerState) {
 }
 \end{minted}
 
-\subsection{Zagnieżdźona Nawigacja}
+\section{Zagnieżdźona Nawigacja}
 
 Przejdźmy do drugiego przykładu w którym zapoznamy się z ideą tworzenia zagnieżdżonych grafów nawigacyjnych.
 
@@ -555,7 +555,7 @@ Zagnieżdżona nawigacja to nie jest skomplikowana funkcja dla zaawansowanych. T
 \item Kontrolę nad Stosem Powrotu: Umożliwia nawigowanie między całymi przepływami i usuwanie ich z historii jednym poleceniem.
 \end{enumerate}
 
-\subsubsection{Pełny kod przykładu}
+\subsection{Pełny kod przykładu}
 
 \begin{minted}{kotlin}
 class MainActivity : ComponentActivity() {
