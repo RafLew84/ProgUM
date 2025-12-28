@@ -1,61 +1,53 @@
-\chapter{Wyklad 3: Architektura aplikacji - MVVM i warstwy logiki}
+\chapter{Współbieżność i Asynchroniczność (Wykład 3)}
 
-\begin{learningobjectives}
-  \item Utrwalisz role warstw w architekturze MVVM.
-  \item Nauczysz sie rozdzielac logike domenowa od prezentacji.
-  \item Przygotujesz schemat architektury dla projektu kursowego.
-\end{learningobjectives}
+\section{Ustrukturyzowana Współbieżność w Praktyce}
 
-\section{Mapa rozdzialu}
+Poprzednio nauczyliśmy się, jak uruchamiać zadania w tle (\textit{nastawiać wodę}) i nie blokować przy tym kuchni. Co w sytuacji, gdy przygotowanie dania wymaga wykonania \textbf{kilku czynności na raz}, a my musimy mieć pewność, że wszystkie zostały ukończone, zanim wydamy posiłek?
+
+Tu z pomocą przychodzi funkcja \texttt{join()}, która jest fundamentem synchronizacji w świecie korutyn.
+
+Wyobraź sobie, że jesteś Szefem Kuchni (Korutyna-Rodzic). Masz przygotować główne danie: \textit{Stek z warzywami}. Nie będziesz robić wszystkiego sam.
 \begin{itemize}
-  \item Warstwy: presentation, domain, data.
-  \item ViewModel, UseCase, Repository.
-  \item Komunikacja z Compose i Flow.
-  \item Testowalnosc i dependency injection.
-  \item Struktura folderow i modulow.
+\item Wołasz Pomocnika nr 1: \textit{Usmaż mięso!} (zajmie to 2 sekundy).
+\item Wołasz Pomocnika nr 2: \textit{Ugotuj warzywa!} (zajmie to 3 sekundy).
 \end{itemize}
 
-\section{Material zrodlowy}
-\begin{itemize}
-  \item PUM2/Wyk/Wyklad4.pdf.
-  \item \texttt{PUM2/Listy/W4-ViewModel\_basics.ipynb}, \texttt{PUM2/Listy/W4-Repository\_basics.ipynb}.
-  \item developer.android.com/topic/architecture.
-\end{itemize}
+Obaj pomocnicy ruszają do pracy w tym samym momencie (współbieżność). Główna korutyn jest wolna i może zająć się innymi sprawami. Ale nie może wydać dania dopóki nie będzie gotowe. To \textit{czekanie} wykonujemy za pomocą \texttt{join()}.
 
-\subsection{Warstwy architektury}
-\begin{itemize}
-  \item Presentation, domain, data - granice odpowiedzialnosci.
-  \item Przeplyw danych i dependency direction.
-  \item Organizacja modulow w projekcie.
-\end{itemize}
+Zobaczmy kod, któy symuluje taką sytuację:
 
-\subsection{MVVM w praktyce}
-\begin{itemize}
-  \item ViewModel i UI state.
-  \item UseCase/Interactor jako command.
-  \item Repository pattern i data sources.
-\end{itemize}
+\begin{minted}{kotlin}
+// 1. Szef Kuchni (Rodzic) rozpoczyna pracę
+scope.launch {
+    logs.add("Szef kuchni (rodzic): Zaczynamy!")
 
-\subsection{Testowanie i DI}
-\begin{itemize}
-  \item Testy jednostkowe warstw.
-  \item Mockowanie repository, fake data sources.
-  \item Integracja z Hilt i modulami DI.
-\end{itemize}
+    // 2. Zlecenie zadania Pomocnikowi 1 (Dziecko 1)
+    val jobMieso = launch {
+        delay(2000) // Symulacja smażenia
+        logs.add("Kucharz 1: Mięso usmażone (2s).")
+    }
 
-\subsection{Case study}
-\begin{itemize}
-  \item Mapa modulow aplikacji katalogowej.
-  \item Zadanie: zaprojektuj kontrakt interfejsu dla repository.
-  \item Checklist: zasady clean architecture.
-\end{itemize}
+    // 3. Zlecenie zadania Pomocnikowi 2 (Dziecko 2)
+    val jobWarzywa = launch {
+        delay(3000) // Symulacja gotowania
+        logs.add("Kucharz 2: Warzywa gotowe (3s).")
+    }
 
-\section{Elementy do rozbudowy}
-\begin{itemize}
-  \item Przyklad A: diagram warstw z przeplywem danych (TODO).
-  \item Przyklad B: implementacja prostego UseCase (TODO).
-  \item Zadania: ocena architektury sample app (TODO).
-  \item Pytania: rola domain layer, jak unikac naruszenia granic (TODO).
-\end{itemize}
+    logs.add("Szef kuchni: Zadania zlecone, scope czeka na zakończenie...")
 
-% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+    // 4. synchronizacja: Szef czeka na wyniki
+    jobWarzywa.join()
+    jobMieso.join()
+
+    // 5. Finał
+    logs.add("Szef kuchni: Wszyscy skończyli! Można podawać danie.")
+}
+\end{minted}
+
+W przykładzie widzimy koordynację zadań podrzędnych. Cały proces rozpoczyna się w momencie, gdy korutyna nadrzędna - nasz metaforyczny Szef Kuchni - uruchamia podzadania za pomocą funkcji \texttt{launch}. Jest to swego rodzaju \textit{bilet zamówienia}, który daje nam unikalny uchwyt do konkretnej, trwającej korutyny. W naszym przypadku tworzymy dwa takie uchwyty: \texttt{jobMieso} oraz \texttt{jobWarzywa}, które stają się dziećmi głównej korutyny uruchomionej w scope.
+
+Oba zadania startują niemal w tym samym momencie, co oznacza, że nie czekamy z gotowaniem warzyw do momentu, aż mięso będzie gotowe. Dzięki temu całkowity czas operacji nie jest sumą czasów poszczególnych zadań (5 sekund), lecz odpowiada czasowi najdłuższego z nich (3 sekundy). Jednak ta niezależność podzadań rodzi problem \textbf{synchronizacji}: co, jeśli Szef Kuchni zakończy swoją pracę szybciej niż jego pomocnicy? Bez odpowiedniej kontroli log \textit{Można podawać danie} pojawiłby się natychmiast po zleceniu zadań, co w naszej metaforze oznaczałoby wydanie klientowi pustego talerza, zanim składniki zdążą się ugotować.
+
+Rozwiązaniem problemu wyścigu (race condition) jest funkcja \texttt{join()}. Z technicznego punktu widzenia jest to funkcja zawieszająca (\texttt{suspend function}), która służy do synchronizacji cyklu życia korutyn. Kiedy korutyna nadrzędna (rodzic) napotyka instrukcję \texttt{jobWarzywa.join()}, jej wykonanie zostaje zawieszone. Należy wyraźnie podkreślić różnicę między zawieszeniem a zablokowaniem: wątek obsługujący tę korutynę nie jest blokowany i może w tym czasie wykonywać inne operacje systemowe. Mechanizm \texttt{join} wprowadza korutynę wywołującą w stan oczekiwania, który trwa dopóki obserwowany obiekt \texttt{Job} nie osiągnie stanu końcowego (Completed lub Cancelled). Dopiero gdy podzadanie faktycznie zakończy swoje działanie, maszyna stanów wznawia korutynę rodzica od kolejnej linii kodu. Dzięki jawnemu wywołaniu \texttt{join()} na obu obiektach \texttt{Job}, realizujemy kontrakt Ustrukturyzowanej Współbieżności, w którym rodzic świadomie koordynuje pracę swoich dzieci i gwarantuje, że żadna operacja nie zostanie zakończona przedwcześnie, zapewniając spójność danych i przewidywalność przepływu aplikacji.
+
+\section{Odbieranie Wyników}

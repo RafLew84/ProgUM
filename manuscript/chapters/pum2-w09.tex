@@ -1,61 +1,61 @@
-\chapter{Wyklad 9: Retrofit i integracja z API zewnetrznymi}
+\chapter{Wyklad 8: Room - model danych, CRUD i migracje}
 
 \begin{learningobjectives}
-  \item Skonfigurujesz Retrofit do pracy z API i serializerami.
-  \item Zastosujesz interceptory OkHttp oraz strategie retry.
-  \item Zabezpieczysz klucze API i obsluzysz bledy sieciowe.
+  \item Poznasz komponenty Room (Entity, DAO, Database).
+  \item Zaprojektujesz lokalna baze danych wraz z relacjami.
+  \item Przygotujesz strategie migracji i testowania zmian schematu.
 \end{learningobjectives}
 
 \section{Mapa rozdzialu}
 \begin{itemize}
-  \item Retrofit setup i konwertery.
-  \item OkHttp interceptors, logging, timeouts.
-  \item Autoryzacja i zarzadzanie kluczami API.
-  \item Error handling, retry, exponential backoff.
-  \item Integracja z Repository i coroutines.
+  \item Entity, DAO, Database - podstawowe elementy.
+  \item Zapytania, relacje, transakcje.
+  \item Migracje i seed danych.
+  \item Integracja z Flow i coroutines.
+  \item Testy instrumentacyjne i jednostkowe.
 \end{itemize}
 
 \section{Material zrodlowy}
 \begin{itemize}
-  \item PUM2/Wyk/Wyklad10.pdf.
-  \item \texttt{PUM2/Listy/W10-Retrofit\_basics.ipynb}, \texttt{PUM2/Listy/W10-Header\_basics.ipynb}.
-  \item square.github.io/retrofit.
+  \item PUM2/Wyk/Wyklad9.pdf.
+  \item \texttt{PUM2/Listy/W9-Room\_basics.ipynb}.
+  \item developer.android.com/training/data-storage/room.
 \end{itemize}
 
-\subsection{Konfiguracja Retrofit}
+\subsection{Model danych}
 \begin{itemize}
-  \item BaseUrl, converter, call adapter.
-  \item Moshi vs Kotlinx serialization.
-  \item Coroutine support i suspend functions.
+  \item Entity annotations, primary keys, indexes.
+  \item Relacje one-to-many i many-to-many.
+  \item Strategia normalizacji vs denormalizacji.
 \end{itemize}
 
-\subsection{OkHttp i interceptory}
+\subsection{DAO}
 \begin{itemize}
-  \item Logging, header i auth interceptors.
-  \item Timeouts, caching, retry policy.
-  \item Monitoring i metrics.
+  \item Query, Insert, Update, Delete.
+  \item Typy zwracane: Flow, suspend, PagingSource.
+  \item Transakcje, concurrency, walidacja danych.
 \end{itemize}
 
-\subsection{Bezpieczenstwo i bledy}
+\subsection{Migracje}
 \begin{itemize}
-  \item Przechowywanie kluczy API i secrets management.
-  \item Error mapping, sealed wynik operacji.
-  \item Retry, exponential backoff, circuit breaker.
+  \item AutoMigrations oraz migracje manualne.
+  \item Seed danych, fallback to destructive.
+  \item Testowanie migracji i weryfikacja schematu.
 \end{itemize}
 
 \subsection{Case study}
 \begin{itemize}
-  \item Integracja API produktow.
-  \item Zadanie: obsluga bledow i fallback offline.
-  \item Checklist: monitoring, logging, analytics.
+  \item Projekt tabel katalogu i powiazanych rekordow.
+  \item Zadanie: dodanie relacji ulubionych i historii.
+  \item Checklist: integracja z Repository i Flow.
 \end{itemize}
 
 \section{Elementy do rozbudowy}
 \begin{itemize}
-  \item Przyklad A: Retrofit service z interceptorem autoryzacji (TODO).
-  \item Przyklad B: wrapper na wyniki zapytan (TODO).
-  \item Zadania: implementacja retry z exponential backoff (TODO).
-  \item Pytania: rola call adapter, jak chronic klucze API (TODO).
+  \item Przyklad A: schema Room dla aplikacji katalogowej (TODO).
+  \item Przyklad B: migracja dodajaca kolumne i przenoszaca dane (TODO).
+  \item Zadania: test Room z inMemoryDatabaseBuilder (TODO).
+  \item Pytania: roznica auto vs manual migration, jak laczyc Room z Flow (TODO).
 \end{itemize}
 
 % TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

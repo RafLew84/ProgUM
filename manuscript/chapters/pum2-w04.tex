@@ -1,61 +1,61 @@
-\chapter{Wyklad 4: Flow i reaktywne zarzadzanie stanem}
+\chapter{Wyklad 3: Architektura aplikacji - MVVM i warstwy logiki}
 
 \begin{learningobjectives}
-  \item Zrozumiesz podstawy przeplywu danych w Kotlin Flow.
-  \item Zbudujesz reaktywne pipeline'y dla UI w Compose.
-  \item Przygotujesz strategie obslugi bledow i backpressure.
+  \item Utrwalisz role warstw w architekturze MVVM.
+  \item Nauczysz sie rozdzielac logike domenowa od prezentacji.
+  \item Przygotujesz schemat architektury dla projektu kursowego.
 \end{learningobjectives}
 
 \section{Mapa rozdzialu}
 \begin{itemize}
-  \item Flow cold vs hot - koncepcje podstawowe.
-  \item Operatorzy transformacji i kontrola przeplywu.
-  \item Buffering, conflation, backpressure.
-  \item Integracja z Compose i ViewModel.
-  \item Testowanie Flow i deterministyczne scenariusze.
+  \item Warstwy: presentation, domain, data.
+  \item ViewModel, UseCase, Repository.
+  \item Komunikacja z Compose i Flow.
+  \item Testowalnosc i dependency injection.
+  \item Struktura folderow i modulow.
 \end{itemize}
 
 \section{Material zrodlowy}
 \begin{itemize}
-  \item PUM2/Wyk/Wyklad5.pdf.
-  \item \texttt{PUM2/Listy/W5-Flow\_basics.ipynb}.
-  \item kotlinlang.org/docs/flow.html.
+  \item PUM2/Wyk/Wyklad4.pdf.
+  \item \texttt{PUM2/Listy/W4-ViewModel\_basics.ipynb}, \texttt{PUM2/Listy/W4-Repository\_basics.ipynb}.
+  \item developer.android.com/topic/architecture.
 \end{itemize}
 
-\subsection{Podstawy Flow}
+\subsection{Warstwy architektury}
 \begin{itemize}
-  \item Flow builders: flowOf, flow, callbackFlow.
-  \item Collect i terminal operators.
-  \item Flow vs Sequence - kiedy ktore rozwiazanie.
+  \item Presentation, domain, data - granice odpowiedzialnosci.
+  \item Przeplyw danych i dependency direction.
+  \item Organizacja modulow w projekcie.
 \end{itemize}
 
-\subsection{Transformacje i operatory}
+\subsection{MVVM w praktyce}
 \begin{itemize}
-  \item map, filter, flatMapLatest, combine.
-  \item buffer, conflate, distinctUntilChanged.
-  \item Error handling w pipeline i retry.
+  \item ViewModel i UI state.
+  \item UseCase/Interactor jako command.
+  \item Repository pattern i data sources.
 \end{itemize}
 
-\subsection{Integracja z UI}
+\subsection{Testowanie i DI}
 \begin{itemize}
-  \item StateFlow, SharedFlow jako hot streams.
-  \item collectAsState i lifecycle aware collect.
-  \item Testowanie przeplywu danych w ViewModel.
+  \item Testy jednostkowe warstw.
+  \item Mockowanie repository, fake data sources.
+  \item Integracja z Hilt i modulami DI.
 \end{itemize}
 
 \subsection{Case study}
 \begin{itemize}
-  \item Przetwarzanie danych katalogu (filtrowanie, sortowanie).
-  \item Zadanie: zestaw operatorow do transformacji wynikow API.
-  \item Checklist: best practices Flow.
+  \item Mapa modulow aplikacji katalogowej.
+  \item Zadanie: zaprojektuj kontrakt interfejsu dla repository.
+  \item Checklist: zasady clean architecture.
 \end{itemize}
 
 \section{Elementy do rozbudowy}
 \begin{itemize}
-  \item Przyklad A: pipeline filtrowania i sortowania (TODO).
-  \item Przyklad B: combine wielu zrodel danych (TODO).
-  \item Zadania: testy Flow z Turbine (TODO).
-  \item Pytania: roznica cold/hot, kiedy uzyc buffer (TODO).
+  \item Przyklad A: diagram warstw z przeplywem danych (TODO).
+  \item Przyklad B: implementacja prostego UseCase (TODO).
+  \item Zadania: ocena architektury sample app (TODO).
+  \item Pytania: rola domain layer, jak unikac naruszenia granic (TODO).
 \end{itemize}
 
 % TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.

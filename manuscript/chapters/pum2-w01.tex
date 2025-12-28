@@ -1,375 +1,722 @@
-\chapter{Wprowadzenie do wielowatkowosci i coroutines (Wyklad 1)}
+\chapter{Organizacja kursu i nawigacja Compose (Wykład 1)}
 
-\section{Problem Zamrożonego UI i \textit{Piekło Callbacków}}
-Zanim zagłębimy się w to, czym są korutyny, musimy zrozumieć, z jakim fundamentalnym problemem musimy mierzyć się od samych początków Androida. Ten problem ma swoje źródło w jednej, kluczowej koncepcji: \textbf{Wątku Głównym}.
+\section{Podstawowe informacje o kursie}
+\subsection{Organizacja kursu}
+Zajęcia obejmują łącznie 75 godzin pracy studenta, z czego 15 godzin przeznaczonych jest na wykłady (45 minutowy wykład na tydzień), a 30 godzin na zajęcia laboratoryjne. Dodatkowo przewidziano 30 godzin pracy własnej studenta, niezbędnej do samodzielnego opracowania materiału, przygotowania projektów oraz pogłębiania wiedzy. Kurs kończy się uzyskaniem 3 punktów ECTS. 
 
-Każda aplikacja na Androida, którą uruchamiasz, \textit{żyje i umiera} w jednym, głównym procesie. Wewnątrz tego procesu istnieje jeden, niezwykle ważny wątek, znany jako \textbf{Wątek Główny} (Main Thread) lub \textbf{Wątek UI} (UI Thread).
-
-Ten wątek jest odpowiedzialny za wszystko, co użytkownik widzi i z czym wchodzi w interakcję:
+W trakcie zajęć wykorzystywane są materiały dydaktyczne dostępne pod adresem: \url{https://github.com/RafLew84/ProgUM}.  Obowiązkowa i zalecana literatura:
 \begin{itemize}
-\item \textbf{Rysowanie interfejsu}: Aktualizowanie widoków, wywoływanie funkcji \texttt{@Composable}.
-\item \textbf{Obsługa zdarzeń}: Reagowanie na kliknięcia, przewijanie, wpisywanie tekstu.
-\item \textbf{Animacje}: Płynne przesuwanie elementów po ekranie.
+\item Dokumentację języka Kotlin (\url{https://kotlinlang.org/docs/home.html}
+) 
+\item oficjalne kursy programowania aplikacji mobilnych dostępne na platformie Android Developers (\url{https://developer.android.com/courses}).
 \end{itemize}
-Wątek UI to w zasadzie nieskończona pętla zdarzeń, która musi działać z prędkością co najmniej 60 klatek na sekundę (nowsze modele posiadają odświeżanie na poziomie 144 Hz). Jeśli kiedykolwiek przestanie pracować – choćby na ułamek sekundy – użytkownik natychmiast to zauważy. Aplikacja \textit{zacina się, laguje}. Dla ekranów 60 Hz mamy do dyspozycji około 16 ms na wykonanie wszystkich operacji (włącznie z renderowaniem UI)(\ref{fig:figura-render}).
+
+\subsection{Zasady zaliczenia}
+\begin{itemize}
+  \item Warunkiem zaliczenia laboratorium jest uzyskanie \textbf{oceny pozytywnej z list zadań}.
+  \item Na zajęcia przewidzianych jest \textbf{5 list zadań}.
+  \item Z każdej listy wystawiana jest \textbf{osobna ocena}.
+  \item \textbf{Nie jest konieczne} zaliczenie wszystkich list aby otrzymać ocenę pozytywną z laboratorium. Dopuszczalne jest nieoddanie/niezaliczenie \textbf{jednej listy} - za tą listę otrzymuje się ocenę 2,0.
+  \item Każda lista posiada informację o \textbf{liczbie} punktów wymaganych na konkretną ocenę
+  \item Każda lista posiada \textbf{termin zwrotu}.
+  \item Za \textbf{każdy tydzień opóźnienia} otrzymana ocena jest \textbf{obniżana o 1,0}.
+  \item Listy oddawane są \textbf{podczas zajęć laboratoryjnych}. 
+  \item Do każdej listy prowadzący \textbf{zadaje 4 pytania}.
+  \item Liczba punktów za listę jest przyznawana na podstawie \textbf{poprawności wykonania zadań} oraz \textbf{odpowiedzi ustnej}.
+  \item Ocena końcowa jest \textbf{średnią arytmetyczną} ze \textbf{wszystkich ocen} z list.
+  \item Na ocenę 3,0 \textbf{wymagana jest} średnia co najmniej 3,0.
+  \item Na zajęciach laboratoryjnych dopuszczalne są \textbf{trzy nieobecności nieusprawiedliwione}.
+\end{itemize}
+
+\subsection{Treści Programowe}
+\begin{enumerate}
+  \item Zasady zaliczenia, Treści Programowe, Zaawansowana Nawigacja.
+  \item Wprowadzenie do Wielowątkowości: Coroutines. Wątek główny.
+  \item Coroutines. Współbieżność, Równoległość, Asynchroniczność.
+  \item Podstawy Architektury Aplikacji: Wzorce MVx (MVC, MVP, MVVM).
+  \item Reaktywne Zarządzanie Stanem: Flow, StateFlow, SharedFlow.
+  \item Zaawansowane Zarządzanie Stanem: withContext, StateIn, ShareIn, FlowOn, combine.
+  \item Coroutines: Kanały - Asynchroniczna Wymiana Danych Między Coroutines.
+  \item Zapis Danych do Pliku: SharedPreferences, DataStore.
+  \item Baza Danych SQLite + ROOM: Entity, Dao, Database, CRUD, Operacje Asynchroniczne.
+  \item Praca z Zewnętrznymi Źródłami Danych: Retrofit2, Operacje Asynchroniczne.
+  \item Wstrzykiwanie Zależności: Dagger, Hilt.
+  \item Czysta Architektura - Warstwa Domeny i Wzorzec Use Case.
+  \item Wzorzec Single Source of Truth - Strategia Offline Caching.
+  \item Backend w Chmurze: Wprowadzenie do Firebase i Firestore
+\end{enumerate}
+
+\section{Android Studio - Rozpoczęcie i konfiguracja projektu - Przypomnienie}
+Podczas zajęć tworzymy projekty w Android Studio, w Kotlinie, z interfejsem budowanym w Jetpack Compose (bez widoków XML). Najprościej zacząć od kreatora: \texttt{New Project $\rightarrow$ Empty Activity}. Ustaw \texttt{Language: Kotlin}, \texttt{Minimum SDK: 28+} i zaakceptuj ustawienia. Taki szablon tworzy gotowy projekt z poprawną konfiguracją Compose i przykładowym \texttt{setContent \{ … \}}. 
+
+\textbf{UWAGA!!!} Nie używaj Empty Views Activity - to rozpoczyna projekt oparty o \textit{widoki}, gdzie ui definiujemy jako pliki XML.
+
+\subsection{Dodawanie zależności}
+Wszystkie zależności dopisujemy w bloku \texttt{dependencies \{ … \}} pliku \texttt{build.gradle(.kts)(Module:App)}. Przykładowy plik:
+
+\textbf{UWAGA!!!!} NIE KOPIUJ PLIKÓW KONFIGURACYJNYCH - zawierają informacje UNIKALNE DLA PROJEKTU !!!!
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+}
+
+android {
+    namespace = "com.example.test"
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = "com.example.test"
+        minSdk = 28
+        targetSdk = 36
+        versionCode = 1
+        versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+    buildFeatures {
+        compose = true
+    }
+}
+
+dependencies {
+    // tutaj dodajemy zależności
+
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.ui.test.manifest)
+}
+\end{minted}
+
+\textbf{UWAGA!!!} Pamiętaj aby wykonać \textbf{synchronizację} (\ref{fig:figura-1}) projektu po jakiejkolwiek zmianie w plikach z katalogu \texttt{gradle}
 
 \begin{figure}[htbp]
-    \includegraphics[width=0.7\textwidth]{fig/pum2-w01-fig1.png}
-    \caption{Czas renderowania okna głównego.}
-    \label{fig:figura-render}
+    \includegraphics{fig/pum2-w01-fig1.png}
+    \caption{Okno programu z widokiem na plik konfiguracyjny.}
+    \label{fig:figura-1}
 \end{figure}
 
-Co się stanie, gdy wciśniemy w ten pędzący mechanizm kij? Przeanalizujmy przykład:
+\section{Szuflada Nawigacyjna}
+W tej części skupimy się na praktycznej implementacji nawigacji w aplikacji Jetpack Compose. Zakładając, znajomość podstawowych bloków konstrukcyjnych: NavHost i NavController, przyjrzymy się, jak zintegrować je z zaawansowanymi komponentami Material 3, takimi jak szuflada nawigacyjna.
 
-\begin{minted}{kotlin}
+Przeanalizujmy kod, który implementuje jeden z najczęstszych wzorców nawigacyjnych w aplikacjach mobilnych: szufladę nawigacyjną (znaną również jako \textit{hamburger menu})(\ref{fig:Figura 2}).
+
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w01-fig2.png}
+    \caption{Szuflada nawigacyjna.}
+    \label{fig:Figura 2}
+\end{figure}
+
+Załączony kod to kompletna, choć minimalistyczna, aplikacja demonstrująca łączenie komponentów \texttt{Jetpack Navigation}, \texttt{Scaffold} oraz \texttt{ModalNavigationDrawer}. Przyjrzyjmy się jej kluczowym elementom krok po kroku.
+
+Aby móc pracować z \texttt{compose navigation} musimy dodać odpowiednią \textbf{zależność} do projektu
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+dependencies {
+    implementation("androidx.navigation:navigation-compose:2.9.2")
+}
+\end{minted}
+
+Pierwszym elementem jest \textbf{centralizacja tras nawigacyjnych} w obiekcie \texttt{data object AppDestinations}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+data object AppDestinations {
+    const val HOME = "home"
+    const val PROFILE = "profile"
+    const val SETTINGS = "settings"
+}
+\end{minted}
+
+
+Centralizacja zapewnia bezpieczeństwo typów, ułatwia refaktoryzację (zmieniamy nazwę w jednym miejscu).
+
+W aplikacji zagnieżdżamy kilku komponentów . Hierarchia wygląda następująco:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainApp() {
+    val navController = rememberNavController()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            DrawerContent(navController = navController, drawerState = drawerState)
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Aplikacja z Szufladą") },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            scope.launch { drawerState.apply { if (isClosed) open() else close() } }
+                        }) { Icon(Icons.Filled.Menu, contentDescription = "Menu") }
+                    }
+                )
+            }
+        ) { paddingValues ->
+            NavHost(
+                navController = navController,
+                startDestination = AppDestinations.HOME,
+                modifier = Modifier.padding(paddingValues)
+            ) {
+                composable(AppDestinations.HOME) { HomeScreen() }
+                composable(AppDestinations.PROFILE) { ProfileScreen() }
+                composable(AppDestinations.SETTINGS) { SettingsScreen() }
+            }
+        }
+    }
+}
+\end{minted}
+
+\begin{enumerate}
+  \item \texttt{ModalNavigationDrawer}: Jest to komponent najwyższego poziomu, który zarządza logiką pokazywania i ukrywania wysuwanej szuflady. Przyjmuje on dwa kluczowe parametry:
+  \begin{itemize}
+    \item \texttt{drawerState}: Stan szuflady (otwarta/zamknięta).
+    \item \texttt{drawerContent}: Funkcja kompozycyjna definiująca zawartość samej szuflady (\texttt{DrawerContent}).
+  \end{itemize}
+  \item \texttt{Scaffold}: Umieszczony wewnątrz \texttt{ModalNavigationDrawer}, \texttt{Scaffold} zapewnia standardową strukturę ekranu. W naszym przypadku używamy go do zdefiniowania \texttt{topBar} (górnego paska aplikacji).
+
+  \item \texttt{NavHost}: Na końcu, wewnątrz \texttt{Scaffold}, umieszczamy nasz \texttt{NavHost}. To on zarządza faktyczną podmianą treści ekranu (\texttt{HomeScreen, ProfileScreen} itd.). Zwróćmy uwagę na kluczowe powiązanie: \texttt{modifier = Modifier.padding(paddingValues)}. Przekazujemy tu wypełnienie (\texttt{paddingValues}) otrzymane ze \texttt{Scaffold}, co zapewnia, że nasza treść nie zostanie przysłonięta przez \texttt{TopAppBar}.
+\end{enumerate}
+
+W funkcji \texttt{MainApp} zauważymy trzy kluczowe \textbf{zmienne stanu}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val navController = rememberNavController()
+val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+val scope = rememberCoroutineScope()
+\end{minted}
+
+Pierwsze dwie są oczywiste: jedna zarządza \textbf{stosem nawigacji}, druga \textbf{stanem szuflady}. Ale dlaczego potrzebujemy \texttt{scope}?
+
+Odpowiedź leży w naturze \texttt{drawerState}. Metody \texttt{drawerState.open()} i \texttt{drawerState.close()} są funkcjami zawieszającymi (\texttt{suspend functions}) - więcej o tych funkcjach w kolejnych rozdziałach. Nie można ich po prostu wywołać z dowolnego miejsca - muszą być uruchomione wewnątrz \textbf{korutyny}. Zmiana \texttt{drawerState} automatycznie spowoduje \textbf{rekompozycję} i wizualne otwarcie szuflady.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+{scope.launch { drawerState.apply { if (isClosed) open() else close() } }})
+\end{minted}
+
+Przejdźmy do zarządzania nawigację z wnętrza szuflady. W funkcji \texttt{MainApp} dodaliśmy \texttt{ModalNavigationDrawer}, który posiada parametr \texttt{drawerContent} - jako ten parametr przekazujemy funkcję \texttt{DrawerContent}, zajrzyjmmy do jej wnętrza:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DrawerContent(navController: NavController, drawerState: DrawerState) {
+    val scope = rememberCoroutineScope()
+
+    ModalDrawerSheet {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Menu", style = MaterialTheme.typography.headlineSmall)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Home, contentDescription = "Strona główna") },
+                label = { Text("Strona główna") },
+                selected = false,
+                onClick = {
+                    navController.navigate(AppDestinations.HOME)
+                    scope.launch { drawerState.close() }
+                }
+            )
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Person, contentDescription = "Profil") },
+                label = { Text("Profil") },
+                selected = false,
+                onClick = {
+                    navController.navigate(AppDestinations.PROFILE)
+                    scope.launch { drawerState.close() }
+                }
+            )
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Settings, contentDescription = "Ustawienia") },
+                label = { Text("Ustawienia") },
+                selected = false,
+                onClick = {
+                    navController.navigate(AppDestinations.SETTINGS)
+                    scope.launch { drawerState.close() }
+                }
+            )
+        }
+    }
+}
+\end{minted}
+
+Wewnątrz \texttt{ModalDrawerSheet} definiujemy elementy będące wyświetlane w szufladzie jako \texttt{NavigationDrawerItem}. Jest to element zaprojektowany według tego samego wzorca (\textit{slot-based-layouts}). Posiada zdefiniowane \textit{sloty} w które można wstawić elementy (\texttt{icon, label, divider}), upraszczając tworzenie całego layoutu.
+Po kliknięciu elementu w szufladzie wykonujemy dwie akcje:
+\begin{itemize}
+  \item \textbf{Nawigujemy}: Wywołujemy \texttt{navController.navigate()}, aby zmienić zawartość \texttt{NavHost}.
+  \item \textbf{Zamykamy szufladę}: Uruchamiamy korutynę (\texttt{scope.launch}), aby wywołać \texttt{drawerState.close()}.
+\end{itemize}
+
+Jak widzimy, nawigacja w Jetpack Compose to znacznie więcej niż tylko wywoływanie \texttt{navController.navigate()}. To przemyślana integracja kontrolera nawigacji z innymi komponentami interfejsu, takimi jak \texttt{ModalNavigationDrawer}. Istotnym elementem jest zrozumienie, jak zarządzać wieloma stanami (\texttt{navController, drawerState}) oraz jak obsługiwać \textbf{asynchroniczne wywołania} (funkcje \texttt{suspend} do otwierania/zamykania szuflady) za pomocą odpowiednich narzędzi, takich jak \texttt{rememberCoroutineScope}.
+
+Na kolejnych wykładach zagłębimy się w korutyny, które są fundamentem działania tego przykładu.
+
+
+\subsection{Pełny Kod Przykładu}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            AnrappTheme {
-                BlockingUiDemoScreen()
+            MyApplicationTheme {
+                MainApp()
             }
         }
     }
 }
 
+data object AppDestinations {
+    const val HOME = "home"
+    const val PROFILE = "profile"
+    const val SETTINGS = "settings"
+}
+
 @Composable
-fun BlockingUiDemoScreen() {
-    var statusText by remember { mutableStateOf("Naciśnij przycisk, aby rozpocząć operację.") }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp).background(Color.Cyan),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+fun HomeScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = "Demonstracja Blokowania Wątku UI",
-            style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(50.dp))
-
-        Text(
-            text = statusText,
-            fontSize = 18.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.height(80.dp)
-        )
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Button(
-            onClick = {
-                statusText = "Operacja rozpoczęta..."
-
-                try {
-                    Thread.sleep(10000)
-                } catch (e: InterruptedException) {
-                }
-
-                statusText = "Operacja zakończona!"
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Uruchom 10-sekundową operację blokującą")
-        }
-        Spacer(modifier = Modifier.height(40.dp))
-
-        var sliderPosition by remember { mutableStateOf(0f) }
-        Text("Spróbuj poruszyć tym suwakiem, gdy operacja trwa:")
-        Slider(
-            value = sliderPosition,
-            onValueChange = { sliderPosition = it }
-        )
+        Text("Strona Główna", fontSize = 24.sp)
     }
 }
-\end{minted}
 
-Zwróćmy uwagę, że mamy w ui przycisk i suwak. Wewnątrz funkcji \texttt{onClick} przycisku mamy kod:
-
-\begin{minted}{kotlin}
-Button(
-    onClick = {
-        statusText = "Operacja rozpoczęta..."
-
-        try {
-            Thread.sleep(10000)
-        } catch (e: InterruptedException) {
-        }
-
-        statusText = "Operacja zakończona!"
-    },
-    modifier = Modifier.fillMaxWidth()
-) {
-    Text("Uruchom 10-sekundową operację blokującą")
+@Composable
+fun ProfileScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Profil Użytkownika", fontSize = 24.sp)
+    }
 }
-\end{minted}
 
-Wywołujemy \texttt{Thread.sleep(10000)}, czyli blokujemy wątek UI na 10 sekund. W tym czasie:
-\begin{itemize}
-\item Przycisk nie pokaże animacji kliknięcia.
-\item Inne animacje na ekranie będą zamrożone.
-\item Użytkownik, wykonując jakąkolwiek interakcję z ekranem, nie otrzyma żadnej odpowiedzi.
-\end{itemize}
-
-System operacyjny Android szybko zauważa, że nasza aplikacja nie odpowiada na zdarzenia. Po kilku sekundach wyświetla komunikat: \textit{Aplikacja nie odpowiada} (ANR - Application Not Responding)(\ref{fig:figura-anr}).
-
-\begin{figure}[htbp]
-    \includegraphics[width=0.7\textwidth]{fig/pum2-w01-fig2.png}
-    \caption{Błąd ANR.}
-    \label{fig:figura-anr}
-\end{figure}
-
-Wszystkie długotrwałe operacje: pobieranie danych z sieci, odczyt z bazy danych, skomplikowane obliczenia – muszą odbywać się \textbf{w tle}.
-
-Przez lata, zanim pojawiły się korutyny, \textit{praca w tle} oznaczała ręczne zarządzanie wątkami. Jeśli programista chciał pobrać dane z sieci po kliknięciu przycisku, jego plan działania musiał wyglądać tak:
-\begin{enumerate}
-\item W \texttt{onClick} (Wątek UI): Utwórz nowy, ręczny obiekt \texttt{Thread}.
-\item W metodzie \texttt{run()} nowego wątku (Wątek Tła): Wykonaj czasochłonną operację sieciową.
-\item Po zakończeniu operacji: Zdobądź wynik (np. dane użytkownika).
-\item Problem: Nie możesz zaktualizować UI (np. \texttt{TextView}) z tego Wątku Tła. Spowoduje to awarię aplikacji.
-\item Rozwiązanie: Utwórz obiekt Handler powiązany z Wątkiem UI.
-\item Użyj \texttt{handler.post \{... \}}, aby \textit{wysłać} wynik z powrotem do Wątku UI, który jako jedyny może bezpiecznie zaktualizować interfejs.
-\end{enumerate}
-
-Ten proces był skomplikowany, ale jeszcze gorsze stawało się, gdy operacje były od siebie zależne. Wyobraźmy sobie pobranie danych użytkownika, następnie na ich podstawie pobranie jego zdjęcia, a na końcu zapisanie go w bazie:
-
-\begin{minted}{java}
-button.setOnClickListener(v -> {
-    // 1. Przechodzimy do tła, by pobrać użytkownika
-    new Thread(() -> {
-        User user = api.fetchUser("123");
-        
-        // 2. Musimy znowu przejść do tła, by pobrać zdjęcie
-        new Thread(() -> {
-            ProfilePicture pic = api.fetchPicture(user.getPictureUrl());
-            
-            // 3. I jeszcze raz do tła, by zapisać w bazie
-            new Thread(() -> {
-                database.save(pic);
-                
-                // 4. Wracamy do Wątku UI, by pokazać sukces
-                mainThreadHandler.post(() -> {
-                    imageView.setImage(pic);
-                    textView.setText("Gotowe!");
-                });
-            }).start();
-        }).start();
-    }).start();
-});
-\end{minted}
-
-To, co widzimy powyżej, to \textit{Piekło Callbacków} (\textit{Callback Hell}). Kod staje się piramidą zagnieżdżonych wywołań. Jest praktycznie nieczytelny, niemożliwy do testowania, a obsługa błędów w każdym z tych kroków staje się koszmarem.
-
-To jest właśnie problem, który doprowadził do rewolucji. Potrzebowaliśmy sposobu na pisanie kodu asynchronicznego, który wyglądałby jak prosty kod synchroniczny; bez callbacków i bez ręcznego zarządzania wątkami.
-
-\section{Korutyny}
-
-\subsection{Wstęp}
-
-Po zidentyfikowaniu fundamentalnego problemu blokowania \textbf{Wątku Głównego}, naturalne pytanie brzmi: \textit{Jaka jest alternatywa?}. Przez lata próbowaliśmy wielu rozwiązań, ale dopiero Kotlin wprowadził model, który zrewolucjonizował programowanie na Androida. Mowa o korutynach.
-
-Aby zrozumieć ich siłę, musimy precyzyjnie zdefiniować, czym są i czym nie są.
-
-Najczęściej spotkasz się z definicją korutyny jako \textit{lekkiego wątku} (\textit{lightweight thread}). Jest to użyteczne uproszczenie, pomaga zrozumieć, że korutyny, podobnie jak wątki, wykonują jakąś pracę w tle. Jednak to porównanie jest też mylące, ponieważ pomija ich najważniejszą cechę. \textbf{UWAGA!!!} - Korutyna nie jest wątkiem.
-
-Lepszą, bardziej precyzyjną definicją jest: \textit{zawieszalne (suspendable) obliczenie}.
-
-Pomyśl o korutynie nie jak o pracowniku, ale jak o zadaniu lub jednostce pracy, którą można w dowolnym momencie wstrzymać (zawiesić) i wznowić w przyszłości, nie blokując przy tym pracownika (wątku), który ją wykonuje.
-
-Kluczowa Różnica: Korutyna kontra Wątek
-\begin{itemize}
-\item \textbf{Wątek (Thread)} jest zarządzany przez System Operacyjny (OS). Jest \textit{ciężki}, jego utworzenie i utrzymanie zużywa znaczące zasoby systemowe. Przełączanie się między wątkami jest operacją kosztowną dla procesora, ponieważ system musi zapisać stan jednego wątku i wczytać stan drugiego.
-\item \textbf{Korutyna (Coroutine)} jest zarządzana przez środowisko uruchomieniowe Kotlina. Jest \textit{lekka}, to w zasadzie tylko obiekt w pamięci, który śledzi stan wykonywanego zadania. Tysiące, a nawet miliony korutyn mogą być uruchomione i zarządzane przez jeden wątek. Przełączanie się między korutynami jest niemal darmowe.
-\end{itemize}
-
-Korutyna \textbf{nie jest wątkiem}. Korutyna \textbf{wykonuje się na wątku}.
-
-Wyobraźmy sobie kuchnię (naszą aplikację) i kucharza (Wątek).
-
-\textbf{Scenariusz 1: Kucharz} jako Tradycyjny Wątek (Model Blokujący) Kucharz (Wątek UI) bierze przepis (zadanie). Pierwszy punkt przepisu brzmi: \textit{Gotuj wodę przez 5 minut}. Kucharz włącza kuchenkę, a następnie stoi bezczynnie przez 5 minut, wpatrując się w garnek. W tym czasie w kuchni panuje chaos. Dzwoni telefon (interakcja użytkownika), przychodzą nowi goście (animacje) - ale kucharz jest zablokowany. Nie może zrobić nic innego, dopóki woda się nie zagotuje. To jest właśnie to, co robi \texttt{Thread.sleep()}.
-
-\textbf{Scenariusz 2: Kucharz z Korutynami} (Model Nieblokujący) Ten sam kucharz (ten sam Wątek UI) bierze ten sam przepis (teraz jako korutynę). Czyta: \textit{Gotuj wodę przez 5 minut}. Kucharz nastawia wodę do gotowania (inicjuje operację wejścia/wyjścia), a następnie zawiesza (suspend) ten przepis i odkłada go na bok. Ponieważ jego ręce są wolne, natychmiast przechodzi do innego zadania - na przykład zaczyna kroić warzywa (obsługuje kliknięcie) lub przyprawiać sałatkę (rysuje animację). Kiedy po 5 minutach słyszy gwizdek czajnika (operacja w tle się zakończyła), kucharz wznawia (resume) pierwszy przepis i kontynuuje od miejsca, w którym skończył.
-
-W tym modelu jeden kucharz (jeden wątek) żongluje wieloma przepisami (korutynami) jednocześnie, nigdy nie marnując czasu na bezczynne czekanie. Dodajmy tutaj że to, co nazywamy \textit{zawieszeniem (suspend)}, to nie jest \textit{pauza} dla całej pracy. To jest \textit{pauza} dla tej \textbf{konkretnej korutyny na tym konkretnym wątku}. To, kto rzeczywiście wykonuje pracę przy gotowaniu wody, rozwiążemy za chwilę.
-
-\subsection{Wątek roboczy}
-
-Musimy wyjaśnić, czym jest przepis w naszej analogii; jest to byt, który nazywamy funkcją z możliwością zawieszenia wykonania (\texttt{suspend fun})
-
-Zobaczmy czym różni się korutyna od \texttt{suspend fun}. \texttt{suspend fun} ma się tak do korutyny, jak klasa ma się do instancji tej klasy; możemy mieć wiele instancji tej samej klasy:
-\begin{itemize}
-\item \texttt{suspend fun} to definicja lub plan (blueprint). To tylko definicja kroków, które mają zostać wykonane. Sama w sobie nie robi nic. Nie jest \textit{aktywna}. Nie ma stanu \textit{działam} lub \textit{jestem zawieszona}
-\item korutyna to instancja lub aktywne wykonanie tego planu. Powstaje, gdy bierzesz \texttt{suspend fun} (lub dowolny blok kodu \texttt{suspend}) i faktycznie go uruchamiasz. Korutyna ma stan (aktywna, zawieszona, anulowana). To jest ten \textit{pracownik}, który wykonuje kroki z planu.
-\end{itemize}
-
-Kiedy piszesz w kodzie \texttt{scope.launch \{... \}} (zaraz wyjaśnimy czym jest \texttt{scope}), ten blok kodu \texttt{launch} (nazywany konstruktorem korutyny) tworzy i uruchamia nową korutynę (nową \textit{instancję} pracy). Ta nowa, żywa korutyna zaczyna wykonywać kod wewnątrz bloku \texttt{\{...\}}. Może działać następująco:
-\begin{enumerate}
-\item Korutyna (instancja) wywołuje \texttt{suspend fun} (plan).
-\item Ta \texttt{suspend fun} (np. \texttt{delay}) mówi do korutyny: \textit{muszę teraz poczekać 1 sekundę. Możesz mnie zawiesić.}
-\item Korutyna (instancja) przechodzi w stan \textit{zawieszona}. \textbf{Zwalnia} \textit{kucharza} (wątek), który może iść robić coś innego (np. obsługiwać UI).
-\item Po 1 sekundzie \texttt{delay} się kończy.
-\item Korutyna (instancja) jest wznawiana na \textbf{dowolnym wolnym wątku} i kontynuuje pracę od następnej linii.
-\end{enumerate}
-
-Słowo kluczowe \texttt{suspend} \textbf{nie oznacza}, że funkcja automatycznie wykonuje się na wątku w tle! Oznacza jedynie, że funkcja \textbf{może zostać zawieszona}. Jeśli wewnątrz funkcji \texttt{suspend} wykonasz kosztowną operację (np. ciężkie obliczenia matematyczne) bez \textbf{jawnego przełączenia dyspozytora} (o dyspozytorach nieco później), nadal \textbf{zablokujesz wątek wywołujący} (w tym przypadku Wątek UI).
-
-Wracając do pytania: kto gotuje wodę gdy kucharz pójdzie np. kroić warzywa?
-
-W tej analogii kucharz będzie naszym \textbf{wątkiem UI} (\textbf{wątkiem głównym}), którego nie chcemy blokować długimi operacjami. Ale nie jest on jedynym pracownikiem kuchni, są również \textbf{pomocnicy kuchenni} (\textbf{wątki robocze/poboczne}). Nasza analogia wygląda teraz następująco:
-
-\begin{enumerate}
-\item Szef Kuchni (Wątek UI) \textbf{bierze przepis} (korutynę). Czyta pierwszy punkt: \textit{Gotuj wodę przez 5 minut} (np. pobierz dane z sieci, co robi \texttt{suspend fun}).
-\item Szef Kuchni \textbf{nie gotuje wody osobiście}. To strata jego cennego czasu (musi obsługiwać UI).
-\item Zamiast tego, woła \textbf{Pomocnika Kuchennego}. Daje mu garnek z wodą i mówi: \textit{Nastaw to na gazie (wykonaj operację sieciową). Jak się zagotuje, daj mi znać}.
-\item Ten Pomocnik idzie i faktycznie \textbf{wykonuje pracę}. Patrzy na garnek (czeka na odpowiedź sieci).
-\item Szef Kuchni (Wątek UI), natychmiast po wydaniu polecenia, zawiesza (\texttt{suspend}) ten przepis - odkłada go na bok z notatką \textit{czekam na wodę od pomocnika}.
-\item Ponieważ jego ręce są wolne, Szef Kuchni (Wątek UI) natychmiast przechodzi do krojenia warzyw (obsługuje kliknięcie) i przyprawiania sałatki (rysuje animację).
-\item Po 5 minutach Pomocnik (wątek IO) kończy pracę. Przybiega do Szefa Kuchni i mówi: \textit{Woda dla przepisu nr 5 jest gotowa!} (sygnał zwrotny trafia z powrotem do Wątku Głównego).
-\item Szef Kuchni (Wątek UI), gdy tylko skończy kroić sałatkę, bierze zawieszony przepis nr 5 i wznawia (\texttt{resume}) go od następnego kroku.
-\end{enumerate}
-
-\subsection{CoroutineScope}
-
-Kucharz nie może pracować w próżni, potrzebuje kuchni; przestrzeni przystosowanej do obsługiwania zadań kucharza, oraz posiadającej przygotowanych pomocników. \textit{Kuchnia} to środowisko, w którym przepisy są realizowane, podobnie, nie możesz po prostu uruchomić korutyny \textit{w powietrzu}; musisz ją uruchomić wewnątrz jakiegoś \texttt{CoroutineScope}. Nową korutynę tworzymy i włączamy za pomocą metody \texttt{launch} i możemy to zrobić tylko na \texttt{CoroutineScope}; przykładowo \texttt{scope.launch\{\}}. Wtedy mówimy: \textit{Chcę, aby ten przepis (korutyna) został wykonany w tej kuchni (scope)}.
-
-Każda Kuchnia (\texttt{CoroutineScope}) ma swój regulamin i swoje zasoby. Ten \textit{regulamin} to obiekt o typie \texttt{CoroutineContext} (Kontekst Korutyny). Posiada on zestaw atrybutów dla tej konkretnej kuchni. Dwa najważniejsze elementy w tym kontekście to:
-\begin{itemize}
-\item \texttt{Job} (Szef Zmiany): To jest komponent odpowiedzialny za cykl życia.
-\item \texttt{Dispatcher} (Szef Kucharzy): To jest komponent odpowiedzialny za przydzielanie pracy.
-\end{itemize}
-
-\texttt{Dispatcher} (Szef Kucharzy), który jest częścią \texttt{CoroutineContext} danej Kuchni, posiada \textbf{własnych pomocników} (własną pulę wątków) wątki. \texttt{Dispatcher} to w zasadzie strateg planowania. Mówi on, na którym wątku (lub puli wątków) dany \textit{przepis} (korutyna) ma być w danym momencie wykonywany. Mamy kilku głównych \textit{Szefów Kucharzy} (Dispatcherów), których możemy wybrać:
-\begin{itemize}
-\item \texttt{Dispatchers.Main}: Ten \textit{Szef} ma pod sobą tylko jednego, specjalistycznego kucharza - Wątek UI. Każde zadanie, które mu dasz, zostanie wykonane tylko przez ten jeden wątek. Idealny do aktualizowania interfejsu.
-\item \texttt{Dispatchers.IO}: Ten \textit{Szef} zarządza dużą, współdzieloną pulą wątków (pulą kucharzy) zoptymalizowaną do zadań wejścia-wyjścia (operacje sieciowe, dyskowe). Kiedy dajesz mu 100 przepisów (korutyn), on efektywnie rozdziela je między dostępnych kucharzy w swojej puli.
-\item \texttt{Dispatchers.Default}: Ten \textit{Szef} również zarządza pulą wątków, ale jest ona zoptymalizowana pod zadania obciążające procesor (np. sortowanie ogromnej listy).
-\end{itemize}
-
-Kiedy korutyna (przepis) uruchomiona na \texttt{Dispatchers.IO} musi poczekać na odpowiedź z sieci (zawiesza się, \texttt{suspend}), \textbf{zwraca} \textit{pomocnika} (wątek) \textbf{z powrotem do puli}, aby ten mógł zająć się innym zadaniem. Kiedy odpowiedź z sieci wraca, korutyna jest wznawiana i dostaje \textbf{dowolnego} wolnego pomocnika (wątek) z puli \texttt{Dispatchers.IO}, aby kontynuować pracę. Korutyna nie ma puli wątków. Korutyna używa puli wątków udostępnianej przez jej \texttt{Dispatcher}.
-
-Drugim kluczowym elementem \texttt{CoroutineScope} jest \texttt{Job} (w naszej analogii będzie to odpowiednik Szefa Zmiany). Śledzi wszystkie korutyny aktualnie gotowane w danym zakresie (kuchni). Działa jak \textit{rodzic} dla wszystkich korutyn uruchomionych w tym \texttt{scope}. Kiedy uruchamiasz korutynę za pomocą \texttt{launch}, funkcja ta zwraca właśnie obiekt \texttt{Job}.
-
-\begin{minted}{kotlin}
-val job = scope.launch {... }
-\end{minted}
-
-\texttt{Job} to jedyny sposób, aby dowiedzieć się, co dzieje się z korutyną. Działa jak interaktywny bilet zamówienia w restauracji. Przechowuje on aktualny stan \textit{wykonania przepisu}:
-\begin{itemize}
-\item New: Zamówienie przyjęte, ale jeszcze nie zaczęte.
-\item Active: Kucharz właśnie nad tym pracuje (lub czeka na wodę).
-\item Completed: Danie gotowe.
-\item Cancelled: Klient wyszedł, wyrzucamy składniki do kosza.
-\item Dzięki Job możesz programowo zapytać: \texttt{job.isActive} (czy jeszcze pracujemy?) lub \texttt{job.isCancelled}.
-\end{itemize}
-
-Jest to funkcja, która odróżnia korutyny od zwykłych wątków. W świecie korutyn każdy \texttt{Job} może mieć rodzica i dzieci. Kiedy tworzysz \texttt{CoroutineScope}, ma on w sobie \textit{Główny Job} (Szefa Zmiany). Kiedy w tym \texttt{Scope} uruchamiasz \texttt{launch}, powstaje nowy \texttt{Job}, który automatycznie staje się dzieckiem \textit{Głównego Joba}. Tworzy to \textbf{nierozerwalne drzewo zależności}. Działają tu dwie żelazne zasady \textbf{Ustrukturyzowanej Współbieżności}:
-\begin{itemize}
-\item \textbf{Zasada Anulowania (W dół)}: Jeśli anulujesz Rodzica (np. zamkniesz ekran i anulujesz \texttt{viewModelScope}), wszystkie \textit{dzieci} są automatycznie anulowane (Canceled). Szef Zmiany mówi: \textit{Zamykamy kuchnię!}, więc wszyscy kucharze natychmiast przestają gotować swoje dania. Nikt nie zostaje w pracy po godzinach.
-\item \textbf{Zasada Oczekiwania (W górę)}: Rodzic nie może zakończyć pracy (Completed), dopóki wszystkie jego dzieci nie skończą. Szef Zmiany nie może wyjść do domu, dopóki ostatni pomocnik nie skończy zmywać naczyń.
-\end{itemize}
-
-Podsumowanie w naszej analogii:
-Jeśli \texttt{CoroutineScope} to Kuchnia, to:
-\begin{itemize}
-\item \texttt{Job} (w Scope): To Kierownik Zmiany. Pilnuje, żeby nikt nie pracował, gdy restauracja jest zamknięta.
-\item \texttt{Job} (zwracany przez \texttt{launch}): To Bilet Konkretnego Zamówienia. Jest przypięty do tablicy korkowej Kierownika. Jeśli Kierownik zdejmie bilet z tablicy i podrze go (anulowanie), kucharz natychmiast przestaje nad nim pracować.
-\end{itemize}
-
-\section{Rozwiązanie problemu ANR}
-
-Wróćmy do przykładu z początku rozdziału. W poprzedniej wersji, gdy klikaliśmy przycisk, który wywoływał \texttt{Thread.sleep(10000)}, cała aplikacja zawieszała się. Suwak (Slider) przestawał działać, przyciski nie reagowały, a po chwili system wyświetlał błąd ANR. Zaimplementujmy kod rozwiązujący ten problem, rozpoczniemy od dodania \textit{przepisu}, czyli funkcji \texttt{suspend}
-
-\begin{minted}{kotlin}
-// Zmiana 1: Słowo kluczowe 'suspend'
-suspend fun fetchDataFromServer(): String {
-    println("Korutyna:...")
-    // Zmiana 2: 'delay' zamiast 'Thread.sleep'
-    delay(10000) // delay jest również funkcja suspend
-    println("Korutyna:...")
-    return "Dane pobrane pomyślnie!"
+@Composable
+fun SettingsScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Ustawienia", fontSize = 24.sp)
+    }
 }
-\end{minted}
 
-To, co nazywamy \textit{zawieszeniem} (suspend), to nie jest \textit{pauza} dla całej pracy. To jest \textit{pauza} dla \textbf{tej konkretnej korutyny na tym konkretnym wątku}.
-\begin{itemize}
-\item \texttt{Thread.sleep} mówi do Wątku UI: \textit{Stój i nic nie rób przez 10 sekund}.
-\item \texttt{delay} mówi do Wątku UI: \textit{Odkładam to zadanie na półkę na 10 sekund. Ty idź zajmij się czymś innym (np. rysowaniem suwaka). Wrócimy do tego później}.
-\end{itemize}
-
-Wewnątrz \texttt{Composable} (\texttt{CoroutineSolutionScreen}) pojawia się nowa linijka:
-
-\begin{minted}{kotlin}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainApp() {
+    val navController = rememberNavController()
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-\end{minted}
 
-Jest to niezbędne, ponieważ funkcja \texttt{onClick} przycisku jest zwykłą funkcją (nie jest \texttt{suspend}). Nie możemy z niej bezpośrednio wywołać \texttt{fetchDataFromServer} ani \texttt{delay}. Potrzebujemy \textit{bramy} lub \textit{pomostu}, który pozwoli nam wejść w świat asynchroniczny. Tym pomostem jest CoroutineScope powiązany z cyklem życia tego ekranu.
-
-Warto zauważyć, że \texttt{CoroutineScope} uzyskany przez \texttt{rememberCoroutineScope()} w Jetpack Compose domyślnie wykorzystuje \texttt{Dispatchers.Main} (a konkretnie \texttt{Main.immediate}). Oznacza to, że kod wewnątrz \texttt{launch} wykonuje się \textbf{na wątku głównym}.
-
-Zakres \texttt{rememberCoroutineScope()} jest ściśle powiązany z punktem w kompozycji, w którym został wywołany. Jeśli użytkownik opuści ten ekran (komponent zostanie usunięty z drzewa UI), \texttt{scope} zostanie automatycznie anulowany. Dzięki temu wszelkie trwające w nim operacje (np. nasze 10-sekundowe pobieranie danych) zostaną natychmiast przerwane, zapobiegając wyciekom pamięci i marnowaniu zasobów.
-
-Wewnątrz \texttt{onClick} widzimy:
-
-\begin{minted}{kotlin}
-Button(onClick = {
-statusText = "Operacja rozpoczęta..." // 1. Natychmiastowa aktualizacja UI
-
-scope.launch { // 2. Start korutyny (Fire-and-forget)
-        val result = fetchDataFromServer() // 3. Punkt zawieszenia (suspend)
-        statusText = result // 4. Wznowienie i aktualizacja UI
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            DrawerContent(navController = navController, drawerState = drawerState)
+        }
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Aplikacja z Szufladą") },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            scope.launch { drawerState.apply { if (isClosed) open() else close() } }
+                        }) { Icon(Icons.Filled.Menu, contentDescription = "Menu") }
+                    }
+                )
+            }
+        ) { paddingValues ->
+            NavHost(
+                navController = navController,
+                startDestination = AppDestinations.HOME,
+                modifier = Modifier.padding(paddingValues)
+            ) {
+                composable(AppDestinations.HOME) { HomeScreen() }
+                composable(AppDestinations.PROFILE) { ProfileScreen() }
+                composable(AppDestinations.SETTINGS) { SettingsScreen() }
+            }
+        }
     }
-})
+}
+
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DrawerContent(navController: NavController, drawerState: DrawerState) {
+    val scope = rememberCoroutineScope()
+
+    ModalDrawerSheet {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Menu", style = MaterialTheme.typography.headlineSmall)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Home, contentDescription = "Strona główna") },
+                label = { Text("Strona główna") },
+                selected = false,
+                onClick = {
+                    navController.navigate(AppDestinations.HOME)
+                    scope.launch { drawerState.close() }
+                }
+            )
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Person, contentDescription = "Profil") },
+                label = { Text("Profil") },
+                selected = false,
+                onClick = {
+                    navController.navigate(AppDestinations.PROFILE)
+                    scope.launch { drawerState.close() }
+                }
+            )
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Default.Settings, contentDescription = "Ustawienia") },
+                label = { Text("Ustawienia") },
+                selected = false,
+                onClick = {
+                    navController.navigate(AppDestinations.SETTINGS)
+                    scope.launch { drawerState.close() }
+                }
+            )
+        }
+    }
+}
 \end{minted}
 
-Co tu się dzieje krok po kroku?
+\section{Zagnieżdźona Nawigacja}
+
+Przejdźmy do drugiego przykładu w którym zapoznamy się z ideą tworzenia zagnieżdżonych grafów nawigacyjnych.
+
+Załóżmy, że nasza aplikacja ma więcej niż trzy proste ekrany. Prawie każda komercyjna aplikacja ma co najmniej dwa odrębne \textit{przepływy} (flows):
 \begin{itemize}
-\item Użytkownik klika.
-\item Tekst zmienia się na \"Operacja rozpoczęta...\".
-\item \texttt{scope.launch} tworzy nową korutynę.
-\item Korutyna wchodzi do \texttt{fetchDataFromServer}, dochodzi do \texttt{delay(10000)} i zawiesza się.
-\item Wątek UI jest wolny! Przez te 10 sekund Wątek Główny obsługuje przesuwanie suwaka (Slider), animacje i inne kliknięcia.
-\item Po 10 sekundach korutyna \textit{budzi się}, przypisuje wynik do \texttt{result} i aktualizuje \texttt{statusText}.
+  \item Przepływ Uwierzytelniania: Logowanie, Rejestracja, Resetowanie Hasła.
+  \item Główny Przepływ Aplikacji: Ekran główny, Profil, Ustawienia, itd.
 \end{itemize}
 
-\begin{table}[h]
-    \centering
-    \begin{tabular}{p{3cm} p{5cm} p{5cm}}
-        \hline
-        \textbf{Cecha} & \textbf{Stara Wersja (Thread.sleep)} & \textbf{Nowa Wersja (delay + Korutyny)} \\
-        \hline
-        Reakcja na przycisk 
-            & Przycisk pozostaje wciśnięty (zamrożony). 
-            & Przycisk klika się normalnie, pokazuje animację \textit{ripple}. \\
-        Suwak (Slider) 
-            & Zablokowany. Nie można go przesunąć. 
-            & Płynny. Możesz nim ruszać przez całe 10 sekund oczekiwania. \\
-        Wątek UI 
-            & Zablokowany (Blocked). Kucharz stoi nad garnkiem. 
-            & Wolny (Free). Kucharz nastawił minutnik i kroi warzywa. \\
-        Ryzyko ANR 
-            & Bardzo wysokie (system zabije aplikację). 
-            & Zerowe (aplikacja jest responsywna). \\
-        Styl kodu 
-            & Sekwencyjny (linia po linii). 
-            & Sekwencyjny! Mimo asynchroniczności, kod czyta się tak samo łatwo. \\
-        \hline
-    \end{tabular}
-    \caption{Porównanie starej wersji (Thread.sleep) i nowej wersji (delay + Korutyny)}
-\end{table}
+Problem polega na tym, że te dwa przepływy mają zupełnie inne zasady. Co najważniejsze: gdy użytkownik pomyślnie się zaloguje, powinien przejść do ekranu głównego, a cały przepływ uwierzytelniania powinien zniknąć z historii. Naciśnięcie przycisku \textit{Wstecz} na ekranie głównym nie powinno cofać do ekranu logowania, lecz zamykać aplikację. Osiągnąć to można za pomocą zagnieżdżonej nawigacji.
 
-\section{Podsumowanie}
+Przeanalizujmy prosty przykład pokazujący takie rozwiązanie. Zamiast traktować \texttt{NavHost} jak jeden wielki kontener, traktujemy go jak folder, który może zawierać zarówno pojedyncze pliki (ekrany), jak i inne foldery (zagnieżdżone grafy).
 
-Współczesne programowanie aplikacji mobilnych to nieustanna walka o płynność. Każda aplikacja na Androida posiada jeden, newralgiczny zasób: Wątek Główny (UI Thread). Jest on odpowiedzialny za wszystko, co widzi użytkownik - od rysowania interfejsu po obsługę dotyku. Jego zablokowanie, choćby na ułamek sekundy, jest niedopuszczalne i prowadzi do niesławnego błędu \textit{Application Not Responding} (ANR).
+Zamiast używać surowych ciągów znaków (Stringów) bezpośrednio w kodzie, co sprzyja literówkom, dobrą praktyką jest stworzenie obiektu, który trzyma wszystkie trasy w jednym miejscu:
 
-Tradycyjne podejście do wielowątkowości, oparte na ręcznym tworzeniu wątków (\texttt{Thread}) i obsłudze callbacków, często prowadziło do kodu trudnego w utrzymaniu i podatnego na błędy. Odpowiedzią Kotlina na te wyzwania są korutyny.
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+data object AppDestinations {
+    // Grafy
+    const val AUTH_GRAPH = "auth_graph"
+    const val MAIN_APP_GRAPH = "main_app_graph"
 
-Korutyny często nazywa się \textit{lekkimi wątkami}, ale precyzyjniejsza definicja to \textit{zawieszalne obliczenie} (suspendable computation). W klasycznym modelu (blokującym), gdy kucharz czeka na zagotowanie wody, stoi bezczynnie nad garnkiem. W modelu opartym na korutynach, kucharz \textit{zawiesza} to zadanie - nastawia minutnik i w międzyczasie zajmuje się krojeniem warzyw. Dzięki temu jeden wątek może obsługiwać wiele korutyn jednocześnie, nigdy nie marnując czasu na bezczynne oczekiwanie.
+    // Ekrany uwierzytelniania
+    const val LOGIN = "login"
+    const val REGISTER = "register"
+    const val FORGOT_PASSWORD = "forgot_password"
 
-Kluczem do tego mechanizmu jest słowo kluczowe \texttt{suspend}. Oznacza ono funkcję, która może zostać wstrzymana (zapauzowana) bez blokowania wątku, na którym jest wykonywana. Gdy korutyna napotyka funkcję zawieszającą (np. \texttt{delay} lub zapytanie sieciowe), zapisuje swój stan i zwalnia wątek, oddając go do dyspozycji innym zadaniom (np. odświeżaniu UI). Gdy operacja w tle się zakończy, korutyna jest wznawiana dokładnie w miejscu, w którym skończyła. Ważne jest jednak zrozumienie, że samo \texttt{suspend} nie oznacza automatycznego przeniesienia pracy do innego wątku - daje jedynie możliwość zawieszenia.
+    // Główne ekrany aplikacji
+    const val WELCOME = "welcome"
+    const val PROFILE = "profile"
+}
+\end{minted}
 
-Korutyny w Kotlinie nie działają w próżni. Aby je uruchomić, musimy skorzystać z \texttt{CoroutineScope} (np. \texttt{viewModelScope} lub \texttt{rememberCoroutineScope}). Definiuje on \textit{czas życia} korutyny. Mechanizm ten, zwany Ustrukturyzowaną Współbieżnością, tworzy hierarchię rodzic-dziecko. Każda uruchomiona korutyna (\texttt{launch}) zwraca obiekt \texttt{Job}, który jest przypisany do swojego zakresu. Gwarantuje to bezpieczeństwo aplikacji: jeśli użytkownik zamknie ekran (anulując zakres-rodzica), wszystkie podrzędne operacje (pobieranie danych, liczniki) zostaną automatycznie anulowane. Zapobiega to wyciekom pamięci i wykonywaniu niepotrzebnej pracy w tle.
+Zauważmy, że nasza aplikacja będzie miała dwa główne podgrafy: \texttt{AUTH\_GRAPH} i \texttt{MAIN\_APP\_GRAPH}
 
-Podsumowując, korutyny pozwalają pisać kod asynchroniczny w sposób sekwencyjny i czytelny, jednocześnie zapewniając bezpieczeństwo zasobów i responsywność aplikacji, której oczekują użytkownicy.
+Spójrzmy na główny \texttt{NavHost} w \texttt{SimpleNestedNavApp}. Jest on uderzająco prosty:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+NavHost(
+    navController = navController,
+    startDestination = AppDestinations.AUTH_GRAPH
+) {
+    // Graf uwierzytelniania (logowanie, rejestracja, itp.)
+    authGraph(navController)
+
+    // Główny graf aplikacji po zalogowaniu
+    mainAppGraph(navController)
+}
+\end{minted}
+
+Zauważmy:
+\begin{enumerate}
+\item \texttt{startDestination} nie jest ekranem. Jest to \texttt{AUTH\_GRAPH}, czyli cały zagnieżdżony graf. Aplikacja uruchamia się, wchodząc do \textit{folderu} uwierzytelniania.
+\item Wewnątrz \texttt{NavHost} nie ma ani jednego \texttt{composable()} definiującego ekran. Zamiast tego, są tylko dwie funkcje (\texttt{authGraph} i \texttt{mainAppGraph}), które definiują całe grupy ekranów.
+\end{enumerate}
+
+Główny \texttt{NavHost} nie musi \textit{wiedzieć} nic o ekranie logowania czy profilu; musi tylko \textit{wiedzieć} o istnieniu \textit{przepływu uwierzytelniania} i \textit{przepływu głównego}.
+
+Gdy aplikacja rośnie, \texttt{NavHost} staje się nieczytelny. Rozwiązaniem jest podział na zagnieżdżone grafy za pomocą funkcji rozszerzających dla \texttt{NavGraphBuilder}:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun NavGraphBuilder.authGraph(navController: NavController) {
+    navigation(
+        startDestination = AppDestinations.LOGIN,
+        route = AppDestinations.AUTH_GRAPH
+    ) {
+        composable(AppDestinations.LOGIN) {
+            LoginScreen(navController) }
+        composable(AppDestinations.REGISTER) {
+            RegisterScreen(navController) }
+        composable(AppDestinations.FORGOT_PASSWORD) {
+            ForgotPasswordScreen(navController) }
+    }
+}
+
+fun NavGraphBuilder.mainAppGraph(navController: NavController) {
+    navigation(
+        startDestination = AppDestinations.WELCOME,
+        route = AppDestinations.MAIN_APP_GRAPH
+    ) {
+        composable(AppDestinations.WELCOME) {
+            WelcomeScreen(navController) }
+        composable(AppDestinations.PROFILE) {
+            ProfileScreen(navController) }
+    }
+}
+\end{minted}
+
+Analiza tego bloku jest kluczowa:
+\begin{itemize}
+\item \texttt{fun NavGraphBuilder.authGraph(...)}: To czysta organizacja kodu. Zamiast zaśmiecać \texttt{NavHost}, grupujemy logikę w oddzielnej funkcji.
+\item \texttt{navigation(...)}: To jest właściwy konstruktor zagnieżdżonego grafu.
+\item \texttt{route = AppDestinations.AUTH\_GRAPH}: Nadajemy całemu \textit{folderowi} nazwę. Teraz możemy nawigować \textit{do} niego.
+\item \texttt{startDestination = AppDestinations.LOGIN}: Definiujemy, który ekran jest domyślny wewnątrz tego grafu.
+\end{itemize}
+
+Identyczną strukturę ma \texttt{mainAppGraph}, który grupuje ekrany \texttt{WELCOME} i \texttt{PROFILE}.
+
+Mamy dwa oddzielne światy: \texttt{AUTH\_GRAPH} i \texttt{MAIN\_APP\_GRAPH}. Jak przeskoczyć z jednego do drugiego i – co najważniejsze - posprzątać po sobie?
+
+Spójrzmy na funkcję \texttt{navigateToMainApp()}, wywoływaną po pomyślnym logowaniu:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun NavController.navigateToMainApp() {
+    this.navigate(AppDestinations.MAIN_APP_GRAPH) {
+        popUpTo(AppDestinations.AUTH_GRAPH) {
+            inclusive = true
+        }
+    }
+}
+\end{minted}
+
+To jest najważniejszy fragment kodu w całym przykładzie. Rozbijmy go na części:
+\begin{itemize}
+\item \texttt{navigate(AppDestinations.MAIN\_APP\_GRAPH)}: Mówimy \textit{nawiguj do grafu głównego}. \texttt{NavController} automatycznie skieruje nas do \texttt{startDestination} tego grafu (czyli \texttt{WELCOME}).
+\item \texttt{popUpTo(AppDestinations.AUTH\_GRAPH)}: To jest polecenie \textit{sprzątające}. Powraca na stosie aż znajdzie \texttt{AUTH\_GRAPH}
+\item \texttt{inclusive = true}: Po znalezieniu na stosie \texttt{AUTH\_GRAPH} jest on również usuwany.
+\end{itemize}
+
+Co się dzieje w praktyce? Użytkownik klika \textit{Zaloguj}. \texttt{NavController}:
+\begin{itemize}
+\item Znajduje na stosie powrotu graf \texttt{AUTH\_GRAPH}.
+\item Usuwa ze stosu \texttt{LOGIN, REGISTER, FORGOT\_PASSWORD} i sam \texttt{AUTH\_GRAPH}.
+\item Dodaje na stos \texttt{MAIN\_APP\_GRAPH} (z ekranem \texttt{WELCOME}).
+\end{itemize}
+
+Stos powrotu jest czysty. Zawiera tylko \texttt{MAIN\_APP\_GRAPH}. Jeśli użytkownik naciśnie teraz przycisk \textit{Wstecz}, nie wróci do ekranu logowania. Opuści aplikację. Osiągnęliśmy dokładnie taki przepływ, jakiego oczekują użytkownicy.
+
+Zagnieżdżona nawigacja to nie jest skomplikowana funkcja dla zaawansowanych. To podstawowe narzędzie do organizacji w każdej aplikacji, która ma więcej niż jeden logiczny przepływ. Jak widzieliśmy w kodzie, ten wzorzec zapewnia trzy kluczowe korzyści:
+\begin{enumerate}
+\item Organizację: Grupuje powiązane ekrany.
+\item Modularność: Utrzymuje główny \texttt{NavHost} czysty i pozwala definiować przepływy w oddzielnych funkcjach.
+\item Kontrolę nad Stosem Powrotu: Umożliwia nawigowanie między całymi przepływami i usuwanie ich z historii jednym poleceniem.
+\end{enumerate}
+
+\subsection{Pełny kod przykładu}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            NestedComposeGraphTheme {
+                SimpleNestedNavApp()
+            }
+        }
+    }
+}
+
+data object AppDestinations {
+    // Grafy
+    const val AUTH_GRAPH = "auth_graph"
+    const val MAIN_APP_GRAPH = "main_app_graph"
+
+    // Ekrany autentykacji
+    const val LOGIN = "login"
+    const val REGISTER = "register"
+    const val FORGOT_PASSWORD = "forgot_password"
+
+    // Główne ekrany aplikacji
+    const val WELCOME = "welcome"
+    const val PROFILE = "profile"
+}
+
+@Composable
+fun SimpleNestedNavApp() {
+    val navController = rememberNavController()
+    NavHost(
+        navController = navController,
+        startDestination = AppDestinations.AUTH_GRAPH
+    ) {
+        // Graf autentykacji (logowanie, rejestracja, itp.)
+        authGraph(navController)
+
+        // Główny graf aplikacji po zalogowaniu
+        mainAppGraph(navController)
+    }
+}
+
+fun NavGraphBuilder.authGraph(navController: NavController) {
+    navigation(
+        startDestination = AppDestinations.LOGIN,
+        route = AppDestinations.AUTH_GRAPH
+    ) {
+        composable(AppDestinations.LOGIN) {
+            LoginScreen(navController) }
+        composable(AppDestinations.REGISTER) {
+            RegisterScreen(navController) }
+        composable(AppDestinations.FORGOT_PASSWORD) {
+            ForgotPasswordScreen(navController) }
+    }
+}
+
+fun NavGraphBuilder.mainAppGraph(navController: NavController) {
+    navigation(
+        startDestination = AppDestinations.WELCOME,
+        route = AppDestinations.MAIN_APP_GRAPH
+    ) {
+        composable(AppDestinations.WELCOME) {
+            WelcomeScreen(navController) }
+        composable(AppDestinations.PROFILE) {
+            ProfileScreen(navController) }
+    }
+}
+
+@Composable
+fun LoginScreen(navController: NavController) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Logowanie", fontSize = 28.sp)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = { navController.navigateToMainApp() }) {
+            Text("Zaloguj")
+        }
+        Spacer(Modifier.height(12.dp))
+        Button(onClick = { navController.navigate(AppDestinations.REGISTER) }) {
+            Text("Przejdź do Rejestracji")
+        }
+        Spacer(Modifier.height(12.dp))
+        TextButton(onClick = { navController.navigate(AppDestinations.FORGOT_PASSWORD) }) {
+            Text("Zapomniałem hasła")
+        }
+    }
+}
+
+@Composable
+fun RegisterScreen(navController: NavController) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Rejestracja", fontSize = 28.sp)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = { navController.navigateToMainApp() }) {
+            Text("Zarejestruj i zaloguj")
+        }
+        Spacer(Modifier.height(12.dp))
+        TextButton(onClick = { navController.popBackStack() }) {
+            Text("Wróć do logowania")
+        }
+    }
+}
+
+@Composable
+fun ForgotPasswordScreen(navController: NavController) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Resetowanie Hasła", fontSize = 24.sp, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = { navController.popBackStack() }) {
+            Text("Powrót")
+        }
+    }
+}
+@Composable
+fun WelcomeScreen(navController: NavController) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Witaj w Aplikacji! 🎉", fontSize = 28.sp)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = { navController.navigate(AppDestinations.PROFILE) }) {
+            Text("Zobacz mój profil")
+        }
+    }
+}
+
+@Composable
+fun ProfileScreen(navController: NavController) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Ekran Profilu 🧑‍💻", fontSize = 28.sp)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = { navController.popBackStack() }) {
+            Text("Wróć do ekranu powitalnego")
+        }
+    }
+}
+
+fun NavController.navigateToMainApp() {
+    this.navigate(AppDestinations.MAIN_APP_GRAPH) {
+        popUpTo(AppDestinations.AUTH_GRAPH) {
+            inclusive = true
+        }
+    }
+}
+\end{minted}

@@ -1,0 +1,62 @@
+\chapter{Wyklad 13: Wprowadzenie do Firebase Firestore i pracy w chmurze}
+
+\begin{learningobjectives}
+  \item Skonfigurujesz Firebase w projekcie Android i przygotujesz build varianty.
+  \item Poznasz podstawy modelowania danych w Firestore oraz zasady zapytan.
+  \item Zaprojektujesz synchronizacje danych online/offline z uwzglednieniem bezpieczenstwa.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Firebase setup, konfiguracja projektu i narzedzi CLI.
+  \item Firestore: kolekcje, dokumenty, zapytania, indeksy.
+  \item Bezpieczenstwo: rules, auth, limity.
+  \item Offline persistence i synchronizacja.
+  \item Integracja z MVVM i Compose.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item firebase.google.com/docs/firestore (docelowe sekcje do zebrania cytatow).
+  \item Przykładowe notebooki i repozytoria (TODO: wskazac konkretne zrodla).
+  \item PUM2/Wyk/Wyklad13.pdf (uzupelnic material dedykowany Firestore).
+\end{itemize}
+
+\subsection{Konfiguracja Firebase}
+\begin{itemize}
+  \item Tworzenie projektu, plik google-services.json, gradle plugin.
+  \item Debug vs release, emulator vs production.
+  \item Integracja z modulami i secret management.
+\end{itemize}
+
+\subsection{Model danych Firestore}
+\begin{itemize}
+  \item Kolekcje, dokumenty, subkolekcje.
+  \item Denormalizacja i ograniczenia zapytan.
+  \item Zapytania, indeksery, paginacja.
+\end{itemize}
+
+\subsection{Bezpieczenstwo i synchronizacja}
+\begin{itemize}
+  \item Rules, custom claims i autoryzacja.
+  \item Offline cache, conflict resolution, retries.
+  \item Monitoring billingu i limitow.
+\end{itemize}
+
+\subsection{Case study}
+\begin{itemize}
+  \item Integracja katalogu produktow z Firestore.
+  \item Zadanie: migracja danych lokalnych do chmury.
+  \item Checklist: release readiness, testy e2e, backup.
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item Przyklad A: fetch i listen na kolekcji produktow (TODO).
+  \item Przyklad B: rules dla kolekcji z uprawnieniami rolami (TODO).
+  \item Zadania: zaprojektuj strukture kolekcji dla ulubionych (TODO).
+  \item Pytania: limity Firestore, zasady offline cache, koszt zapytan (TODO).
+\end{itemize}
+
+% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+
