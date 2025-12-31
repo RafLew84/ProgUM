@@ -1,6 +1,6 @@
 \chapter{Wprowadzenie do wielowatkowosci i coroutines (Wyklad 2)}
 
-\section{Problem Zamrożonego UI i \textit{Piekło Callbacków}}
+\section{Problem Zamrożonego UI i \textit{Piekło Callbacków} - Wątek Główny}
 Zanim zagłębimy się w to, czym są korutyny, musimy zrozumieć, z jakim fundamentalnym problemem musimy mierzyć się od samych początków Androida. Ten problem ma swoje źródło w jednej, kluczowej koncepcji: \textbf{Wątku Głównym}.
 
 Każda aplikacja na Androida, którą uruchamiasz, \textit{żyje i umiera} w jednym, głównym procesie. Wewnątrz tego procesu istnieje jeden, niezwykle ważny wątek, znany jako \textbf{Wątek Główny} (Main Thread) lub \textbf{Wątek UI} (UI Thread).
@@ -21,7 +21,7 @@ Wątek UI to w zasadzie nieskończona pętla zdarzeń, która musi działać z p
 
 Co się stanie, gdy wciśniemy w ten pędzący mechanizm kij? Przeanalizujmy przykład:
 
-\begin{minted}{kotlin}
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,7 +89,7 @@ fun BlockingUiDemoScreen() {
 
 Zwróćmy uwagę, że mamy w ui przycisk i suwak. Wewnątrz funkcji \texttt{onClick} przycisku mamy kod:
 
-\begin{minted}{kotlin}
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
 Button(
     onClick = {
         statusText = "Operacja rozpoczęta..."
@@ -114,7 +114,7 @@ Wywołujemy \texttt{Thread.sleep(10000)}, czyli blokujemy wątek UI na 10 sekund
 \item Użytkownik, wykonując jakąkolwiek interakcję z ekranem, nie otrzyma żadnej odpowiedzi.
 \end{itemize}
 
-System operacyjny Android szybko zauważa, że nasza aplikacja nie odpowiada na zdarzenia. Po kilku sekundach wyświetla komunikat: \textit{Aplikacja nie odpowiada} (ANR - Application Not Responding)(\ref{fig:figura-anr}).
+System operacyjny Android szybko \textit{zauważa}, że nasza aplikacja nie odpowiada na zdarzenia. Po kilku sekundach wyświetla komunikat: \textit{Aplikacja nie odpowiada} (ANR - Application Not Responding)(\ref{fig:figura-anr}).
 
 \begin{figure}[htbp]
     \includegraphics[width=0.7\textwidth]{fig/pum2-w02-fig2.png}
@@ -136,7 +136,7 @@ Przez lata, zanim pojawiły się korutyny, \textit{praca w tle} oznaczała ręcz
 
 Ten proces był skomplikowany, ale jeszcze gorsze stawało się, gdy operacje były od siebie zależne. Wyobraźmy sobie pobranie danych użytkownika, następnie na ich podstawie pobranie jego zdjęcia, a na końcu zapisanie go w bazie:
 
-\begin{minted}{java}
+\begin{minted}[frame=single,framesep=10pt]{java}
 button.setOnClickListener(v -> {
     // 1. Przechodzimy do tła, by pobrać użytkownika
     new Thread(() -> {
@@ -252,7 +252,7 @@ Kiedy korutyna (przepis) uruchomiona na \texttt{Dispatchers.IO} musi poczekać n
 
 Drugim kluczowym elementem \texttt{CoroutineScope} jest \texttt{Job} (w naszej analogii będzie to odpowiednik Szefa Zmiany). Śledzi wszystkie korutyny aktualnie gotowane w danym zakresie (kuchni). Działa jak \textit{rodzic} dla wszystkich korutyn uruchomionych w tym \texttt{scope}. Kiedy uruchamiasz korutynę za pomocą \texttt{launch}, funkcja ta zwraca właśnie obiekt \texttt{Job}.
 
-\begin{minted}{kotlin}
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
 val job = scope.launch {... }
 \end{minted}
 
@@ -282,7 +282,7 @@ Jeśli \texttt{CoroutineScope} to Kuchnia, to:
 
 Wróćmy do przykładu z początku rozdziału. W poprzedniej wersji, gdy klikaliśmy przycisk, który wywoływał \texttt{Thread.sleep(10000)}, cała aplikacja zawieszała się. Suwak (Slider) przestawał działać, przyciski nie reagowały, a po chwili system wyświetlał błąd ANR. Zaimplementujmy kod rozwiązujący ten problem, rozpoczniemy od dodania \textit{przepisu}, czyli funkcji \texttt{suspend}
 
-\begin{minted}{kotlin}
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
 // Zmiana 1: Słowo kluczowe 'suspend'
 suspend fun fetchDataFromServer(): String {
     println("Korutyna:...")
@@ -301,7 +301,7 @@ To, co nazywamy \textit{zawieszeniem} (suspend), to nie jest \textit{pauza} dla 
 
 Wewnątrz \texttt{Composable} (\texttt{CoroutineSolutionScreen}) pojawia się nowa linijka:
 
-\begin{minted}{kotlin}
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
     val scope = rememberCoroutineScope()
 \end{minted}
 
@@ -313,7 +313,7 @@ Zakres \texttt{rememberCoroutineScope()} jest ściśle powiązany z punktem w ko
 
 Wewnątrz \texttt{onClick} widzimy:
 
-\begin{minted}{kotlin}
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
 Button(onClick = {
 statusText = "Operacja rozpoczęta..." // 1. Natychmiastowa aktualizacja UI
 
