@@ -1,61 +1,73 @@
-\chapter{Wyklad 3: Architektura aplikacji - MVVM i warstwy logiki}
+\chapter{Podstawy Architektury Aplikacji (Wykład 4)}
 
-\begin{learningobjectives}
-  \item Utrwalisz role warstw w architekturze MVVM.
-  \item Nauczysz sie rozdzielac logike domenowa od prezentacji.
-  \item Przygotujesz schemat architektury dla projektu kursowego.
-\end{learningobjectives}
+\section{Problem Monolitycznego Kodu ("God Composable")}
 
-\section{Mapa rozdzialu}
+Na początku przygody z Jetpack Compose naturalnym odruchem jest pisanie całego kodu wewnątrz funkcji \texttt{@Composable}. Skoro UI to tylko funkcja, dlaczego nie umieścić w niej również pobierania danych z sieci czy logiki biznesowej?
+
+Spójrzmy na kod, który działa, ale łamie zasady inżynierii oprogramowania. Nazywamy to antywzorcem \textbf{"God Composable"} - funkcją, która wie i robi wszystko.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// KROK 1: Kod "naiwny"
+@Composable
+fun UserProfileScreen() {
+    // Stan UI + Logika w jednym miejscu
+    var userData by remember { mutableStateOf("Ładowanie...") }
+    val scope = rememberCoroutineScope() // Scope powiązany z cyklem życia UI
+
+    Column {
+        Button(onClick = {
+            // Operacja sieciowa bezpośrednio w UI
+            scope.launch {
+                try {
+                    val user = api.getUser() // Symulacja pobierania (2 sekundy)
+                    userData = user.name.uppercase() // Logika biznesowa
+                } catch (e: Exception) {
+                    userData = "Błąd!"
+                }
+            }
+        }) {
+            Text("Pobierz dane")
+        }
+        Text(userData)
+    }
+}
+\end{minted}
+
+\subsection{Rotacja Ekranu}
+Uruchamiamy aplikację, klikamy przycisk, dane się pobierają. Wszystko wygląda świetnie. Do momentu, gdy obrócimy telefon.
+Android przy zmianie konfiguracji (np. obrót ekranu) niszczy i tworzy aktywność od nowa. Funkcja \texttt{remember} traci pamięć. Użytkownik, który czekał na dane, nagle znów widzi ekran początkowy \texttt{Ładowanie...}.
+
+\subsection{Próba ratunku: rememberSaveable}
+Rozwiązanie tego problemu już znamy z poprzedniego semestru. Spróbujmy więc naprawić nasz kod:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// rememberSaveable
+var userData by rememberSaveable { mutableStateOf("Ładowanie...") }
+\end{minted}
+
+Czy to rozwiązuje problem? Tylko pozornie i tylko w trywialnych przypadkach. Gdy spróbujemy zastosować to w większej aplikacji, napotkamy trzy krytyczne problemy, których \texttt{rememberSaveable} nie rozwiąże:
+
 \begin{itemize}
-  \item Warstwy: presentation, domain, data.
-  \item ViewModel, UseCase, Repository.
-  \item Komunikacja z Compose i Flow.
-  \item Testowalnosc i dependency injection.
-  \item Struktura folderow i modulow.
+    \item \textbf{Śmierć Korutyny:} \texttt{rememberCoroutineScope} jest ściśle powiązany z widokiem. Gdy obracasz ekran w trakcie pobierania danych (np. wolne WiFi), stary widok ginie, a wraz z nim \textbf{anulowana jest korutyna}. Pobieranie zostaje przerwane w połowie. Nowy ekran powstaje, ale nic nie wie o tym, że poprzedni coś pobierał. Użytkownik klika, czeka i nic nie dostaje.
+    
+    \item \textbf{Ograniczenia Pamięci (Bundle):} \texttt{rememberSaveable} zapisuje dane w systemowym \texttt{Bundle}. Jest on przeznaczony dla małych danych (tekst, liczby). Jeśli spróbojemy tam zapisać listę 500 obiektów JSON pobranych z API, aplikacja wyrzuci błąd \texttt{TransactionTooLargeException} i się zamknie.
+    
+    \item \textbf{Testowalność:} Jak przetestować, czy nazwisko jest poprawnie zamieniane na wielkie litery? W obecnym kodzie jest to niemożliwe bez uruchamiania emulatora, bo logika jest \textit{zabetonowana} wewnątrz przycisku.
 \end{itemize}
 
-\section{Material zrodlowy}
+\subsection{Separacja odpowiedzialności}
+Dochodzimy do wniosku, że funkcja \texttt{Composable} nie jest odpowiednim miejscem na trzymanie danych ani wykonywanie operacji. Potrzebujemy miejsca, które:
+\begin{enumerate}
+    \item Przeżyje rotację ekranu (nie jak \texttt{rememberSaveable}).
+    \item Pozwoli korutynom dokończyć pracę, nawet gdy widok jest niszczony.
+    \item Nie ma limitu wielkości danych (nie jak \texttt{Bundle}).
+\end{enumerate}
+
+\subsection{Metafora Budowlana: Buda vs Wieżowiec}
+Aby zrozumieć potrzebę architektury, posłużmy się analogią budowlaną:
 \begin{itemize}
-  \item PUM2/Wyk/Wyklad4.pdf.
-  \item \texttt{PUM2/Listy/W4-ViewModel\_basics.ipynb}, \texttt{PUM2/Listy/W4-Repository\_basics.ipynb}.
-  \item developer.android.com/topic/architecture.
+    \item \textbf{Budowanie budy dla psa (Brak architektury):} Możesz to zrobić sam. Jeśli wbijesz gwóźdź w złym miejscu, łatwo to poprawić. To są małe, proste aplikacje.
+    \item \textbf{Budowanie wieżowca (Z architekturą):} Tutaj potrzebujesz planu. Elektryk (Data Layer) nie maluje ścian, a malarz (UI Layer) nie kładzie instalacji gazowej. W dużym projekcie, jeśli Composable zajmuje się logiką API, to tak jakby malarz próbował naprawiać windę.
 \end{itemize}
 
-\subsection{Warstwy architektury}
-\begin{itemize}
-  \item Presentation, domain, data - granice odpowiedzialnosci.
-  \item Przeplyw danych i dependency direction.
-  \item Organizacja modulow w projekcie.
-\end{itemize}
-
-\subsection{MVVM w praktyce}
-\begin{itemize}
-  \item ViewModel i UI state.
-  \item UseCase/Interactor jako command.
-  \item Repository pattern i data sources.
-\end{itemize}
-
-\subsection{Testowanie i DI}
-\begin{itemize}
-  \item Testy jednostkowe warstw.
-  \item Mockowanie repository, fake data sources.
-  \item Integracja z Hilt i modulami DI.
-\end{itemize}
-
-\subsection{Case study}
-\begin{itemize}
-  \item Mapa modulow aplikacji katalogowej.
-  \item Zadanie: zaprojektuj kontrakt interfejsu dla repository.
-  \item Checklist: zasady clean architecture.
-\end{itemize}
-
-\section{Elementy do rozbudowy}
-\begin{itemize}
-  \item Przyklad A: diagram warstw z przeplywem danych (TODO).
-  \item Przyklad B: implementacja prostego UseCase (TODO).
-  \item Zadania: ocena architektury sample app (TODO).
-  \item Pytania: rola domain layer, jak unikac naruszenia granic (TODO).
-\end{itemize}
-
-% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+Potrzebujemy więc "Kierownika Budowy", który ma plany w biurze (bezpiecznym od remontów) i zarządza pracami. Tym kierownikiem będzie komponent, który za chwilę poznamy.
