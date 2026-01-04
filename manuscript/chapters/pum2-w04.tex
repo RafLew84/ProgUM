@@ -71,3 +71,72 @@ Aby zrozumieć potrzebę architektury, posłużmy się analogią budowlaną:
 \end{itemize}
 
 Potrzebujemy więc "Kierownika Budowy", który ma plany w biurze (bezpiecznym od remontów) i zarządza pracami. Tym kierownikiem będzie komponent, który za chwilę poznamy.
+
+\section{Ewolucja Wzorców Architektonicznych}
+
+Skoro wiemy już, że wrzucanie wszystkiego do jednego worka ("God Composable") jest nie najlepszym rozwiązaniem, musimy zastanowić się, jak podzielić aplikację. W inżynierii oprogramowania ten problem nie jest nowy. Przez dekady wykształciło się wiele różnych podejść do tego problemu. Jednym z nich jest rodzina wzorców MVx, które różnią się sposobem, w jaki warstwa danych komunikuje się z warstwą wizualną.
+
+Aby zrozumieć różnice między nimi, posłużymy się analogiami z życia codziennego.
+
+\subsection{MVC (Model-View-Controller) - Sklep z ladą}
+
+
+[Image of MVC architecture diagram]
+
+Jest to najstarsze podejście, które można porównać do wizyty w tradycyjnym sklepie, gdzie towar podaje sprzedawca.
+
+\begin{itemize}
+    \item \textbf{Ty (View):} Stoisz przed ladą. Widzisz towar, ale jesteś pasywny - nie możesz go sam wziąć.
+    \item \textbf{Sprzedawca (Controller):} To on rządzi procesem. Mówisz mu: \textit{Poproszę chleb} (Interakcja).
+    \item \textbf{Magazyn (Model):} Sprzedawca idzie na zaplecze, sprawdza stan magazynowy i bierze towar.
+\end{itemize}
+
+\textbf{Wniosek:} W tym układzie Sprzedawca (Controller) decyduje o wszystkim. To on musi wiedzieć, jak wygląda magazyn i to on decyduje, co pokazać klientowi. Musi też być w stanie wskazać konkretnego klienta, któremu musi wydać towar.
+
+\subsection{MVP (Model-View-Presenter) - Restauracja}
+
+Druga odmiana wzorca z rodziny MVx.
+
+\begin{itemize}
+    \item \textbf{Klient przy stoliku (View):} Siedzisz i czekasz. Nie wiesz i nieinteresuje Cię, co się dzieje w kuchni.
+    \item \textbf{Kelner (Presenter):} Przyjmuje zamówienie i idzie do kuchni (Model).
+    \item \textbf{Kluczowa cecha:} Kelner wraca z kuchni i \textbf{własnoręcznie stawia talerz na Twoim stole}.
+\end{itemize}
+
+W kodzie wygląda to tak, że Presenter (Kelner) posiada referencję do Widoku (Klienta). Wywołuje na nim konkretną metodę, np. \texttt{view.showDinner()}.
+\textbf{Problem:} Jest to sztywne połączenie 1:1. Kelner musi znać konkretny stolik. Jeśli Klient wyjdzie do toalety (Rotacja Ekranu/Zniszczenie Widoku), a Kelner wróci z talerzem i spróbuje go postawić na pustym miejscu, dojdzie do błędu (\texttt{NullPointerException}).
+
+\subsection{MVVM (Model-View-ViewModel) - Automat z napojami}
+
+To podejście jest standardem we współczesnym Androidzie i idealnie współgra z Jetpack Compose.
+
+\begin{itemize}
+    \item \textbf{Użytkownik (View):} Podchodzi do maszyny i naciska przycisk (Wysyła Event).
+    \item \textbf{Automat (ViewModel):} Odbiera sygnał, mieli kawę, pobiera wodę (komunikuje się z Repozytorium/Modelem).
+    \item \textbf{Wynik (State):} Automat wystawia kubek z kawą do szuflady odbiorczej (\textit{Emisja stanu}).
+\end{itemize}
+
+\textbf{Kluczowa różnica - Reaktywność:} Automatu nie obchodzi, kto ten kubek weźmie.
+\begin{itemize}
+    \item Automat tylko \textbf{wystawia stan}.
+    \item Jeśli nikt nie stoi przed maszyną - kubek (dane) po prostu czeka w szufladzie.
+    \item Jeśli użytkownik odejdzie (obróci ekran) i przyjdzie nowy (\texttt{Activity} zostanie stworzone na nowo) - kubek z kawą nadal tam jest. Nowy widok po prostu zagląda do szuflady i widzi gotowy napój.
+\end{itemize}
+
+W Compose tą \textit{szufladą} są strumienie danych, takie jak \texttt{StateFlow}. ViewModel aktualizuje \texttt{StateFlow}, a Widok (Composable) jedynie nasłuchuje zmian. To rozwiązuje nasz problem z rotacją ekranu - ViewModel trzyma \textit{napój}, niezależnie od tego, co dzieje się z \textit{klientem}.
+
+\subsection{MVI (Model-View-Intent) - Kiosk samoobsługowy}
+
+Jest to ewolucja wzorca MVVM, która kładzie rygorystyczny nacisk na jednokierunkowy przepływ danych (Unidirectional Data Flow).
+
+\begin{itemize}
+    \item \textbf{View (Ekran kiosku):} Wyświetla aktualny stan zamówienia. Jest to \textit{tylko odczyt}.
+    \item \textbf{Intent (Zamiar/Akcja):} Gdy klikasz \textit{Dodaj frytki}, nie zmieniasz bezpośrednio zamówienia. Wysyłasz do systemu \textit{zamiar} (Intent) o treści: "Użytkownik chce dodać frytki".
+    \item \textbf{Model (System):} System bierze Twój \textit{aktualny paragon}, bierze Twój \textit{zamiar}, przetwarza je i wypluwa \textbf{zupełnie nowy, zaktualizowany paragon} (State).
+\end{itemize}
+
+\textbf{Kluczowa cecha - Cykliczność i Niezmienność:}
+W przeciwieństwie do MVVM, gdzie ViewModel może mieć wiele różnych strumieni danych (osobno imię, osobno lista, osobno błędy), w MVI dążymy do posiadania \textbf{jednego obiektu stanu} (np. \texttt{OrderUiState}).
+W naszej metaforze: Nie możesz wziąć długopisu i dopisać frytek do wydrukowanego paragonu. Musisz wysłać żądanie, a system wydrukuje Ci nowy, zaktualizowany paragon. To zapewnia przewidywalność aplikacji - zawsze wiemy, co doprowadziło do obecnego stanu ekranu.
+
+W Jetpack Compose naturalnie dążymy do MVI, używając pojedynczego \texttt{StateFlow<UiState>} w ViewModelu.
