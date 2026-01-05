@@ -33,11 +33,9 @@ fun UserProfileScreen() {
 }
 \end{minted}
 
-\subsection{Rotacja Ekranu}
 Uruchamiamy aplikację, klikamy przycisk, dane się pobierają. Wszystko wygląda świetnie. Do momentu, gdy obrócimy telefon.
 Android przy zmianie konfiguracji (np. obrót ekranu) niszczy i tworzy aktywność od nowa. Funkcja \texttt{remember} traci pamięć. Użytkownik, który czekał na dane, nagle znów widzi ekran początkowy \texttt{Ładowanie...}.
 
-\subsection{Próba ratunku: rememberSaveable}
 Rozwiązanie tego problemu już znamy z poprzedniego semestru. Spróbujmy więc naprawić nasz kod:
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -63,7 +61,6 @@ Dochodzimy do wniosku, że funkcja \texttt{Composable} nie jest odpowiednim miej
     \item Nie ma limitu wielkości danych (nie jak \texttt{Bundle}).
 \end{enumerate}
 
-\subsection{Metafora Budowlana: Buda vs Wieżowiec}
 Aby zrozumieć potrzebę architektury, posłużmy się analogią budowlaną:
 \begin{itemize}
     \item \textbf{Budowanie budy dla psa (Brak architektury):} Możesz to zrobić sam. Jeśli wbijesz gwóźdź w złym miejscu, łatwo to poprawić. To są małe, proste aplikacje.
@@ -166,7 +163,7 @@ W Jetpack Compose naturalnie dążymy do MVI, używając pojedynczego \texttt{St
 
 W tej sekcji przeanalizujemy implementację wzorca MVVM na prostym przykładzie. Skupimy się na separacji warstw oraz mechanizmie zachowania stanu przy zmianach konfiguracji.
 
-\subsection{Warstwa ViewModel: Enkapsulacja Stanu}
+\subsection*{Warstwa ViewModel: Enkapsulacja Stanu}
 
 Klasa \texttt{ViewModel} pełni rolę zarządcy stanu. Kluczowym aspektem implementacji jest tutaj wzorzec \textbf{Backing Property}, który zapewnia pełną enkapsulację danych.
 
@@ -196,7 +193,7 @@ class WordViewModel : ViewModel() {
 
 Zastosowanie \texttt{mutableStateListOf} zamiast standardowego \texttt{List} jest krytyczne dla \textbf{reaktywności}. W Jetpack Compose system nie obserwuje standardowych kolekcji Javy/Kotlina. Typy ze świata Compose (jak \texttt{State<T>}) implementują wzorzec Obserwatora, automatycznie powiadamiając subskrybentów (funkcje Composable) o zmianach.
 
-\subsection{Warstwa Widoku: Delegacja Odpowiedzialności}
+\subsection*{Warstwa Widoku: Delegacja Odpowiedzialności}
 Widok (Composable) staje się tzw. \textbf{Passive View}. Nie posiada własnego stanu logicznego, a jedynie renderuje to, co dostarczy ViewModel.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -230,7 +227,7 @@ Aby skorzystać z funkcji \texttt{viewmodel()} musimy dodać odpowiednią zależ
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
 \end{minted}
 
-\subsection{Mechanizm działania: ViewModelStore a Singleton}
+\subsection{ViewModelStore a Singleton}
 Kluczową zaletą ViewModelu jest przetrwanie rotacji ekranu. Nie dzieje się to jednak w sposób magiczny, lecz wynika z architektonicznego cyklu życia komponentów Androida.
 
 Możemy myśleć o ViewModelu jak o \textbf{Singletonie zakresowym (Scoped Singleton)}.
@@ -257,15 +254,11 @@ Dzięki temu mechanizmowi, dane wewnątrz ViewModelu (nasza lista słów) pozost
 Do tej pory nasz ViewModel trzymał dane w pamięci. W większej aplikacji dane pochodzą z zewnętrznych źródeł: API (Retrofit), bazy danych SQL (Room), plików. Tutaj pojawia się pytanie: \textit{Czy ViewModel powinien wiedzieć, skąd pochodzą dane?}
 Zgodnie z zasadą \textbf{Separation of Concerns} - absolutnie nie.
 
-\subsection{Separacja: Kelner a Kucharz}
-
 Wróćmy do metafory restauracji:
 \begin{itemize}
     \item \textbf{ViewModel (Kelner):} Chce po prostu otrzymać gotowe danie. Nie interesuje go, czy składniki są z targu, czy z lodówki.
     \item \textbf{Repozytorium (Kuchnia/Magazyn):} To tutaj zapadają decyzje \textit{skąd wziąć dane}.
 \end{itemize}
-
-\subsection{Interfejs: Kontrakt między warstwami}
 
 Aby uniezależnić ViewModel od konkretnego źródła danych, używamy interfejsu.
 
@@ -276,7 +269,7 @@ interface WordRepository {
 }
 \end{minted}
 
-\subsection{Dlaczego to robimy? Praktyczne zastosowania}
+\subsection{Zastosowanie}
 W prostym przykładzie Repozytorium może wydawać się zbędną warstwą ("przekazywaczem"). Jednak w większych aplikacjach, które będziemy budować na kolejnych wykładach, Repozytorium pełni kluczowe funkcje:
 
 \begin{itemize}
@@ -309,7 +302,6 @@ I tu pojawia się problem. Gdy w kodzie Composable wywołamy standardową funkcj
 
 Funkcja biblioteczna \texttt{viewModel()} domyślnie potrafi tworzyć tylko obiekty posiadające pusty konstruktor (bez parametrów). Działa ona na zasadzie refleksji - próbuje utworzyć instancję klasy, ale nie ma pojęcia, skąd wziąć obiekt \texttt{WordRepository}, którego wymaga nasz konstruktor.
 
-\subsection{Metafora: Samochód z placu vs Zamówienie Specjalne}
 Aby to zrozumieć, wyobraźmy sobie salon samochodowy:
 \begin{itemize}
     \item \textbf{ViewModel bez parametrów (Samochód z placu):} Wchodzisz, mówisz \textit{Poproszę Passata}, sprzedawca daje Ci kluczyki do standardowego modelu stojącego na parkingu. Proste i szybkie.
@@ -318,7 +310,6 @@ Aby to zrozumieć, wyobraźmy sobie salon samochodowy:
 
 W Androidzie tą specyfikacją jest wzorzec \textbf{Factory}.
 
-\subsection{Rozwiązanie: ViewModelProvider.Factory}
 Musimy dostarczyć \textit{instrukcję obsługi}, która powie systemowi: \textit{Jeśli ktoś poprosi Cię o WordViewModel, to najpierw stwórz Repozytorium, a potem włóż je do środka}.
 
 Współcześnie najczęściej implementujemy to za pomocą \texttt{companion object} wewnątrz klasy ViewModelu:
@@ -360,7 +351,7 @@ fun WordScreen(
 
 Dzięki temu drobnemu dodatkowi, Android \textit{wie}, jak skonstruować nasz złożony obiekt, zachowując jednocześnie wszystkie zalety cyklu życia ViewModelu (przeżycie rotacji ekranu).
 
-\subsection{Hilt}
+\subsection*{Hilt}
 \textit{„Czy musimy pisać taki boilerplate (nadmiarowy kod) dla każdego ekranu?”}.
 Na tym etapie - tak. Jest to tzw. \textbf{Manual Dependency Injection}. Musimy rozumieć, jak obiekty są ze sobą łączone \textit{pod maską}.
 
