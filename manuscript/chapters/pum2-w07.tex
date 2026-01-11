@@ -1,61 +1,522 @@
-\chapter{Wyklad 6: Kanaly i komunikacja asynchroniczna}
+\chapter{Kanały (Channels): Komunikacja i Synchronizacja (Wykład 7)}
 
-\begin{learningobjectives}
-  \item Zrozumiesz role kanalow w Kotlin Coroutines.
-  \item Zaprojektujesz komunikacje asynchroniczna pomiedzy komponentami.
-  \item Poznasz techniki selekcji i multiplexingu dla strumieni danych.
-\end{learningobjectives}
+W poprzednich rozdziałach do przesyłania danych używaliśmy strumieni (\texttt{Flow}). Strumień działał jak radio: stacja nadawcza emitowała sygnał, a każdy, kto nastroił odbiornik (\texttt{collect}), otrzymywał te same dane.
 
-\section{Mapa rozdzialu}
+Co jednak w sytuacji, gdy potrzebujemy precyzyjnej komunikacji \textit{jeden-do-jednego}? Wyobraźmy sobie fabrykę: jedna maszyna produkuje śruby, a druga je pakuje. Każda śruba wyprodukowana przez maszynę A musi trafić do maszyny B. Nie chcemy, aby śruba \textit{zginęła} w eterze, ani żeby trafiła do dwóch paczek naraz.
+
+Do takich zadań Kotlin udostępnia osobny prymityw synchronizacyjny: \textbf{Kanały (Channels)}.
+
+Kanał (\texttt{Channel}) to koncepcyjnie taśmociąg łączący dwie korutyny.
 \begin{itemize}
-  \item Channel basics: send, receive, close.
-  \item Typy kanalow: rendezvous, buffered, conflated.
-  \item select i multiplexing.
-  \item Porownanie channel vs SharedFlow.
-  \item Zastosowania w aplikacjach mobilnych.
+    \item \textbf{Nadawca (Producer):} Wrzuca dane z jednej strony rury.
+    \item \textbf{Odbiorca (Consumer):} Wyciąga dane z drugiej strony.
 \end{itemize}
 
-\section{Material zrodlowy}
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w07-channel.png}
+    \caption{\texttt{Channel}.}
+    \label{fig:Figura channel}
+\end{figure}
+
+Kluczową cechą kanałów jest to, że służą one nie tylko do przesyłania danych, ale także do \textbf{synchronizacji} pracy korutyn. Jeśli rura jest pusta, odbiorca czeka. Jeśli rura jest pełna (w przypadku kanałów buforowanych), nadawca czeka.
+
+\section{Channel vs Flow (SharedFlow)}
+
+To jedno z najczęstszych pytań rekrutacyjnych dotyczących korutyn. Różnica jest fundamentalna i dotyczy modelu dystrybucji danych.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|p{6cm}|p{6cm}|}
+\hline
+\textbf{Cecha} & \textbf{Flow (SharedFlow)} & \textbf{Channel} \\ \hline
+\textbf{Model komunikacji} & \textbf{Multicast} (Jeden do Wielu) & \textbf{Unicast} (Jeden do Jednego*) \\ \hline
+\textbf{Metafora} & \textbf{Radio / Telewizja}. Wszyscy subskrybenci słyszą to samo. Jeśli nikt nie słucha, audycja i tak leci (SharedFlow) lub w ogóle nie startuje (Cold Flow). & \textbf{Poczta / Walkie-Talkie}. List trafia do jednej skrzynki. Jeśli jest dwóch odbiorców, ten szybszy zabierze list, a drugi zobaczy pustą skrzynkę. \\ \hline
+\textbf{Dystrybucja elementu} & Każdy element trafia do \textbf{wszystkich} aktywnych subskrybentów. & Każdy element trafia tylko do \textbf{jednego} odbiorcy. \\ \hline
+\textbf{Zastosowanie} & Stan UI, aktualizacje bazy danych, zdarzenia globalne. & Kolejki zadań, przesyłanie wyników między wątkami tła. \\ \hline
+\end{tabular}
+\caption{Porównanie Flow i Channel}
+\end{table}
+
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w07-channelvssharedflow.png}
+    \caption{\texttt{Channel} vs \texttt{SharedFlow}.}
+    \label{fig:Figura channelvssharedflow}
+\end{figure}
+
+\textit{*Uwaga: Kanał może mieć wielu odbiorców, ale wtedy działają oni jak konkurencyjni pracownicy - każdy element zostanie obsłużony tylko przez jednego z nich. W SharedFlow każdy pracownik dostałby kopie wszystkich zadań.}
+
+\subsection{Zastosowania}
+
 \begin{itemize}
-  \item PUM2/Wyk/Wyklad7.pdf.
-  \item \texttt{PUM2/Listy/W7-Channels\_basics.ipynb}, \texttt{PUM2/Listy/W7-Channels\_select\_basics.ipynb}.
-  \item kotlinlang.org/docs/channels.html.
+    \item Użyj \textbf{StateFlow/SharedFlow}, gdy dane mają trafić do warstwy UI (Widoku). UI zazwyczaj tylko \textit{obserwuje} stan i nie \textit{konsumuje} go bezpowrotnie.
+    \item Użyj \textbf{Channel}, gdy implementujesz mechanizm producent-konsument wewnątrz logiki biznesowej (np. kolejka plików do wysłania na serwer).
 \end{itemize}
 
-\subsection{Podstawy kanalow}
+\section{Podstawowe API: send() i receive()}
+
+W przeciwieństwie do \texttt{Flow}, który definiujemy deklaratywnie, obsługa Kanału przypomina obsługę tradycyjnej kolejki, ale z jedną kluczową różnicą: jest ona textbf{asynchroniczna}.
+
+Interfejs \texttt{Channel<T>} implementuje dwa mniejsze interfejsy:
 \begin{itemize}
-  \item Tworzenie i wykorzystywanie Channel.
-  \item send/receive, close, iteration.
-  \item Backpressure i buffer.
+    \item \texttt{SendChannel<T>} - pozwala tylko wysyłać i zamykać kanał.
+    \item \texttt{ReceiveChannel<T>} - pozwala tylko odbierać dane.
 \end{itemize}
 
-\subsection{Zaawansowane wzorce}
+Dzięki temu możemy przekazać odbiorcy tylko interfejs \texttt{ReceiveChannel}, mając pewność, że przez pomyłkę nic nie wyśle ani nie zamknie kanału.
+
+Dwie główne metody obsługi kanału to \texttt{send(element)} oraz \texttt{receive()}. Obie są funkcjami zawieszającymi (\texttt{suspend}).
+
+\begin{enumerate}
+    \item \textbf{receive() zawiesza}, gdy kanał jest \textbf{pusty}.
+    Konsument podchodzi do taśmociągu. Jeśli nie ma tam żadnej paczki, nie blokuje wątku (nie stoi bezczynnie). Korutyna zawiesza się (\textit{idzie na przerwę}) i zostanie wznowiona dopiero, gdy Nadawca wrzuci coś do kanału.
+
+    \item \textbf{send() zawiesza}, gdy kanał jest \textbf{pełny}.
+    Jeśli taśmociąg ma ograniczoną pojemność (co omówimy w sekcji 7.4) i jest zapchany, Nadawca nie może wrzucić nowej paczki. Korutyna zawiesza się i czeka, aż Konsument zdejmie coś z taśmy, robiąc miejsce.
+\end{enumerate}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val channel = Channel<Int>()
+
+// KORUTYNA 1: Producent
+launch {
+    for (x in 1..5) {
+        // Jeśli odbiorca nie jest gotowy, send() zawiesi tę korutynę
+        channel.send(x * x) 
+        delay(100)
+    }
+    // Ważne: Sygnał, że więcej danych nie będzie
+    channel.close() 
+}
+
+// KORUTYNA 2: Konsument
+launch {
+    // Pętla for automatycznie kończy działanie, 
+    // gdy kanał zostanie zamknięty
+    for (y in channel) {
+        println("Odebrano: $y")
+    }
+    println("Kanał zamknięty, koniec pracy.")
+}
+\end{minted}
+
+Kanał jest koncepcyjnie \textit{otwarty} tak długo, jak go nie zamkniemy. W przeciwieństwie do \texttt{Flow}, który kończy się naturalnie po wykonaniu bloku kodu, Kanał może działać w nieskończoność.
+
+Metoda \texttt{close()} wysyła specjalny sygnał \textit{koniec transmisji}.
 \begin{itemize}
-  \item select i multiplexing.
-  \item Ticker, pipeline, fan-in i fan-out.
-  \item Porownanie z SharedFlow i event bus.
+    \item Próba wysłania (\texttt{send}) na zamknięty kanał rzuci wyjątek \texttt{ClosedSendChannelException}.
+    \item Próba odbioru (\texttt{receive}) z zamkniętego kanału (gdy bufor jest pusty) rzuci wyjątek \texttt{ClosedReceiveChannelException}.
 \end{itemize}
 
-\subsection{Praktyka mobilna}
+Dlatego w praktyce rzadko używamy surowego \texttt{receive()}. Zdecydowanie lepiej używać pętli \texttt{for (item in channel)}, która automatycznie obsługuje zamknięcie kanału i bezpiecznie wychodzi z pętli.
+
+\section{Rodzaje Kanałów (Buforowanie)}
+
+Konstruktor klasy \texttt{Channel} przyjmuje opcjonalny parametr \texttt{capacity}. To on decyduje o tym, kiedy funkcja \texttt{send()} zawiesi nadawcę. Wybór odpowiedniego typu bufora jest kluczowy dla zarządzania przepływem danych.
+
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w07-buffors.png}
+    \caption{Typy buforów.}
+    \label{fig:Figura buffors}
+\end{figure}
+
+\subsection{Rendezvous (Domyślny)}
+\texttt{capacity = Channel.RENDEZVOUS} (lub 0).
+
+To domyślny i najbardziej restrykcyjny typ kanału. Nie posiada on żadnego bufora.
 \begin{itemize}
-  \item Komunikacja worker -> UI.
-  \item Streamowanie danych sieciowych i sensorow.
-  \item Testowanie i deterministyczny scheduling.
+    \item \textbf{Działanie:} Nadawca i Odbiorca muszą się \textit{spotkać} (fr. \textit{rendezvous}) w tym samym momencie.
+    \item \textbf{Zachowanie:} \texttt{send()} zawiesza się dopóki druga strona nie wywoła \texttt{receive()}. I odwrotnie.
+    \item \textbf{Metafora:} Przekazywanie pałeczki w sztafecie. Biegacz A nie może puścić pałeczki, dopóki B jej nie chwyci.
 \end{itemize}
 
-\subsection{Case study}
+Jest to idealne rozwiązanie do ścisłej synchronizacji dwóch wątków.
+
+\subsection{Buffered (Buforowany)}
+\texttt{capacity = liczba dodatnia} (np. 10).
+
+Kanał posiada kolejkę o ustalonym rozmiarze (\texttt{ArrayChannel}).
 \begin{itemize}
-  \item Kanal powiadomien i logowania.
-  \item Analiza bledow: missed signals i resource leaks.
-  \item Checklist: czyszczenie zasobow i lifecycle.
+    \item \textbf{Działanie:} Nadawca może wysłać tyle elementów, ile mieści bufor, nie czekając na odbiorcę.
+    \item \textbf{Zachowanie:} \texttt{send()} zawiesza się dopiero, gdy bufor jest \textbf{pełny}.
+    \item \textbf{Metafora:} Taśmociąg w fabryce. Maszyna produkująca może pracować szybciej przez chwilę, zapełniając taśmę, nawet jeśli maszyna pakująca chwilowo stanęła.
 \end{itemize}
 
-\section{Elementy do rozbudowy}
+\subsection{Conflated (Scalony/Nadpisujący)}
+\texttt{capacity = Channel.CONFLATED}.
+
+Specyficzny kanał o pojemności 1, który nigdy nie wstrzymuje nadawcy.
 \begin{itemize}
-  \item Przyklad A: fan-in dla zapytan sieciowych (TODO).
-  \item Przyklad B: select dla priorytetyzacji zadan (TODO).
-  \item Zadania: testy kanalow z runTest (TODO).
-  \item Pytania: kiedy preferowac SharedFlow zamiast Channel (TODO).
+    \item \textbf{Działanie:} Jeśli odbiorca nie nadąża, stare elementy są \textbf{wyrzucane}, a w kanale zostaje tylko ten najnowszy.
+    \item \textbf{Zachowanie:} \texttt{send()} \textbf{nigdy} się nie zawiesza.
+    \item \textbf{Metafora:} Tablica z kursami walut. Nie interesuje nas historia zmian z ostatnich 5 minut, chcemy widzieć tylko aktualną cenę.
 \end{itemize}
 
-% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+\subsection{Unlimited (Nielimitowany)}
+\texttt{capacity = Channel.UNLIMITED}.
+
+Kanał z buforem opartym na liście łączonej (\texttt{LinkedList}), która rośnie w \textit{nieskończoność}.
+
+\begin{itemize}
+    \item \textbf{Działanie:} Przyjmuje wszystko.
+    \item \textbf{Zachowanie:} \texttt{send()} \textbf{nigdy} się nie zawiesza (chyba że braknie pamięci RAM).
+    \item \textbf{Ostrzeżenie:} Używanie tego kanału jest ryzykowne. Jeśli nadawca jest szybszy od odbiorcy, program w końcu wyrzuci błąd \texttt{OutOfMemoryError}.
+\end{itemize}
+
+\subsection{Przykład konfiguracji}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// 1. Rendezvous (domyślny) - ścisła synchronizacja
+val c1 = Channel<Int>() 
+
+// 2. Buffered - bufor na 10 elementów
+val c2 = Channel<Int>(10)
+
+// 3. Conflated - tylko najnowsza wartość
+val c3 = Channel<Int>(Channel.CONFLATED)
+\end{minted}
+
+Warto zauważyć, że \texttt{StateFlow} działa bardzo podobnie do kanału typu \texttt{Conflated} (trzyma tylko najnowszy stan), podczas gdy zwykły \texttt{Flow} z buforem zachowuje się jak kanał \texttt{Buffered}.
+
+\section{Instrukcja select}
+
+W standardowym kodzie asynchronicznym (używając \texttt{await} lub \texttt{receive}) czekamy sekwencyjnie: najpierw na wynik A, potem na wynik B.
+Co jednak, jeśli mamy dwa niezależne źródła danych i chcemy przetworzyć wynik z tego, które odpowie \textbf{szybciej}?
+
+Tu z pomocą przychodzi wyrażenie \texttt{select}. Pozwala ono \textit{nasłuchiwać} na wielu kanałach (lub obiektach \texttt{Deferred}) jednocześnie i uruchomić kod skojarzony tylko z tym zdarzeniem, które nastąpi jako pierwsze.
+
+Wyrażenie \texttt{select<T>} zwraca wynik typu \texttt{T}. Wewnątrz bloku definiujemy klauzule (np. \texttt{onReceive}), które mówią \textit{co zrobić, jeśli to źródło wygra wyścig}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+
+suspend fun raceData() {
+    val server1 = Channel<String>()
+    val server2 = Channel<String>()
+
+    // Symulacja: Serwer 1 jest wolny
+    launch {
+        delay(500)
+        server1.send("Dane z USA (500ms)")
+    }
+
+    // Symulacja: Serwer 2 jest szybki
+    launch {
+        delay(100)
+        server2.send("Dane z Europy (100ms)")
+    }
+
+    // WYŚCIG: Czekamy na PIERWSZY wynik
+    val winner = select<String> {
+        // Klauzula 1: Jeśli server1 wyśle pierwszy...
+        server1.onReceive { msg ->
+            "Wygrał Serwer 1: $msg"
+        }
+        
+        // Klauzula 2: Jeśli server2 wyśle pierwszy...
+        server2.onReceive { msg ->
+            "Wygrał Serwer 2: $msg"
+        }
+    }
+
+    println(winner)
+}
+\end{minted}
+
+\subsection{Zastosowanie Praktyczne: Timeout}
+
+Najczęstszym zastosowaniem \texttt{select} jest zastosowanie \texttt{onTimeout}, aby \textbf{zrezygnować z czekania}, jeśli operacja trwa zbyt długo.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val dataChannel = Channel<String>()
+
+val result = select<String?> {
+    // Opcja 1: Dane przyszły na czas
+    dataChannel.onReceive { it }
+    
+    // Opcja 2: Minął czas (np. 1 sekunda)
+    onTimeout(1000) { 
+        println("Za długo! Anuluję.")
+        null 
+    }
+}
+\end{minted}
+
+\section{Przykład Zastosowania}
+
+Aby utrwalić wiedzę o kanałach, zbudujmy symulację aukcji internetowej.
+
+Mamy tutaj do czynienia z asymetrią:
+\begin{itemize}
+    \item \textbf{Producenci (Licytujący):} Jest ich wielu. Działają na różnych wątkach, w różnym tempie. Nie wiedzą o sobie nawzajem.
+    \item \textbf{Kanał (Stolik aukcyjny):} Punkt synchronizacji. Gwarantuje, że oferty będą przetwarzane po kolei, nawet jeśli wpłynęły w tej samej milisekundzie.
+    \item \textbf{Konsument (Aukcjoner):} Jest jeden. Jego zadaniem jest walidacja ofert (np. czy nowa oferta jest wyższa od poprzedniej) i ogłaszanie zwycięzcy.
+\end{itemize}
+
+Gdybyśmy użyli tutaj zwykłej zmiennej (\texttt{var currentPrice}), musielibyśmy używać mutexów lub blokad, aby uniknąć \textit{Race Conditions}. Kanał zdejmuje z nas ten ciężar - on \textit{kolejkuje} dostęp do aukcjonera.
+
+Zobaczmy, jak wygląda to w kodzie. Kluczowym elementem jest pętla \texttt{for} iterująca po kanale.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Prosty model danych oferty
+data class Bid(val bidderName: String, val amount: Int)
+
+class AuctionViewModel : ViewModel() {
+
+    // Stan UI (obserwowany przez Compose)
+    private val _uiState = MutableStateFlow(AuctionUiState())
+    val uiState = _uiState.asStateFlow()
+
+    // KANAŁ: Serce synchronizacji.
+    // Używamy UNLIMITED lub dużej pojemności, aby nie blokować licytujących,
+    private val bidChannel = Channel<Bid>(capacity = Channel.UNLIMITED)
+
+    init {
+        // Startujemy "Aukcjonera" w momencie powstania ViewModela
+        startAuctioneer()
+    }
+
+    // --- KONSUMENT (Aukcjoner) ---
+    private fun startAuctioneer() {
+        viewModelScope.launch {
+            // Pętla for zawiesza się, gdy kanał jest pusty.
+            // Gdy pojawią się oferty, bierze je PO JEDNEJ na raz.
+            for (bid in bidChannel) {
+                
+                // Pobieramy aktualny stan
+                val currentState = _uiState.value
+                
+                // Logika Biznesowa: Czy oferta jest ważna?
+                // ma prawo zmieniać stan w oparciu o oferty!
+                if (bid.amount > currentState.currentPrice) {
+                    val newLog = "${bid.bidderName} podbija do ${bid.amount} PLN"
+                    _uiState.update { 
+                        it.copy(
+                            currentPrice = bid.amount, 
+                            winningBidder = bid.bidderName,
+                            logs = it.logs + newLog
+                        ) 
+                    }
+                } else {
+                    // Oferta za niska - ignorujemy lub logujemy błąd
+                    val errorLog = "Odrzucono ${bid.amount} od ${bid.bidderName} (za mało)"
+                     _uiState.update { it.copy(logs = it.logs + errorLog) }
+                }
+                
+                // Symulacja czasu przetwarzania (np. aukcjoner wykrzykuje cenę)
+                delay(50) 
+            }
+        }
+    }
+
+    // --- PRODUCENT (Licytujący) ---
+    fun placeBid(name: String, amount: Int) {
+        viewModelScope.launch {
+            // To jest operacja atomowa.
+            bidChannel.send(Bid(name, amount))
+        }
+    }
+    
+    // Sprzątanie
+    override fun onCleared() {
+        super.onCleared()
+        bidChannel.close() // Zamykamy kanał
+    }
+}
+\end{minted}
+
+\section{Pełne Przykłady Implementacji}
+
+\subsection{Przykład 1: System Aukcyjny}
+
+W tym przykładzie ViewModel pełni rolę "Aukcjonera". Posiada jeden Kanał, do którego spływają oferty z różnych przycisków (symulujących różnych użytkowników). Dzięki pętli \texttt{for} na kanale, oferty są przetwarzane sekwencyjnie, co eliminuje ryzyko błędów współbieżności (Race Condition) przy aktualizacji ceny.
+
+\begin{minted}[frame=single,framesep=10pt,fontsize=\footnotesize]{kotlin}
+// --- 1. Model Danych ---
+data class Bid(val bidderName: String, val amount: Int)
+
+data class AuctionUiState(
+    val currentPrice: Int = 100,
+    val winningBidder: String = "Brak",
+    val recentLogs: List<String> = emptyList(), // Log ostatnich zdarzeń
+    val isAuctionActive: Boolean = true
+)
+
+// --- 2. ViewModel (Aukcjoner) ---
+class AuctionViewModel : ViewModel() {
+    private val _uiState = MutableStateFlow(AuctionUiState())
+    val uiState = _uiState.asStateFlow()
+
+    // KANAŁ: Lejek, do którego wpadają oferty z różnych wątków UI
+    private val bidChannel = Channel<Bid>(capacity = Channel.UNLIMITED)
+
+    init {
+        startAuctioneer()
+    }
+
+    private fun startAuctioneer() {
+        viewModelScope.launch {
+            // KONSUMENT: Ta pętla działa tak długo, jak kanał jest otwarty.
+            // Gwarantuje przetwarzanie ofert jedna po drugiej.
+            for (bid in bidChannel) {
+                val currentState = _uiState.value
+                
+                // Walidacja oferty (logika biznesowa)
+                if (bid.amount > currentState.currentPrice) {
+                    _uiState.update {
+                        it.copy(
+                            currentPrice = bid.amount,
+                            winningBidder = bid.bidderName,
+                            recentLogs = (
+                              it.recentLogs + 
+                                "${bid.bidderName} przebija na ${bid.amount} PLN"
+                            ).takeLast(5)
+                        )
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            recentLogs = (
+                              it.recentLogs + 
+                                "Odrzucono ${bid.amount} od ${bid.bidderName} (za mało)"
+                            ).takeLast(5)
+                        )
+                    }
+                }
+                // Symulacja czasu reakcji aukcjonera
+                delay(100) 
+            }
+        }
+    }
+
+    // PRODUCENT: Funkcja wywoływana z UI (Button)
+    fun placeBid(name: String) {
+        if (!_uiState.value.isAuctionActive) return
+        
+        // Wrzucamy ofertę do kanału
+        val randomBid = _uiState.value.currentPrice + Random.nextInt(10, 50)
+        viewModelScope.launch {
+            bidChannel.send(Bid(name, randomBid))
+        }
+    }
+
+    fun stopAuction() {
+        _uiState.update { 
+          it.copy(
+            isAuctionActive = false, 
+            recentLogs = it.recentLogs + "AUKCJA ZAKOŃCZONA") 
+        }
+        bidChannel.close() // Zamykamy kanał - 
+                           //pętla w 'startAuctioneer' zakończy działanie
+    }
+}
+
+// --- 3. Widok (Compose) ---
+@Composable
+fun AuctionScreen(viewModel: AuctionViewModel = viewModel()) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text("Aktualna cena: ${state.currentPrice} PLN")
+        Text("Wygrywa: ${state.winningBidder}")
+        
+        Spacer(Modifier.height(16.dp))
+        
+        // Przyciski symulujące różnych graczy
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+              onClick = { viewModel.placeBid("Ania") }, 
+              enabled = state.isAuctionActive
+            ) { Text("Ania licytuje") }
+            Button(
+              onClick = { viewModel.placeBid("Tomek") }, 
+              enabled = state.isAuctionActive
+            ) { Text("Tomek licytuje") }
+        }
+        
+        Button(
+            onClick = { viewModel.stopAuction() }, 
+            modifier = Modifier.padding(top = 8.dp)
+        ) { Text("Zakończ aukcję") }
+
+        Spacer(Modifier.height(16.dp))
+        Text("Log aukcji:")
+        LazyColumn {
+            items(state.recentLogs) { log -> Text(log) }
+        }
+    }
+}
+\end{minted}
+
+\subsection{Przykład 2: Wyścig Serwerów z Select}
+
+Przykład pokazujący użycie instrukcji \texttt{select} wewnątrz ViewModela. Użytkownik klika \textit{Szukaj oferty}, a ViewModel wysyła zapytania do dwóch źródeł równolegle. Wygrywa to, które odpowie pierwsze.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// --- 1. ViewModel ---
+class RaceViewModel : ViewModel() {
+    var resultText by mutableStateOf("Naciśnij start, aby wyszukać")
+        private set
+    var isSearching by mutableStateOf(false)
+        private set
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun startRace() {
+        viewModelScope.launch {
+            isSearching = true
+            resultText = "Szukanie najszybszej oferty..."
+
+            // Tworzymy dwa kanały symulujące dwa serwery
+            val fastServer = Channel<String>()
+            val slowServer = Channel<String>()
+
+            // Uruchamiamy "producentów" danych
+            launch {
+                delay(Random.nextLong(200, 1500)) // Losowy czas
+                fastServer.send("Oferta z Amazon (USA)")
+            }
+            launch {
+                delay(Random.nextLong(200, 1500)) // Losowy czas
+                slowServer.send("Oferta z Allegro (PL)")
+            }
+
+            // SELECT: Czekamy na PIERWSZY wynik
+            val winner = select<String> {
+                fastServer.onReceive { offer -> "Wygrał FastServer: $offer" }
+                slowServer.onReceive { offer -> "Wygrał SlowServer: $offer" }
+                
+                // Timeout, jeśli oba serwery będą zbyt wolne (np. > 1000ms)
+                onTimeout(1000) { "Błąd: Przekroczono limit czasu (Timeout)!" }
+            }
+
+            resultText = winner
+            isSearching = false
+        }
+    }
+}
+
+// --- 2. Widok (Compose) ---
+@Composable
+fun RaceScreen(viewModel: RaceViewModel = viewModel()) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (viewModel.isSearching) {
+            CircularProgressIndicator()
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        
+        Text(viewModel.resultText)
+        
+        Spacer(Modifier.height(32.dp))
+        
+        Button(
+          onClick = { viewModel.startRace() }, 
+          enabled = !viewModel.isSearching
+        ) {
+            Text("Znajdź najlepszą ofertę (Wyścig)")
+        }
+    }
+}
+\end{minted}
