@@ -1,61 +1,416 @@
-\chapter{Wyklad 8: Room - model danych, CRUD i migracje}
+\chapter{Bazy Danych: Biblioteka Room (Wykład 9)}
 
-\begin{learningobjectives}
-  \item Poznasz komponenty Room (Entity, DAO, Database).
-  \item Zaprojektujesz lokalna baze danych wraz z relacjami.
-  \item Przygotujesz strategie migracji i testowania zmian schematu.
-\end{learningobjectives}
+W poprzednim rozdziale nauczyliśmy się zapisywać proste ustawienia. Dla większej ilości danych, szczególnie dla bardziej skomplikowanej struktury użyjemy relacyjnej bazy danych. W Androidzie mamy dostępny \texttt{Room}.
 
-\section{Mapa rozdzialu}
+Android posiada wbudowany silnik \textbf{SQLite}. Jest to relacyjna baza danych zamknięta w jednym pliku. Możemy z niej korzystać używając języka SQL. \texttt{Room} to biblioteka z pakietu Android Jetpack, która działa jako warstwa abstrakcji nad SQLite.
 \begin{itemize}
-  \item Entity, DAO, Database - podstawowe elementy.
-  \item Zapytania, relacje, transakcje.
-  \item Migracje i seed danych.
-  \item Integracja z Flow i coroutines.
-  \item Testy instrumentacyjne i jednostkowe.
+    \item Sprawdza poprawność zapytań SQL podczas kompilacji.
+    \item Automatycznie mapuje wyniki zapytań na obiekty Kotlina (Data Classes).
+    \item Zwraca strumienie \texttt{Flow}, dzięki czemu UI odświeża się samo.
 \end{itemize}
 
-\section{Material zrodlowy}
+\section{Architektura Room}
+
+Aby używać Room, musimy zdefiniować trzy główne komponenty. Działa tu analogia do magazynu:
+
+\begin{enumerate}
+    \item \textbf{Entity (Encja):} Klasa danych (`data class`), która definiuje strukturę tabeli (kolumny).
+    \item \textbf{DAO (Data Access Object):} Interfejs, który definiujemetody dostęowe do bazy danych. To tu piszemy zapytania SQL.
+    \item \textbf{Database:} Główny punkt dostępu do bazy, który spina Encje z DAO.
+\end{enumerate}
+
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w09-roomscheme.png}
+    \caption{Schemat bazy danych ROOM.}
+    \label{fig:Figura roomscheme}
+\end{figure}
+
+\subsection{Entity (Definiowanie Tabeli)}
+
+Zacznijmy od stworzenia tabeli dla prostego zadania (Task). Używamy adnotacji, aby \textit{nauczyć} Room, jak traktować naszą klasę.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Entity(tableName = "tasks_table") // Nazwa tabeli w SQL
+data class TaskEntity(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0, // Room sam nada kolejne ID
+    
+    @ColumnInfo(name = "task_title")
+    val title: String,
+    
+    val isCompleted: Boolean, // Room domyślnie nazwie 
+                              // kolumnę "isCompleted"
+    
+    val createdAt: Long = System.currentTimeMillis()
+)
+\end{minted}
+
+\subsection{DAO (Operacje na danych)}Data Access Object (DAO) stanowi warstwę abstrakcji oddzielającą logikę biznesową aplikacji od niskopoziomowych operacji na bazie danych SQLite. W bibliotece Room, DAO musi być interfejsem (lub klasą abstrakcyjną), ponieważ właściwa implementacja metod (zawierająca kod SQL i zarządzanie kursorami) jest generowana automatycznie podczas kompilacji.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Dao
+interface TaskDao {
+
+    // Operacje jednorazowe (Zapis/Edycja/Usuwanie)
+    // Muszą być SUSPEND, bo te operacje mogą zająć
+    // dużo czasu.
+    // Room automatycznie wykona je na Dispatchers.IO (Main-Safe).
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTask(task: TaskEntity)
+
+    @Delete
+    suspend fun deleteTask(task: TaskEntity)
+
+    @Update
+    suspend fun updateTask(task: TaskEntity)
+
+    // Operacje odczytu (Reaktywne)
+    // NIE są suspend! Zwracają Flow.
+    // Flow emituje nową listę za każdym razem, 
+    // gdy cokolwiek zmieni się w tabeli.
+    
+    @Query("SELECT * FROM tasks_table ORDER BY createdAt DESC")
+    fun getAllTasks(): Flow<List<TaskEntity>>
+
+    // Możemy też robić jednorazowe strzały po konkretną daną
+    @Query("SELECT * FROM tasks_table WHERE id = :id")
+    suspend fun getTaskById(id: Long): TaskEntity?
+}
+\end{minted}
+
+Metody oznaczone adnotacjami \texttt{@Insert}, \texttt{@Delete} oraz \texttt{@Update} odpowiadają za modyfikację stanu bazy danych.
+
 \begin{itemize}
-  \item PUM2/Wyk/Wyklad9.pdf.
-  \item \texttt{PUM2/Listy/W9-Room\_basics.ipynb}.
-  \item developer.android.com/training/data-storage/room.
+    \item \textbf{Modyfikator \texttt{suspend}:} Operacje zapisu na dysku (I/O) są z natury blokujące i mogą trwać od kilku do kilkudziesięciu milisekund. Oznaczenie ich jako \texttt{suspend} wymusza na programiście wywołanie ich wewnątrz korutyny.
+    \item \textbf{Main-Safety:} Room gwarantuje bezpieczeństwo wątku głównego. Wygenerowana implementacja tych metod automatycznie przenosi wykonanie zapytania SQL na dedykowany dla bazy danych dyspozytor (zazwyczaj oparty na \texttt{Dispatchers.IO}), niezależnie od tego, na jakim wątku została uruchomiona korutyna nadrzędna.
+    \item \textbf{Strategia Konfliktów:} Parametr \texttt{onConflict = OnConflictStrategy.REPLACE} instruuje silnik bazy danych, jak zachować się w przypadku naruszenia unikalności klucza głównego (Primary Key). W tym przypadku, próba wstawienia zadania o istniejącym już ID spowoduje nadpisanie starego rekordu nowym (tzw. operacja \textit{UPSERT}).
 \end{itemize}
 
-\subsection{Model danych}
+Metoda \texttt{getAllTasks()} zwraca typ \texttt{Flow<List<TaskEntity>>}. Jest to kluczowy mechanizm dla architektury sterowanej danymi (Data-Driven Architecture).
+
 \begin{itemize}
-  \item Entity annotations, primary keys, indexes.
-  \item Relacje one-to-many i many-to-many.
-  \item Strategia normalizacji vs denormalizacji.
+    \item \textbf{Brak \texttt{suspend}:} Zauważmy, że ta metoda \textbf{nie jest} funkcją zawieszającą. Wynika to z faktu, że samo wywołanie metody nie wykonuje zapytania SQL. Tworzy ono jedynie i zwraca instancję strumienia (\texttt{Flow}). Dopiero zasubskrybowanie się do strumienia (operacja \texttt{collect}) uruchamia zapytanie.
+    \item \textbf{Invalidation Tracker:} Room automatycznie monitoruje tabele w bazie danych. Gdy nastąpi jakakolwiek zmiana w tabeli \texttt{tasks\_table} (np. przez \texttt{insertTask}), Room wykrywa to zdarzenie, automatycznie wykonuje zapytanie \texttt{SELECT} ponownie i emituje zaktualizowaną listę do strumienia. Zapewnia to spójność widoku z danymi bez konieczności ręcznego odświeżania UI.
 \end{itemize}
 
-\subsection{DAO}
+Metoda \texttt{getTaskById} jest przykładem klasycznego zapytania zwracającego pojedynczy wynik (Snapshot).
+
 \begin{itemize}
-  \item Query, Insert, Update, Delete.
-  \item Typy zwracane: Flow, suspend, PagingSource.
-  \item Transakcje, concurrency, walidacja danych.
+    \item W przeciwieństwie do zapytania zwracającego \texttt{Flow}, tutaj musimy użyć słowa kluczowego \texttt{suspend}, ponieważ zapytanie SQL wykonywane jest natychmiastowo w momencie wywołania funkcji, co wymaga zawieszenia wątku na czas operacji I/O.
+    \item Typ zwracany jest nullowalny (\texttt{TaskEntity?}), co zmusza programistę do obsłużenia sytuacji, w której rekord o danym ID nie istnieje w bazie danych.
 \end{itemize}
 
-\subsection{Migracje}
+\subsection{Database (Punkt wejścia)}
+
+Na koniec tworzymy abstrakcyjną klasę bazy danych.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Database(entities = [TaskEntity::class], version = 1)
+abstract class AppDatabase : RoomDatabase() {
+    
+    abstract fun taskDao(): TaskDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: AppDatabase? = null
+
+        fun getDatabase(context: Context): AppDatabase {
+            // Wzorzec Double-Check Locking dla Singletona
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    AppDatabase::class.java,
+                    "my_todo_database"
+                )
+                .fallbackToDestructiveMigration() 
+                .build()
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
+}
+\end{minted}
+
+Powyższy kod realizuje wzorzec projektowy \textbf{Singleton} z wykorzystaniem mechanizmu \textbf{Double-Check Locking}, mający na celu zapewnienie bezpiecznego dostępu do zasobu w środowisku wielowątkowym przy minimalnym narzucie wydajnościowym.
+
+Adnotacja \texttt{@Database} pełni rolę konfiguratora dla procesora adnotacji (KSP/KAPT).
 \begin{itemize}
-  \item AutoMigrations oraz migracje manualne.
-  \item Seed danych, fallback to destructive.
-  \item Testowanie migracji i weryfikacja schematu.
+    \item \texttt{entities}: Definiuje schemat bazy danych. Room zweryfikuje, czy klasy te posiadają poprawne mapowanie na typy SQL.
+    \item \texttt{version}: Liczba całkowita określająca wersję schematu. Zmiana struktury encji (np. dodanie pola) wymaga inkrementacji tej wartości i dostarczenia strategii migracji.
+    \item Klasa jest \texttt{abstract}, ponieważ to biblioteka Room generuje jej konkretną implementację (suffix \texttt{\_Impl}) w czasie kompilacji, wstrzykując kod odpowiedzialny za transakcje SQL.
 \end{itemize}
 
-\subsection{Case study}
+Zmienna statyczna \texttt{INSTANCE} została oznaczona jako \texttt{@Volatile}. W Java Memory Model (JMM) ma to krytyczne znaczenie dla widoczności zmian w pamięci:
 \begin{itemize}
-  \item Projekt tabel katalogu i powiazanych rekordow.
-  \item Zadanie: dodanie relacji ulubionych i historii.
-  \item Checklist: integracja z Repository i Flow.
+    \item \textbf{Problem:} Wątki mogą przechowywać wartości zmiennych w lokalnych rejestrach procesora (CPU Cache) zamiast w głównej pamięci RAM. Bez \texttt{@Volatile}, wątek A mógłby zainicjalizować bazę, ale wątek B wciąż widziałby \texttt{null} w swojej pamięci podręcznej.
+    \item \textbf{Rozwiązanie:} \texttt{@Volatile} wymusza relację \textit{happens-before}. Zapis do tej zmiennej jest natychmiast widoczny dla wszystkich innych wątków (flush to main memory), a odczyt zawsze pobiera wartość z pamięci głównej. Zapobiega to również tzw. \textit{Instruction Reordering} (przeorganizowaniu instrukcji przez kompilator), co mogłoby doprowadzić do użycia nie w pełni zainicjalizowanego obiektu.
 \end{itemize}
 
-\section{Elementy do rozbudowy}
+Funkcja \texttt{getDatabase} implementuje mechanizm leniwej inicjalizacji (Lazy Initialization) z optymalizacją wydajności:
+\begin{enumerate}
+    \item \textbf{Pierwsze sprawdzenie (Bez blokady):} \texttt{return INSTANCE ?: ...} sprawdza, czy instancja już istnieje. Jeśli tak, zwraca ją natychmiast, unikając kosztownego wchodzenia w blok synchronizowany. Jest to ścieżka wykonania dla 99\% wywołań w cyklu życia aplikacji.
+    \item \textbf{Sekcja Krytyczna (Synchronizacja):} \texttt{synchronized(this)} zapewnia, że tylko jeden wątek jednocześnie może wykonywać kod wewnątrz bloku. Chroni to przed sytuacją \textit{Race Condition}, gdzie dwa wątki równocześnie stwierdziłyby brak instancji i utworzyłyby dwie niezależne kopie bazy danych.
+    \item \textbf{Drugie sprawdzenie (Wewnątrz blokady):} Wewnątrz bloku \texttt{synchronized} (ukryte w logice operatora Elvis i przypisania) następuje ponowna weryfikacja. Jest to konieczne, gdyż między pierwszym sprawdzeniem a wejściem do sekcji krytycznej inny wątek mógł zdążyć utworzyć instancję.
+\end{enumerate}
+
+Wywołanie \texttt{context.applicationContext} jest zabezpieczeniem przed wyciekami pamięci (Memory Leaks).
+Baza danych (jako Singleton) żyje przez cały czas działania procesu aplikacji. Gdybyśmy przekazali do niej \texttt{Activity Context}, Singleton trzymałby referencję do Activity, uniemożliwiając Garbage Collectorowi zwolnienie pamięci po zamknięciu ekranu. Kontekst aplikacji jest niezależny od cyklu życia widoków.
+
+Metoda \texttt{.fallbackToDestructiveMigration()} definiuje zachowanie w przypadku niezgodności wersji schematu (parametr \texttt{version}) ze stanem faktycznym pliku na dysku, przy jednoczesnym braku zdefiniowanej ścieżki migracji (klasy \texttt{Migration}).
+W trybie tym Room usuwa plik bazy danych i tworzy go na nowo. Jest to dopuszczalne w fazie deweloperskiej (prototypowanie), ale w środowisku produkcyjnym prowadzi do trwałej utraty danych użytkownika i powinno zostać zastąpione implementacją metody \texttt{.addMigrations()}.
+
+\section{Integracja z Architekturą MVVM}
+
+Posiadając zdefiniowaną bazę danych, nie powinniśmy korzystać z niej bezpośrednio w warstwie prezentacji (Activity/Composable). Zamiast tego zastosujemy wzorzec \texttt{Repository}.
+
+Repozytorium pełni rolę mediatora. ViewModel nie musi wiedzieć, czy dane pochodzą z bazy SQLite, z sieci czy z pliku JSON. On chce tylko danych.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class TaskRepository(private val taskDao: TaskDao) {
+
+    // Strumień danych (Obserwowanie)
+    // Repozytorium po prostu przekazuje Flow z DAO dalej.
+    // Nie musimy tu używać 'suspend', bo samo pobranie referencji 
+    // do strumienia jest natychmiastowe.
+    val allTasks: Flow<List<TaskEntity>> = taskDao.getAllTasks()
+
+    // Operacje edycyjne
+    // Tutaj musimy użyć 'suspend', aby nie zablokować wątku,
+    // z którego wołamy tę funkcję (zazwyczaj ViewModel).
+    suspend fun addTask(title: String) {
+        val newTask = TaskEntity(title = title, isCompleted = false)
+        taskDao.insertTask(newTask)
+    }
+
+    suspend fun toggleTaskCompletion(task: TaskEntity) {
+        val updatedTask = task.copy(isCompleted = !task.isCompleted)
+        taskDao.updateTask(updatedTask)
+    }
+    
+    suspend fun removeTask(task: TaskEntity) {
+        taskDao.deleteTask(task)
+    }
+}
+\end{minted}
+
+To tutaj następuje konwersja strumienia bazodanowego na stan interfejsu użytkownika. Podobnie jak w przypadku DataStore (Rozdział 8), wykorzystamy operator \texttt{stateIn}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
+
+    // Konwersja Flow<List<TaskEntity>> -> StateFlow<List<TaskEntity>>
+    // Dzięki temu UI zawsze ma dostęp do "najświeższej" listy zadań.
+    val tasks: StateFlow<List<TaskEntity>> = repository.allTasks
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    // Funkcje wywoływane przez UI (np. po kliknięciu przycisku)
+    fun onAddTaskClick(title: String) {
+        if (title.isBlank()) return
+        
+        viewModelScope.launch {
+            // Room automatycznie przeniesie to na Dispatchers.IO
+            repository.addTask(title)
+            // Nie musimy ręcznie odświeżać listy!
+            // Room wykryje zmianę, zaktualizuje Flow, 
+            // a StateFlow wyśle nowe dane do UI.
+        }
+    }
+
+    fun onTaskCheckedChange(task: TaskEntity) {
+        viewModelScope.launch {
+            repository.toggleTaskCompletion(task)
+        }
+    }
+    
+    fun onTaskDelete(task: TaskEntity) {
+         viewModelScope.launch {
+            repository.removeTask(task)
+        }
+    }
+}
+\end{minted}
+
+\section{Przykład Praktyczny: Aplikacja ToDo}
+
+Zepnijmy wszystkie omówione elementy w działającą aplikację. Naszym celem jest stworzenie ekranu, na którym użytkownik może dodawać zadania i odznaczać je jako wykonane. Dzięki reaktywności Room, lista będzie aktualizować się automatycznie.
+
+Aby zachować poprawność architektoniczną, instancja bazy danych i repozytorium powinna żyć tak długo, jak aplikacja. Najlepszym miejscem na ich inicjalizację jest klasa dziedzicząca po \texttt{Application}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// 1. Rejestrujemy tę klasę w AndroidManifest.xml w atrybucie android:name
+class TodoApplication : Application() {
+    
+    // Inicjalizacja leniwa (lazy) - baza powstanie dopiero przy pierwszym użyciu,
+    // a nie przy starcie aplikacji (szybszy czas uruchamiania).
+    val database by lazy { AppDatabase.getDatabase(this) }
+    
+    val repository by lazy { TaskRepository(database.taskDao()) }
+}
+\end{minted}
+
+\begin{minted}[frame=single,framesep=10pt]{xml}
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:name=".TodoApplication"
+        
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.TodoApp">
+        
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.TodoApp">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
+
+Ponieważ nasz \texttt{TaskViewModel} przyjmuje parametr w konstruktorze (\texttt{repository}), system Android nie potrafi go domyślnie utworzyć. Musimy dostarczyć fabrykę.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class TaskViewModelFactory(private val repository: TaskRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(TaskViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return TaskViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+\end{minted}
+
+Poniżej kod ekranu w Jetpack Compose. Zwróć uwagę na brak logiki odświeżania listy. UI po prostu \textit{reaguje} na to, co przychodzi ze \texttt{StateFlow}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable
+fun TaskScreen(viewModel: TaskViewModel) {
+    // 1. Obserwowanie stanu (bezpieczne dla cyklu życia)
+    val tasks by viewModel.tasks.collectAsStateWithLifecycle()
+    
+    // Stan lokalny dla pola tekstowego
+    var newTaskTitle by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        
+        // Sekcja dodawania
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = newTaskTitle,
+                onValueChange = { newTaskTitle = it },
+                label = { Text("Nowe zadanie") },
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = {
+                viewModel.onAddTaskClick(newTaskTitle)
+                newTaskTitle = "" // Wyczyść pole po dodaniu
+            }) {
+                Text("Dodaj")
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Sekcja listy
+        if (tasks.isEmpty()) {
+            Text(
+                text = "Brak zadań. Dodaj coś!",
+                modifier = Modifier
+                  .align(Alignment.CenterHorizontally)
+                  .padding(top = 32.dp),
+            )
+        } else {
+            LazyColumn {
+                items(tasks, key = { it.id }) { task ->
+                    TaskItem(
+                        task = task,
+                        onCheckedChange = { viewModel.onTaskCheckedChange(task) },
+                        onDeleteClick = { viewModel.onTaskDelete(task) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TaskItem(
+    task: TaskEntity, 
+    onCheckedChange: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = task.isCompleted,
+                onCheckedChange = { onCheckedChange() }
+            )
+            Text(
+                text = task.title,
+                modifier = Modifier.weight(1f).padding(start = 8.dp),
+            )
+            IconButton(onClick = onDeleteClick) {
+                Icon(Icons.Default.Delete, contentDescription = "Usuń")
+            }
+        }
+    }
+}
+\end{minted}
+
+Ostatnim elementem jest powiązanie wszystkiego w \texttt{MainActivity}. Pobieramy repozytorium z klasy \texttt{Application} i przekazujemy do fabryki.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // Pobieramy gotowe repozytorium (Singleton)
+        val appContainer = application as TodoApplication
+        val repository = appContainer.repository
+        
+        setContent {
+            AppTheme {
+                // Tworzymy ViewModel używając fabryki
+                val viewModel: TaskViewModel = viewModel(
+                    factory = TaskViewModelFactory(repository)
+                )
+                
+                TaskScreen(viewModel = viewModel)
+            }
+        }
+    }
+}
+\end{minted}
+
+\section{Podsumowanie Rozdziału}
+
+W tym rozdziale zbudowaliśmy kompletną architekturę \textbf{Offline-First}.
 \begin{itemize}
-  \item Przyklad A: schema Room dla aplikacji katalogowej (TODO).
-  \item Przyklad B: migracja dodajaca kolumne i przenoszaca dane (TODO).
-  \item Zadania: test Room z inMemoryDatabaseBuilder (TODO).
-  \item Pytania: roznica auto vs manual migration, jak laczyc Room z Flow (TODO).
+    \item \textbf{Room} dba o bezpieczne przechowywanie danych strukturalnych.
+    \item \textbf{DAO} i \textbf{Flow} zapewniają automatyczną synchronizację widoku z bazą danych.
+    \item \textbf{Repozytorium} izoluje logikę biznesową od szczegółów implementacji bazy.
 \end{itemize}
 
-% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+W kolejnym rozdziale (Wykład 10) wyjdziemy poza urządzenie i połączymy naszą aplikację z Internetem, wykorzystując bibliotekę \textbf{Retrofit}.
