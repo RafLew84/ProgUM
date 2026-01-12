@@ -8,6 +8,12 @@ Komunikacja sieciowa w aplikacjach mobilnych opiera się zazwyczaj na architektu
     \item \textbf{Serwer (API):} Przetwarza żądanie i odsyła odpowiedź (Response).
 \end{itemize}
 
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w10-retrofitscheme.png}
+    \caption{Schemat MVVM z biblioteką Retrofit.}
+    \label{fig:Figura retrofitscheme}
+\end{figure}
+
 Operacja sieciowa jest zjawiskiem wysoce nieprzewidywalnym. Czas odpowiedzi serwera (Latency) zależy od jakości zasięgu (LTE/5G/WiFi), obciążenia łącza czy odległości geograficznej od serwera. Może to trwać od 50 ms do nawet kilku sekund.
 
 Ze względu na tę nieprzewidywalność, system Android narzuca rygorystyczne ograniczenie: \textbf{Wykonywanie jakichkolwiek operacji sieciowych na Wątku Głównym (UI Thread) jest zabronione.}
@@ -356,7 +362,7 @@ data class ArticleDto(val title: String, val description: String?)
 
 // Interfejs Retrofit
 interface NewsApiService {
-    @GET("top-headlines?country=pl")
+    @GET("top-headlines?country=us")
     suspend fun getTopHeadlines(): NewsResponse
 }
 \end{minted}
@@ -460,7 +466,7 @@ fun NewsScreen(viewModel: NewsViewModel) { // ViewModel przekazywany jako parame
 
 \subsection{Punkt wejścia (MainActivity)}
 
-\begin{minted}[frame=single,framesep=10pt,fontsize=\footnotesize]{kotlin}
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -484,7 +490,7 @@ class MainActivity : ComponentActivity() {
 
 \section{Singleton vs Application Class}
 
-Uważny czytelnik może zauważyć różnicę w sposobie inicjalizacji klienta sieciowego względem bazy danych z Rozdziału 9.
+Zauważmy różnicę w sposobie inicjalizacji klienta sieciowego względem bazy danych z Rozdziału 9.
 \begin{itemize}
     \item W przypadku \textbf{Room}, musieliśmy użyć klasy \texttt{Application}, ponieważ baza danych wymaga dostępu do \texttt{Context} (systemu plików urządzenia).
     \item W przypadku \textbf{Retrofita}, zastosowaliśmy uproszczenie w postaci statycznego obiektu (\texttt{object RetrofitInstance}). Jest to możliwe, ponieważ klient HTTP w swojej podstawowej formie nie zależy od systemu Android i nie wymaga \texttt{Contextu}.
