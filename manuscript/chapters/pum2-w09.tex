@@ -9,6 +9,44 @@ Android posiada wbudowany silnik \textbf{SQLite}. Jest to relacyjna baza danych 
     \item Zwraca strumienie \texttt{Flow}, dzięki czemu UI odświeża się samo.
 \end{itemize}
 
+\section{Zależności (Gradle)}
+
+Aby móc skorzystać z biblioteki i wszystkich adnotacji, musimy odpowiednia skonfigurować projekt:
+
+W pliku \texttt{build.gradle.kts(Project)} dodajemy:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+plugins {
+    id("androidx.room") version "2.8.0" apply false
+    id("com.google.devtools.ksp") version "2.0.21-1.0.27" apply false
+}
+\end{minted}
+
+Do pliku \texttt{build.gradle.kts(Module)} dodajemy:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+plugins {
+    id("androidx.room")
+    id("com.google.devtools.ksp")
+}
+
+android {
+    room {
+        schemaDirectory("$projectDir/schemas")
+    }
+}
+
+dependencies {
+
+    implementation("androidx.room:room-runtime:2.8.0")
+    ksp("androidx.room:room-compiler:2.8.0")
+    implementation("androidx.room:room-ktx:2.8.0")
+
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
+}
+end{minted}
+
 \section{Architektura Room}
 
 Aby używać Room, musimy zdefiniować trzy główne komponenty. Działa tu analogia do magazynu:
