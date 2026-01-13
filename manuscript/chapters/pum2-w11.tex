@@ -400,9 +400,7 @@ Zasada ta chroni przed wyciekami pamięci (Memory Leaks). Nie można wstrzykną�
 
 \section{Integracja z ViewModel}
 
-W standardowym podejściu (bez DI), wstrzykiwanie zależności do ViewModelu jest problematyczne, ponieważ ViewModele muszą przetrwać zmiany konfiguracji (np. obrót ekranu). Wymaga to tworzenia skomplikowanych klas typu \texttt{ViewModelProvider.Factory}, które ręcznie przekazują zależności do konstruktora.
-
-Biblioteka Hilt całkowicie eliminuje konieczność pisania fabryk. Udostępnia ona dedykowany komponent \texttt{ViewModelComponent} oraz specjalną adnotację \texttt{@HiltViewModel}.
+W standardowym podejściu (bez DI), wstrzykiwanie zależności do ViewModelu jest problematyczne, ponieważ ViewModele muszą przetrwać zmiany konfiguracji (np. obrót ekranu). Wymaga to tworzenia skomplikowanych klas typu \texttt{ViewModelProvider.Factory}, które ręcznie przekazują zależności do konstruktora. Biblioteka Hilt całkowicie eliminuje konieczność pisania fabryk. Udostępnia ona dedykowany komponent \texttt{ViewModelComponent} oraz specjalną adnotację \texttt{@HiltViewModel}.
 
 \subsection{Adnotacja @HiltViewModel}
 
