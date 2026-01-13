@@ -1,62 +1,1024 @@
-\chapter{Wyklad 12: Offline caching i Single Source of Truth}
+\chapter{Single Source of Truth i Offline Caching (Wykład 13)}
 
-\begin{learningobjectives}
-  \item Zrozumiesz wzorzec Single Source of Truth i jego zalety.
-  \item Zaprojektujesz warstwe cache laczaca Room i Retrofit.
-  \item Przygotujesz strategie synchronizacji danych offline/online.
-\end{learningobjectives}
+W poprzednich rozdziałach nauczyliśmy się pobierać dane z Internetu (Retrofit) oraz zapisywać je w lokalnej bazie danych (Room). Do tej pory traktowaliśmy te technologie rozłącznie. Nasze aplikacje działały w trybie \textit{Online-Only} - jeśli telefon tracił zasięg, użytkownik widział pusty ekran lub komunikat błędu.
 
-\section{Mapa rozdzialu}
+W tym rozdziale połączymy te technologie, aby stworzyć aplikację typu \textbf{Offline-First}.
+
+\section{Wstęp: Paradygmat Offline-First}
+
+Urządzenia mobilne, ze swojej natury, działają w środowisku o zmiennej jakości połączenia sieciowego. Użytkownik może wejść do windy, przejechać przez tunel w metrze lub po prostu znaleźć się w strefie słabego zasięgu (EDGE/HSPA).
+
+W prostych aplikacjach przepływ danych wygląda następująco:
+\begin{center}
+\texttt{UI} $\leftrightarrow$ \texttt{ViewModel} $\leftrightarrow$ \texttt{Retrofit (Internet)}
+\end{center}
+
+Wady tego rozwiązania są krytyczne dla User Experience (UX):
 \begin{itemize}
-  \item Definicja SSOT i oczekiwane korzysci.
-  \item Network Bound Resource pattern.
-  \item Synchronizacja i polityki odswiezania.
-  \item Mutex, concurrency, atomic updates.
-  \item Error handling i fallback.
+    \item \textbf{Brak danych offline:} Bez internetu aplikacja jest bezużyteczna.
+    \item \textbf{Opóźnienia (Latency):} Nawet przy dobrym zasięgu, każde wejście na ekran wymaga oczekiwania na odpowiedź serwera (ładowanie spinnera).
+    \item \textbf{Utrata danych:} Jeśli użytkownik wypełni formularz i kliknie \textit{Wyślij} w momencie utraty zasięgu, dane przepadają.
 \end{itemize}
 
-\section{Material zrodlowy}
+Paradygmat Offline-First odwraca tę logikę. Zakłada on, że brak dostępu do Internetu nie jest błędem, lecz normalnym stanem pracy aplikacji.
+
+W tym modelu aplikacja działa \textbf{zawsze}, niezależnie od sieci. Wyświetla dane, które pobrała wcześniej (cache), a Internet służy jedynie do \textit{synchronizacji} (aktualizacji) tych danych w tle.
+
+\textbf{Główne założenia:}
+\begin{enumerate}
+    \item Aplikacja uruchamia się i pokazuje treść natychmiast (korzystając z lokalnej bazy danych).
+    \item Jeśli sieć jest dostępna, pobieramy nowsze dane i aktualizujemy bazę.
+    \item Jeśli sieć jest niedostępna, użytkownik nadal może przeglądać stare dane, a nawet modyfikować stan (np. dodawać do ulubionych) - zmiany te zostaną wysłane, gdy połączenie wróci.
+\end{enumerate}
+
+Aby zrealizować ten cel, musimy gruntownie przebudować architekturę naszych Repozytoriów, implementując wzorzec \textbf{Single Source of Truth (SSoT)}.
+
+\section{Wzorzec Single Source of Truth (SSoT)}
+
+Wzorzec \textbf{Single Source of Truth (SSoT)} (Pojedyncze Źródło Prawdy) to fundament nowoczesnych aplikacji mobilnych. Interfejs użytkownika (UI) oraz ViewModel nigdy nie powinny komunikować się bezpośrednio z siecią (API). Jedynym zaufanym źródłem danych dla widoku jest \textbf{lokalna baza danych}.
+
+Oznacza to, że nawet jeśli mamy świetne połączenie z Internetem, dane najpierw trafiają do bazy (Room), a dopiero stamtąd są wyświetlane na ekranie.
+
+W tym podejściu przepływ danych przestaje być liniowy (Pobierz $\rightarrow$ Wyświetl). Dzieli się on na dwa niezależne procesy:
+
+\begin{enumerate}
+    \item \textbf{Ścieżka Odczytu (Read Path):}
+    \begin{itemize}
+        \item Odpowiedzialność: Dostarczanie danych do UI.
+        \item Kierunek: \texttt{Room $\rightarrow$ Repository $\rightarrow$ ViewModel $\rightarrow$ UI}.
+        \item Mechanizm: Reaktywność (\texttt{Flow}). ViewModel subskrybuje zmiany w tabeli. Gdy tylko coś zmieni się w bazie, UI odświeża się \textit{automatycznie}.
+    \end{itemize}
+    
+    \item \textbf{Ścieżka Synchronizacji (Write Path):}
+    \begin{itemize}
+        \item Odpowiedzialność: Aktualizacja danych w bazie.
+        \item Kierunek: \texttt{Retrofit $\rightarrow$ Repository $\rightarrow$ Room}.
+        \item Mechanizm: Funkcje zawieszające (\texttt{suspend}). Repozytorium pobiera JSON z sieci, mapuje go na Encje i zapisuje w bazie.
+    \end{itemize}
+\end{enumerate}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w13-ssotscheme.png}
+    \caption{Architektura SSoT: UI obserwuje bazę danych, a sieć służy tylko do aktualizowania tej bazy w tle.}
+    \label{fig:Figura ssotscheme}
+\end{figure}
+
+Zobaczmy, jak zmienia się interfejs naszego repozytorium:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Rozdzielamy obserwację od odświeżania
+class UserRepository(
+    private val api: UserApi,
+    private val dao: UserDao
+) {
+    // 1. Ścieżka Odczytu: Zwraca Flow z bazy danych.
+    // Działa zawsze, nawet bez internetu (zwraca puste dane lub stare dane).
+    fun getUsersStream(): Flow<List<UserEntity>> {
+        return dao.getAllUsers()
+    }
+
+    // 2. Ścieżka Synchronizacji: Pobiera z sieci i zapisuje do bazy.
+    // Nie zwraca danych! Zwraca Unit lub błąd sieci.
+    suspend fun refreshUsers() {
+        val remoteUsers = api.getUsers()
+        // Logika zapisu do bazy (np. usuń stare, wstaw nowe)
+        dao.replaceUsers(remoteUsers.map { it.toEntity() })
+    }
+}
+\end{minted}
+
+Metoda \texttt{refreshUsers()} nie zwraca listy użytkowników. Jej zadaniem jest jedynie aktualizacja bazy danych. Gdy baza zostanie zaktualizowana, Room automatycznie wyemituje nową listę w strumieniu \texttt{getUsersStream()}, co spowoduje odświeżenie ekranu.
+
+\section{Podstawowy Caching}
+
+Najprostszym sposobem na zsynchronizowanie lokalnej bazy danych z serwerem jest potraktowanie bazy jako tymczasowego lustra (cache). Przy każdym odświeżeniu usuwamy starą zawartość tabeli i wstawiamy nową, pobraną z API.
+
+Algorytm metody \texttt{refresh()}:
+\begin{enumerate}
+    \item Pobierz listę obiektów z API.
+    \item Otwórz transakcję bazy danych.
+    \item Usuń wszystkie rekordy z tabeli (\texttt{DELETE FROM ...}).
+    \item Wstaw nowe rekordy pobrane w kroku 1.
+\end{enumerate}
+
+Dlaczego usuwamy wszystko? Ponieważ na serwerze mogły zostać usunięte pewne elementy. Jeśli byśmy tylko używali \texttt{Insert (OnConflict = REPLACE)}, usunięte elementy \textit{wisiałyby} w naszej lokalnej bazie w nieskończoność.
+
+W Room operacja \textit{Wyczyść i Wstaw} powinna być atomowa (wykonana w jednej transakcji), aby użytkownik nie zobaczył przez ułamek sekundy pustego ekranu między usunięciem a wstawieniem.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// data/local/UserDao.kt
+
+@Dao
+interface UserDao {
+    // 1. Ścieżka Odczytu (zawsze zwraca najnowszy stan tabeli)
+    @Query("SELECT * FROM users")
+    fun getAllUsers(): Flow<List<UserEntity>>
+
+    // Operacje pomocnicze dla Ścieżki Zapisu
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(users: List<UserEntity>)
+
+    @Query("DELETE FROM users")
+    suspend fun clearAll()
+
+    // Transakcja: Gwarantuje, że usunięcie i wstawienie
+    // zdarzy się "jednocześnie" dla obserwatorów Flow.
+    @Transaction
+    suspend fun replaceUsers(users: List<UserEntity>) {
+        clearAll()
+        insertAll(users)
+    }
+}
+\end{minted}
+
+Repozytorium łączy API z DAO. Tutaj mapujemy też obiekty sieciowe (DTO) na obiekty bazy danych (Entity).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// data/UserRepository.kt
+
+class UserRepository @Inject constructor(
+    private val api: UserApi,
+    private val dao: UserDao
+) {
+    // Ścieżka Odczytu - po prostu przekazujemy Flow
+    val users: Flow<List<UserEntity>> = dao.getAllUsers()
+
+    // Ścieżka Zapisu
+    suspend fun refreshUsers() {
+        try {
+            // 1. Pobierz z sieci
+            val remoteUsers = api.getUsers()
+            
+            // 2. Zmapuj na encje
+            val entities = remoteUsers.map { dto -> 
+                UserEntity(
+                    id = dto.id,
+                    name = dto.name,
+                    email = dto.email
+                    // Uwaga: Nie mapujemy pól lokalnych (np. isFavorite),
+                    // bo API ich nie zwraca!
+                ) 
+            }
+            
+            // 3. Zaktualizuj bazę (Source of Truth)
+            dao.replaceUsers(entities)
+            
+        } catch (e: Exception) {
+            // Błąd sieci? Trudno.
+            // Nie rzucamy wyjątku wyżej (chyba że chcemy pokazać Snackbar).
+            // Dzięki temu UI nadal wyświetla stare dane z 'users' Flow.
+            throw e 
+        }
+    }
+}
+\end{minted}
+
+ViewModel uruchamia odświeżanie przy starcie, ale dane pobiera ze strumienia.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@HiltViewModel
+class UserViewModel @Inject constructor(
+    private val repository: UserRepository
+) : ViewModel() {
+
+    // UI obserwuje to pole. Będzie ono zawierać dane z bazy.
+    // Dzięki stateIn, Flow zamienia się w StateFlow (Hot Stream).
+    val uiState = repository.users
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    init {
+        refreshData()
+    }
+
+    fun refreshData() {
+        viewModelScope.launch {
+            try {
+                repository.refreshUsers()
+            } catch (e: Exception) {
+                // Tu obsłuż błąd, np. wyślij zdarzenie "Brak sieci" do UI.
+                // Ale lista użytkowników NIE zniknie z ekranu!
+            }
+        }
+    }
+}
+\end{minted}
+
+Powyższa strategia jest świetna dla danych \textit{tylko do odczytu} (np. lista wiadomości). Ma jednak jedną krytyczną wadę.
+
+Wyobraźmy sobie, że dodajemy do encji pole \texttt{isFavorite: Boolean}, które użytkownik zmienia klikając \textit{serduszko} w aplikacji.
+\begin{enumerate}
+    \item Użytkownik klika \textit{Ulubione} przy użytkowniku Jan Kowalski. W bazie \texttt{isFavorite} zmienia się na \texttt{true}.
+    \item Następuje odświeżenie danych z sieci (metoda \texttt{refreshUsers}).
+    \item Metoda \texttt{clearAll()} usuwa wszystkich użytkowników (wraz z informacją o ulubionych).
+    \item Metoda \texttt{insertAll()} wstawia świeże dane z serwera. Serwer nie wie nic o \textit{ulubionych}, więc pole to przyjmuje wartość domyślną (\texttt{false}).
+\end{enumerate}
+
+\textbf{Efekt:} Odświeżenie danych resetuje stan lokalny aplikacji. Aby temu zapobiec, musimy zastosować bardziej zaawansowane podejście.
+
+\section{Zaawansowany Caching}
+
+Aby rozwiązać problem znikających \textit{serduszek} przy odświeżaniu danych, musimy fizycznie odseparować dane pochodzące z serwera od danych generowanych przez użytkownika.
+
+Zastosujemy architekturę opartą na dwóch tabelach:
+\begin{enumerate}
+    \item \textbf{Tabela Cache (np. \texttt{movies\_cache}):} Zawiera surowe dane z API (tytuł, opis, plakat). Ta tabela jest \textit{tymczasowa} - strategia \texttt{refresh()} może ją do woli czyścić i nadpisywać.
+    \item \textbf{Tabela Stanu (np. \texttt{favorite\_ids}):} Zawiera tylko identyfikatory elementów oznaczonych przez użytkownika. Ta tabela jest trwała - proces synchronizacji z siecią nigdy jej nie modyfikuje.
+\end{enumerate}
+
+Ostateczny obiekt domenowy (\texttt{Movie}), który trafi do UI, powstanie w wyniku połączenia tych dwóch tabel w czasie rzeczywistym.
+
+\subsection{Krok 1: Definicja Encji}
+
+Potrzebujemy dwóch osobnych encji w bazie danych Room.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// data/local/MovieCacheEntity.kt
+@Entity(tableName = "movies_cache")
+data class MovieCacheEntity(
+    @PrimaryKey val id: Int,
+    val title: String,
+    val overview: String
+    // Tu NIE MA pola isFavorite!
+)
+
+// data/local/FavoriteIdEntity.kt
+@Entity(tableName = "favorite_ids")
+data class FavoriteIdEntity(
+    @PrimaryKey val id: Int
+    // Ta tabela przechowuje tylko ID ulubionych filmów
+)
+
+// Model Domenowy (to, co widzi UI)
+data class Movie(
+    val id: Int,
+    val title: String,
+    val overview: String,
+    val isFavorite: Boolean // To pole obliczymy dynamicznie
+)
+\end{minted}
+
+Najważniejszą częścią jest zapytanie w DAO. Musimy pobrać wszystkie filmy z cache i \textit{dokleić} do nich informację, czy ich ID znajduje się w tabeli ulubionych.
+
+Używamy do tego klauzuli \texttt{LEFT JOIN}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// data/local/MovieDao.kt
+
+@Dao
+interface MovieDao {
+
+    // Ścieżka Odczytu: Łączymy dwie tabele
+    // (f.id IS NOT NULL) zwróci 1 (true) jeśli znaleziono ID w ulubionych,
+    // lub 0 (false) jeśli nie znaleziono.
+    @Query("""
+        SELECT 
+            m.id, 
+            m.title, 
+            m.overview,
+            (f.id IS NOT NULL) as isFavorite
+        FROM movies_cache AS m
+        LEFT JOIN favorite_ids AS f ON m.id = f.id
+    """)
+    fun getMoviesStream(): Flow<List<Movie>>
+
+    // Operacje na Cache (Sieć)
+    @Query("DELETE FROM movies_cache")
+    suspend fun clearCache()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCache(movies: List<MovieCacheEntity>)
+
+    @Transaction
+    suspend fun refreshCache(movies: List<MovieCacheEntity>) {
+        clearCache()
+        insertCache(movies)
+    }
+
+    // Operacje na Ulubionych (Użytkownik)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun addFavorite(id: FavoriteIdEntity)
+
+    @Query("DELETE FROM favorite_ids WHERE id = :id")
+    suspend fun removeFavorite(id: Int)
+}
+\end{minted}
+
+Prześledźmy ten sam scenariusz co w poprzedniej sekcji:
+
+\begin{enumerate}
+    \item Użytkownik klika serduszko przy filmie o ID=5.
+    \item Aplikacja dodaje rekord \texttt{FavoriteIdEntity(5)} do tabeli \texttt{favorite\_ids}.
+    \item Room automatycznie przelicza zapytanie \texttt{LEFT JOIN}. Dla filmu ID=5 warunek \texttt{f.id IS NOT NULL} staje się prawdą. UI odświeża się, pokazując czerwone serce.
+    \item \textbf{Następuje odświeżenie z sieci.}
+    \item Metoda \texttt{refreshCache()} czyści tabelę \texttt{movies\_cache} i wstawia nowe dane.
+    \item Tabela \texttt{favorite\_ids} \textbf{nie jest ruszana}.
+    \item Room ponownie przelicza \texttt{LEFT JOIN}. Nowy rekord filmu z cache łączy się z istniejącym rekordem w ulubionych.
+    \item UI odświeża się z nowymi opisami filmów, ale serduszko przy ID=5 \textbf{pozostaje na miejscu}.
+\end{enumerate}
+
+To podejście jest odporne na błędy i stanowi podstawę aplikacji Offline-First.
+
+W tym modelu, jeśli serwer przestanie zwracać film o ID=5 (zostanie on usunięty z oferty), zniknie on również z listy w aplikacji (bo \texttt{FROM movies\_cache} go nie zwróci), nawet jeśli jego ID wciąż jest w tabeli ulubionych. Jest to zazwyczaj pożądane zachowanie (tzw. \textit{Orphaned Record} w ulubionych nie przeszkadza).
+
+\section{Współbieżność (Race Conditions)}
+
+Mamy system, który działa poprawnie w 99\% przypadków. Jednak w specyficznych warunkach (np. wolna sieć + niecierpliwy użytkownik) może dojść do uszkodzenia danych.
+
+Rozważmy następujący scenariusz wyścigu (Race Condition):
+
+\begin{enumerate}
+    \item Aplikacja rozpoczyna pobieranie danych z sieci (trwa to 2 sekundy).
+    \item W międzyczasie użytkownik klika \textit{Dodaj do ulubionych} przy filmie X.
+    \item Aplikacja zapisuje ID filmu X do tabeli \texttt{favorite\_ids}.
+    \item Pobieranie z sieci kończy się sukcesem.
+    \item Aplikacja czyści tabelę \texttt{movies\_cache} i wstawia nowe dane.
+\end{enumerate}
+
+W powyższym scenariuszu wszystko jest w porządku, ponieważ tabele są rozłączne. Ale co się stanie, jeśli logika biznesowa będzie bardziej złożona?
+
+Załóżmy, że zamiast osobnej tabeli, trzymamy liczbę polubień bezpośrednio w tabeli z filmami (bo API zwraca globalną liczbę lajków, a my chcemy ją lokalnie inkrementować).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Scenariusz Błędu:
+// 1. Użytkownik klika \textit{Like} (Lokalnie: likes = 10 + 1 = 11)
+// 2. Repozytorium pobiera dane z sieci (Serwer: likes = 10)
+// 3. Repozytorium nadpisuje lokalne zmiany danymi z serwera (likes = 10)
+\end{minted}
+
+W efekcie lajk użytkownika zostaje \textit{połknięty} przez odświeżenie danych. Nawet przy dwóch tabelach istnieje ryzyko niespójności, jeśli operacje nie są atomowe.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+suspend fun toggleFavorite(id: Int) {
+    // 1. Sprawdź czy jest w ulubionych
+    val isFavorite = dao.isFavorite(id) 
+    
+    // <--- W tym momencie następuje przełączenie wątku (context switch)
+    // <--- Inny proces usuwa ten film z bazy
+    
+    // 2. Jeśli był, to usuń. Jeśli nie, to dodaj.
+    if (isFavorite) dao.remove(id) else dao.add(id)
+}
+\end{minted}
+
+Aby zabezpieczyć się przed takimi sytuacjami, musimy zsynchronizować dostęp do bazy danych, upewniając się, że w danym momencie tylko jedna operacja modyfikująca (Zapis z Sieci lub Zapis od Użytkownika) jest wykonywana.
+
+\section{Rozwiązanie 1: Mutex (Mutual Exclusion)}
+
+Aby zapobiec wyścigom (Race Conditions), musimy zagwarantować, że operacje zapisu do bazy danych będą wykonywane \textbf{sekwencyjnie}, a nie równolegle. W świecie Kotlin Coroutines służy do tego narzędzie o nazwie \texttt{Mutex} (od ang. \textit{Mutual Exclusion} - Wzajemne Wykluczanie).
+
+Działa ono jak zamek w drzwiach: tylko jedna osoba (korutyna) może być w środku (w sekcji krytycznej). Inne muszą czekać w kolejce, aż zamek zostanie zwolniony.
+
+Klasa \texttt{Mutex} pochodzi z biblioteki \texttt{kotlinx.coroutines.sync}. Używamy metody \texttt{withLock \{ ... \}}, która automatycznie zamyka zamek na początku bloku i otwiera go na końcu (nawet jeśli wystąpi wyjątek).
+
+Zmodyfikujmy nasze repozytorium:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// data/MovieRepository.kt
+
+class MovieRepository @Inject constructor(
+    private val api: MovieApi,
+    private val dao: MovieDao
+) {
+    // Obiekt Mutex musi być polem klasy (współdzielony przez wszystkie wywołania)
+    private val mutex = Mutex()
+
+    // Operacja 1: Odświeżanie z sieci
+    suspend fun refreshMovies() {
+        // KROK A: Pobieranie z sieci (Długie!)
+        // Robimy to POZA blokadą. Nie chcemy blokować UI, gdy czekamy na serwer.
+        val remoteMovies = api.getMovies()
+        val entities = remoteMovies.map { it.toEntity() }
+
+        // KROK B: Zapis do bazy (Krótkie!)
+        // To jest nasza SEKCJA KRYTYCZNA.
+        mutex.withLock {
+            dao.refreshCache(entities)
+        }
+    }
+
+    // Operacja 2: Zmiana statusu ulubione
+    suspend fun toggleFavorite(movieId: Int) {
+        // Cała logika "sprawdź i zapisz" musi być atomowa.
+        mutex.withLock {
+            val isFavorite = dao.isFavorite(movieId)
+            if (isFavorite) {
+                dao.removeFavorite(movieId)
+            } else {
+                dao.addFavorite(FavoriteIdEntity(movieId))
+            }
+        }
+    }
+}
+\end{minted}
+
+Wróćmy do scenariusza wyścigu:
+\begin{enumerate}
+    \item \textbf{Wątek A (Refresh):} Pobiera dane z sieci (trwa to 2 sekundy). Mutex jest otwarty.
+    \item \textbf{Wątek B (User):} Klika \textit{Like}. Wywołuje \texttt{toggleFavorite}.
+    \item \textbf{Wątek B:} Wchodzi w \texttt{mutex.withLock}. Zamyka zamek. Zapisuje ulubiony film do bazy. Otwiera zamek.
+    \item \textbf{Wątek A:} Kończy pobieranie. Próbuje wejść w \texttt{mutex.withLock}.
+    \item Jeśli Wątek B jeszcze trzyma zamek, Wątek A \textbf{zawiesza się} (suspend) i czeka.
+    \item Gdy Wątek B zwolni zamek, Wątek A wchodzi do sekcji krytycznej i bezpiecznie aktualizuje cache.
+\end{enumerate}
+
+Dzięki temu, że operacja zapisu ulubionego filmu (\texttt{addFavorite}) i czyszczenia cache (\texttt{refreshCache}) nigdy nie dzieją się w tym samym czasie, baza danych pozostaje spójna.
+
+Zwróćmy uwagę, że pobieranie danych z sieci (\texttt{api.getMovies()}) znajduje się \textbf{przed} blokiem \texttt{mutex.withLock}. Gdybyśmy objęli blokadą również zapytanie sieciowe, użytkownik nie mógłby kliknąć \textit{Lubię to} przez cały czas trwania synchronizacji (aplikacja wydawałaby się zacięta). Blokujemy tylko dostęp do zasobu współdzielonego (Bazy Danych).
+
+Zalety metody:
 \begin{itemize}
-  \item PUM2/Wyk/Wyklad13.pdf.
-  \item PUM2/Listy/W13-OfflineCachingBasics.ipynb, PUM2/Listy/W13-ActorDesignPatternOfflineCachingBasics.ipynb.
-  \item developer.android.com/topic/performance/vitals/offline.
+    \item Prostota implementacji.
+    \item Czytelność kodu (widać gdzie jest sekcja krytyczna).
 \end{itemize}
 
-\subsection{Single Source of Truth}
+Wady metody:
 \begin{itemize}
-  \item Definicja i oczekiwane korzysci.
-  \item Powiazanie Room i zrodel sieciowych.
-  \item Schemat przeplywu danych w SSOT.
+    \item Ryzyko \textbf{zakleszczenia (Deadlock)}, jeśli spróbujemy zagnieździć dwa Mutexy lub wejść w ten sam Mutex dwukrotnie w tym samym wątku (choć Mutex w Kotlinie nie jest reentrant).
+    \item Przy bardzo dużej liczbie operacji, ciągłe blokowanie i odblokowywanie może stać się wąskim gardłem wydajności.
 \end{itemize}
 
-\subsection{Offline caching}
+\section{Rozwiązanie 2: Wzorzec Aktor (Actor Pattern)}
+
+Mutex rozwiązuje problem, ale działa na zasadzie twardej blokady. Jeśli odświeżanie trwa 5 sekund, a użytkownik kliknie \textit{Lubię to}, operacja ta musi czekać w zawieszeniu.
+
+Alternatywnym podejściem jest \textbf{Wzorzec Aktor}. Zamiast pozwalać wielu wątkom na bezpośredni dostęp do bazy danych (i kazać im czekać w kolejce), tworzymy jednego \textit{Aktora} - dedykowaną korutynę, która jako jedyna ma prawo pisać do bazy. Reszta aplikacji nie modyfikuje danych bezpośrednio, lecz wysyła do Aktora wiadomości (Prośby/Akcje).
+
+Repozytorium przestaje być tylko zbiorem metod. Staje się aktywnym komponentem, który posiada:
 \begin{itemize}
-  \item NetworkBoundResource wzorzec.
-  \item Polityki odswiezania: stale while revalidate, timed refresh.
-  \item Mutex, synchronizacja, atomic updates.
+    \item \textbf{Kanał (Channel):} Skrzynka pocztowa, do której wpadają zlecenia (np. \textit{Odśwież}, \textit{Polub}).
+    \item \textbf{Pętlę Aktora:} Nieskończona pętla wewnątrz \texttt{init}, która pobiera komunikaty jeden po drugim i je przetwarza.
 \end{itemize}
 
-\subsection{Synchronizacja}
+Dzięki temu operacje są naturalnie zsynchronizowane (Aktor robi tylko jedną rzecz naraz), ale wątek wysyłający wiadomość nie jest blokowany - wrzuca list do skrzynki i idzie dalej. Do implementacji użyjemy \texttt{Channel} (kanał) oraz \texttt{Sealed Interface} do zdefiniowania typów wiadomości.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// data/MovieRepository.kt
+
+// 1. Definiujemy możliwe akcje (Intent)
+sealed interface DataAction {
+    data object Refresh : DataAction
+    data class ToggleFavorite(val id: Int) : DataAction
+}
+
+@Singleton
+class MovieRepository @Inject constructor(
+    private val api: MovieApi,
+    private val dao: MovieDao,
+    // Potrzebujemy Scope'a, aby uruchomić aktora, który żyje tak długo jak aplikacja
+    @ApplicationScope private val externalScope: CoroutineScope
+) {
+    // 2. Kanał (Kolejka) o nielimitowanej pojemności
+    private val actionChannel = Channel<DataAction>(Channel.UNLIMITED)
+
+    // Ścieżka Odczytu (bez zmian)
+    val movies: Flow<List<Movie>> = dao.getMoviesStream()
+
+    init {
+        // 3. Uruchomienie Aktora (Loop)
+        externalScope.launch {
+            // consumeEach przetwarza komunikaty sekwencyjnie (FIFO)
+            actionChannel.consumeEach { action ->
+                processAction(action)
+            }
+        }
+    }
+
+    // Logika przetwarzania (prywatna, dostępna tylko dla Aktora)
+    private suspend fun processAction(action: DataAction) {
+        when (action) {
+            is DataAction.Refresh -> {
+                try {
+                    val remoteMovies = api.getMovies() // To może trwać długo
+                    dao.refreshCache(remoteMovies.map { it.toEntity() })
+                } catch (e: Exception) {
+                    // Log error
+                }
+            }
+            is DataAction.ToggleFavorite -> {
+                val isFavorite = dao.isFavorite(action.id)
+                if (isFavorite) dao.removeFavorite(action.id)
+                else dao.addFavorite(FavoriteIdEntity(action.id))
+            }
+        }
+    }
+
+    // 4. Publiczne API (Fire and Forget)
+    // Metody nie są już 'suspend', bo wrzucenie do kanału jest szybkie.
+    fun refresh() {
+        actionChannel.trySend(DataAction.Refresh)
+    }
+
+    fun toggleFavorite(id: Int) {
+        actionChannel.trySend(DataAction.ToggleFavorite(id))
+    }
+}
+\end{minted}
+
+Wróćmy do naszego scenariusza wyścigu:
+\begin{enumerate}
+    \item UI wywołuje \texttt{refresh()} $\rightarrow$ Akcja \texttt{Refresh} wpada do kanału.
+    \item Aktor wyjmuje \texttt{Refresh} i zaczyna pobierać dane z sieci.
+    \item W międzyczasie UI wywołuje \texttt{toggleFavorite(5)} $\rightarrow$ Akcja \texttt{Toggle} wpada do kanału i czeka.
+    \item Aktor kończy pobieranie i zapisuje dane cache.
+    \item Aktor kończy przetwarzanie \texttt{Refresh}. Pętla wraca na początek.
+    \item Aktor wyjmuje z kanału czekające \texttt{ToggleFavorite(5)}.
+    \item Aktor aktualizuje tabelę ulubionych.
+\end{enumerate}
+
+Mimo że akcja użytkownika musiała \textit{poczekać} na przetworzenie, została ona zakolejkowana i wykonana poprawnie po zakończeniu synchronizacji. Żadne dane nie zostały utracone.
+
+Zalety metody:
 \begin{itemize}
-  \item Strategie sync: push, pull, hybrid.
-  \item Rozwiazywanie konfliktow danych.
-  \item Monitoring, retry, metrics.
+    \item Brak klasycznego blokowania (deadlocks są niemożliwe).
+    \item Gwarancja kolejności wykonywania operacji (FIFO).
+    \item \textbf{Responsywność:} UI nie czeka na wykonanie operacji zapisu (Fire and Forget).
 \end{itemize}
 
-\subsection{Case study}
+Wady metody:
 \begin{itemize}
-  \item Cache dla katalogu produktow.
-  \item Zadanie: implementacja strumienia SSOT.
-  \item Checklist: fallback, logowanie, obserwowalnosc.
+    \item Brak natychmiastowej informacji zwrotnej (metoda \texttt{toggleFavorite} zwraca \texttt{void}). UI musi polegać na obserwacji \texttt{Flow} z bazy danych, aby dowiedzieć się, czy operacja się udała. Jest to zgodne z filozofią SSoT, ale wymaga zmiany myślenia programisty.
 \end{itemize}
 
-\section{Elementy do rozbudowy}
-\begin{itemize}
-  \item Przyklad A: NetworkBoundResource implementacja (TODO).
-  \item Przyklad B: offline refresh flow z Mutex (TODO).
-  \item Zadania: scenariusze sync do testow (TODO).
-  \item Pytania: definicja SSOT, jak rozwiazywac konflikty (TODO).
-\end{itemize}
+\section{Kompletny przykład: Czysta Architektura i Actor Pattern}
 
-% TODO: uzupelnic narracje, przyklady kodu i cytowania na etapie draftu.
+Poniżej znajduje się kompletny kod źródłowy modułu, który łączy architekturę Offline-First z pełnym podziałem na warstwy (Clean Architecture). 
 
+W tym podejściu \textbf{ViewModel} nie rozmawia bezpośrednio z \textbf{Repozytorium}. Pośrednikiem są \textbf{Przypadki Użycia (Use Cases)}, które enkapsulują logikę biznesową.
+
+\subsection{Warstwa Domeny (Domain Layer)}
+
+Jest to warstwa niezależna od frameworków Androida. Definiuje modele, interfejsy oraz logikę biznesową.
+
+Model Domenowy:
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// Plik: domain/model/Movie.kt
+package com.example.movieapp.domain.model
+
+data class Movie(
+    val id: Int,
+    val title: String,
+    val overview: String,
+    val rating: Double,
+    val isFavorite: Boolean
+)
+\end{minted}
+
+Interfejs Repozytorium (Kontrakt):
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// Plik: domain/repository/MovieRepository.kt
+package com.example.movieapp.domain.repository
+
+interface MovieRepository {
+    // Strumień danych (zawsze aktualny)
+    fun getMoviesStream(): Flow<List<Movie>>
+    
+    // Akcje (Fire-and-forget lub suspend)
+    suspend fun refresh()
+    suspend fun toggleFavorite(id: Int)
+}
+\end{minted}
+
+Przypadki Użycia (Use Cases):
+Każda klasa realizuje jedno zadanie biznesowe.
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// Plik: domain/usecase/GetMoviesUseCase.kt
+package com.example.movieapp.domain.usecase
+
+class GetMoviesUseCase @Inject constructor(
+    private val repository: MovieRepository
+) {
+    operator fun invoke(): Flow<List<Movie>> {
+        return repository.getMoviesStream()
+    }
+}
+
+// Plik: domain/usecase/RefreshMoviesUseCase.kt
+package com.example.movieapp.domain.usecase
+
+class RefreshMoviesUseCase @Inject constructor(
+    private val repository: MovieRepository
+) {
+    suspend operator fun invoke() {
+        repository.refresh()
+    }
+}
+
+// Plik: domain/usecase/ToggleFavoriteUseCase.kt
+package com.example.movieapp.domain.usecase
+
+class ToggleFavoriteUseCase @Inject constructor(
+    private val repository: MovieRepository
+) {
+    suspend operator fun invoke(id: Int) {
+        repository.toggleFavorite(id)
+    }
+}
+\end{minted}
+
+\subsection{Warstwa Danych (Data Layer)}
+
+Implementacja dostępu do danych. Tutaj znajduje się logika \textbf{Room}, \textbf{Retrofit} oraz \textbf{Aktor}.
+
+Encje Bazy Danych:
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// Plik: data/local/MovieEntities.kt
+package com.example.movieapp.data.local
+
+@Entity(tableName = "movies_cache")
+data class MovieCacheEntity(
+    @PrimaryKey val id: Int,
+    val title: String,
+    val overview: String,
+    val voteAverage: Double
+)
+
+@Entity(tableName = "favorite_ids")
+data class FavoriteIdEntity(
+    @PrimaryKey val id: Int
+)
+\end{minted}
+
+DAO (Data Access Object):
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// Plik: data/local/MovieDao.kt
+package com.example.movieapp.data.local
+
+@Dao
+interface MovieDao {
+    // SSoT: Łączenie danych z dwóch tabel
+    @Query("""
+        SELECT 
+            m.id, m.title, m.overview, m.voteAverage as rating,
+            (f.id IS NOT NULL) as isFavorite
+        FROM movies_cache AS m
+        LEFT JOIN favorite_ids AS f ON m.id = f.id
+    """)
+    fun getMoviesStream(): Flow<List<Movie>>
+
+    // Operacje atomowe dla Aktora
+    @Transaction
+    suspend fun refreshCache(movies: List<MovieCacheEntity>) {
+        clearCache()
+        insertCache(movies)
+    }
+
+    @Query("DELETE FROM movies_cache")
+    suspend fun clearCache()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCache(movies: List<MovieCacheEntity>)
+
+    // Ulubione
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun addFavorite(entity: FavoriteIdEntity)
+
+    @Query("DELETE FROM favorite_ids WHERE id = :id")
+    suspend fun removeFavorite(id: Int)
+
+    @Query("SELECT EXISTS(SELECT 1 FROM favorite_ids WHERE id = :id)")
+    suspend fun isFavorite(id: Int): Boolean
+}
+\end{minted}
+
+API (Retrofit):
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// Plik: data/remote/TmdbApi.kt
+package com.example.movieapp.data.remote
+
+data class TmdbResponse(@SerializedName("results") val results: List<MovieDto>)
+
+data class MovieDto(
+    val id: Int,
+    val title: String,
+    val overview: String,
+    @SerializedName("vote_average") val voteAverage: Double
+)
+
+interface TmdbApi {
+    @GET("movie/popular")
+    suspend fun getPopularMovies(
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String = "pl-PL"
+    ): TmdbResponse
+}
+\end{minted}
+
+Repozytorium (Implementacja Aktora):
+Klasa ta implementuje interfejs z domeny. Używa kanału do synchronizacji.
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// Plik: data/repository/MovieRepositoryImpl.kt
+package com.example.movieapp.data.repository
+
+// Wewnętrzne wiadomości aktora
+private sealed interface RepoAction {
+    data object Refresh : RepoAction
+    data class ToggleFavorite(val id: Int) : RepoAction
+}
+
+@Singleton
+class MovieRepositoryImpl @Inject constructor(
+    private val api: TmdbApi,
+    private val dao: MovieDao,
+    private val externalScope: CoroutineScope, // Application Scope
+    private val apiKey: String
+) : MovieRepository {
+
+    private val actorChannel = Channel<RepoAction>(Channel.UNLIMITED)
+
+    override fun getMoviesStream(): Flow<List<Movie>> = dao.getMoviesStream()
+
+    init {
+        // Uruchomienie pętli przetwarzania
+        externalScope.launch {
+            actorChannel.consumeEach { action ->
+                processAction(action)
+            }
+        }
+    }
+
+    private suspend fun processAction(action: RepoAction) {
+        when (action) {
+            is RepoAction.Refresh -> {
+                try {
+                    val response = api.getPopularMovies(apiKey)
+                    val entities = response.results.map { dto ->
+                        MovieCacheEntity(dto.id, dto.title, dto.overview, dto.voteAverage)
+                    }
+                    dao.refreshCache(entities)
+                } catch (e: Exception) { /* Ignoruj błąd sieci */ }
+            }
+            is RepoAction.ToggleFavorite -> {
+                val isFav = dao.isFavorite(action.id)
+                if (isFav) dao.removeFavorite(action.id)
+                else dao.addFavorite(FavoriteIdEntity(action.id))
+            }
+        }
+    }
+
+    // Metody interfejsu wrzucają zadania do kolejki
+    override suspend fun refresh() {
+        actorChannel.send(RepoAction.Refresh)
+    }
+
+    override suspend fun toggleFavorite(id: Int) {
+        actorChannel.send(RepoAction.ToggleFavorite(id))
+    }
+}
+\end{minted}
+
+\subsection{Dependency Injection (Hilt)}
+
+Moduł spinający implementację Repozytorium z jego interfejsem.
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// Plik: di/AppModule.kt
+package com.example.movieapp.di
+
+@Module
+@InstallIn(SingletonComponent::class)
+object AppModule {
+
+    @Provides
+    @Singleton
+    fun provideDatabase(@ApplicationContext context: Context): MoviesDatabase {
+        return Room.databaseBuilder(context, MoviesDatabase::class.java, "app.db").build()
+    }
+
+    @Provides
+    fun provideDao(db: MoviesDatabase): MovieDao = db.movieDao()
+
+    @Provides
+    @Singleton
+    fun provideApi(): TmdbApi {
+        return Retrofit.Builder()
+            .baseUrl("https://api.themoviedb.org/3/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(TmdbApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAppScope(): CoroutineScope = 
+      CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @Provides
+    fun provideApiKey(): String = "YOUR_API_KEY"
+
+    // Wstrzyknięcie Implementacji jako Interfejsu Domenowego
+    @Provides
+    @Singleton
+    fun provideMovieRepository(
+        impl: MovieRepositoryImpl
+    ): MovieRepository = impl
+}
+\end{minted}
+
+Powyższa definicja \texttt{provideAppScope} wymaga komentarza. Wstrzykiwanie \texttt{CoroutineScope} powiązanego z procesem aplikacji (a nie z ekranem) jest krytyczne dla wzorca Offline-First z dwóch powodów: 
+\begin{enumerate}
+    \item \textbf{Niezależność od cyklu życia UI (Fire-and-Forget):}
+    Standardowy \texttt{viewModelScope} jest anulowany w momencie wyjścia użytkownika z ekranu lub rotacji urządzenia. Gdybyśmy użyli go do uruchomienia operacji zapisu (np. \texttt{toggleFavorite}), a użytkownik zamknąłby aplikację w trakcie trwania tej operacji, proces zapisu zostałby przerwany w połowie. Mogłoby to doprowadzić do niespójności danych. \texttt{externalScope} gwarantuje, że rozpoczęta operacja zostanie dokończona w tle, nawet jeśli interfejs użytkownika już nie istnieje.
+
+    \item \textbf{Izolacja błędów (SupervisorJob):}
+    Domyślny \texttt{Job} w korutynach działa na zasadzie odpowiedzialności zbiorowej - jeśli jedna korutyna w zakresie rzuci wyjątek, cały zakres jest anulowany (\textit{fail-fast}). Dla Aktora obsługującego wiele niezależnych zadań jest to zachowanie niepożądane (błąd synchronizacji sieci nie powinien blokować możliwości dodawania filmów do ulubionych). Użycie \texttt{SupervisorJob} sprawia, że awaria jednej korutyny nie wpływa na pozostałe ani na sam zakres, co zapewnia stabilność pętli przetwarzającej komunikaty Aktora.
+\end{enumerate}
+
+Linia kodu:
+\begin{minted}{kotlin}
+CoroutineScope(SupervisorJob() + Dispatchers.Default)
+\end{minted}
+składa się z trzech istotnych elementów, które razem tworzą bezpieczne środowisko dla operacji w tle. Pierwszy został omówiony powyżej, przyjrzyjmy się pozostałmy dwóm:
+
+\begin{enumerate}
+    
+    \item \textbf{\texttt{Dispatchers.Default}}: 
+    Definiuje domyślną pulę wątków dla tego zakresu. \texttt{Default} jest zoptymalizowany pod kątem operacji obciążających procesor (CPU-intensive), co jest dobrym punktem wyjścia dla ogólnej logiki biznesowej (np. przetwarzania logiki Aktora). Należy pamiętać, że operacje wejścia/wyjścia (I/O), takie jak zapytania do Room czy Retrofita, i tak powinny wewnętrznie przełączać się na \texttt{Dispatchers.IO}.
+    
+    \item \textbf{Operator \texttt{+}} : 
+    W Kotlinie \texttt{CoroutineContext} działa jak mapa (zbiór elementów). Operator plus służy do łączenia tych elementów. W tym przypadku tworzymy kontekst, który posiada zarówno specyficzne zachowanie błędów (\texttt{SupervisorJob}), jak i specyficzną strategię wątkowania (\texttt{Dispatchers.Default}).
+\end{enumerate}
+
+Podsumowując: Tworzymy przestrzeń życiową dla wątków, która jest odporna na pojedyncze awarie i działa na wydajnej puli wątków w tle.
+
+\subsection{Warstwa Prezentacji (ViewModel)}
+
+ViewModel korzysta wyłącznie z Use Caseów. Nie ma dostępu do Repozytorium ani Bazy Danych.
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// Plik: presentation/MoviesViewModel.kt
+package com.example.movieapp.presentation
+
+@HiltViewModel
+class MoviesViewModel @Inject constructor(
+    getMoviesUseCase: GetMoviesUseCase,
+    private val refreshMoviesUseCase: RefreshMoviesUseCase,
+    private val toggleFavoriteUseCase: ToggleFavoriteUseCase
+) : ViewModel() {
+
+    // Konwersja Flow na StateFlow (UI State)
+    val uiState: StateFlow<List<Movie>> = getMoviesUseCase()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    init {
+        // Pobranie danych przy starcie
+        viewModelScope.launch {
+            refreshMoviesUseCase()
+        }
+    }
+
+    fun onFavoriteClick(movie: Movie) {
+        viewModelScope.launch {
+            toggleFavoriteUseCase(movie.id)
+        }
+    }
+    
+    fun onSwipeRefresh() {
+        viewModelScope.launch {
+            refreshMoviesUseCase()
+        }
+    }
+}
+\end{minted}
+
+\subsection{Konfiguracja Aplikacji (Hilt \& Manifest)}
+
+Aby wstrzykiwanie zależności zadziałało, musimy utworzyć klasę dziedziczącą po \texttt{Application} i opatrzyć ją adnotacją \texttt{@HiltAndroidApp}. To tutaj Hilt generuje graf zależności.
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// Plik: MovieApplication.kt
+package com.example.movieapp
+
+@HiltAndroidApp
+class MovieApplication : Application()
+\end{minted}
+
+Nie zapomnij zarejestrować tej klasy w pliku \texttt{AndroidManifest.xml}. Bez tego aplikacja wyrzuci błąd przy starcie.
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{xml}
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.movieapp">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".MovieApplication" 
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.MovieApp">
+        
+        <activity
+            android:name=".presentation.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+\end{minted}
+
+\subsection{Warstwa Widoku (UI - Jetpack Compose)}
+
+Ostatnim elementem jest \texttt{MainActivity}, która pełni rolę punktu wejścia (\texttt{@AndroidEntryPoint}). Interfejs użytkownika budujemy w oparciu o \textbf{Jetpack Compose}, obserwując \texttt{StateFlow} z ViewModelu. Widok jest całkowicie pasywny - jedynie wyświetla stan i przekazuje zdarzenia (kliknięcia) do ViewModelu.
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// Plik: presentation/MainActivity.kt
+package com.example.movieapp.presentation
+
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MaterialTheme {
+                MoviesScreen()
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MoviesScreen(
+    viewModel: MoviesViewModel = hiltViewModel()
+) {
+    // Obserwacja stanu UI (zamiana Flow na State)
+    val movies by viewModel.uiState.collectAsState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Filmy Offline-First") },
+                actions = {
+                    IconButton(onClick = { viewModel.onSwipeRefresh() }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Odśwież")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            contentPadding = padding,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(movies, key = { it.id }) { movie ->
+                MovieItem(
+                    movie = movie,
+                    onFavoriteClick = { viewModel.onFavoriteClick(movie) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MovieItem(
+    movie: Movie,
+    onFavoriteClick: () -> Unit
+) {
+    ListItem(
+        headlineContent = { Text(movie.title) },
+        supportingContent = { 
+            Text(
+                text = movie.overview, 
+                maxLines = 2, 
+            ) 
+        },
+        trailingContent = {
+            IconButton(onClick = onFavoriteClick) {
+                // Ikona zmienia się w zależności od pola isFavorite (SSoT)
+                Icon(
+                    imageVector = if (movie.isFavorite) Icons.Default.Favorite 
+                                  else Icons.Default.FavoriteBorder,
+                    contentDescription = null,
+                    tint = if (movie.isFavorite) Color.Red else Color.Gray
+                )
+            }
+        },
+        leadingContent = {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = movie.rating.toString(),
+                    )
+                }
+            }
+        },
+        modifier = Modifier.clickable { /* Otwórz szczegóły */ }
+    )
+    Divider()
+}
+\end{minted}
