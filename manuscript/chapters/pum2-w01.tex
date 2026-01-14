@@ -6,7 +6,7 @@ Zajęcia obejmują łącznie 75 godzin pracy studenta, z czego 15 godzin przezna
 
 W trakcie zajęć wykorzystywane są materiały dydaktyczne dostępne pod adresem: \url{https://github.com/RafLew84/ProgUM}.  Obowiązkowa i zalecana literatura:
 \begin{itemize}
-\item Dokumentację języka Kotlin (\url{https://kotlinlang.org/docs/home.html}
+\item Dokumentacja języka Kotlin (\url{https://kotlinlang.org/docs/home.html}
 ) 
 \item oficjalne kursy programowania aplikacji mobilnych dostępne na platformie Android Developers (\url{https://developer.android.com/courses}).
 \end{itemize}
@@ -14,7 +14,7 @@ W trakcie zajęć wykorzystywane są materiały dydaktyczne dostępne pod adrese
 \subsection{Zasady zaliczenia}
 \begin{itemize}
   \item Warunkiem zaliczenia laboratorium jest uzyskanie \textbf{oceny pozytywnej z list zadań}.
-  \item Na zajęcia przewidzianych jest \textbf{5 list zadań}.
+  \item Na zajęcia przewidzianych jest \textbf{6 list zadań}.
   \item Z każdej listy wystawiana jest \textbf{osobna ocena}.
   \item \textbf{Nie jest konieczne} zaliczenie wszystkich list aby otrzymać ocenę pozytywną z laboratorium. Dopuszczalne jest nieoddanie/niezaliczenie \textbf{jednej listy} - za tą listę otrzymuje się ocenę 2,0.
   \item Każda lista posiada informację o \textbf{liczbie} punktów wymaganych na konkretną ocenę
@@ -52,7 +52,7 @@ Podczas zajęć tworzymy projekty w Android Studio, w Kotlinie, z interfejsem bu
 \textbf{UWAGA!!!} Nie używaj Empty Views Activity - to rozpoczyna projekt oparty o \textit{widoki}, gdzie ui definiujemy jako pliki XML.
 
 \subsection{Dodawanie zależności}
-Wszystkie zależności dopisujemy w bloku \texttt{dependencies \{ … \}} pliku \texttt{build.gradle(.kts)(Module:App)}. Przykładowy plik:
+Wszystkie zależności dopisujemy w bloku \texttt{dependencies \{ … \}} pliku \path{build.gradle(.kts)(Module:App)}. Przykładowy plik:
 
 \textbf{UWAGA!!!!} NIE KOPIUJ PLIKÓW KONFIGURACYJNYCH - zawierają informacje UNIKALNE DLA PROJEKTU !!!!
 
@@ -119,7 +119,7 @@ dependencies {
 }
 \end{minted}
 
-\textbf{UWAGA!!!} Pamiętaj aby wykonać \textbf{synchronizację} (\ref{fig:figura-1}) projektu po jakiejkolwiek zmianie w plikach z katalogu \texttt{gradle}
+\textbf{UWAGA!!!} Pamiętaj aby wykonać \textbf{synchronizację} (Rys. \ref{fig:figura-1}) projektu po jakiejkolwiek zmianie w plikach z katalogu \texttt{gradle}
 
 \begin{figure}[htbp]
     \includegraphics{fig/pum2-w01-fig1.png}
@@ -130,7 +130,7 @@ dependencies {
 \section{Szuflada Nawigacyjna}
 W tej części skupimy się na praktycznej implementacji nawigacji w aplikacji Jetpack Compose. Zakładając, znajomość podstawowych bloków konstrukcyjnych: NavHost i NavController, przyjrzymy się, jak zintegrować je z zaawansowanymi komponentami Material 3, takimi jak szuflada nawigacyjna.
 
-Przeanalizujmy kod, który implementuje jeden z najczęstszych wzorców nawigacyjnych w aplikacjach mobilnych: szufladę nawigacyjną (znaną również jako \textit{hamburger menu})(\ref{fig:Figura 2}).
+Przeanalizujmy kod, który implementuje jeden z najczęstszych wzorców nawigacyjnych w aplikacjach mobilnych: szufladę nawigacyjną (znaną również jako \textit{hamburger menu})(Rys. \ref{fig:Figura 2}).
 
 \begin{figure}[htbp]
     \includegraphics[width=0.7\textwidth]{fig/pum2-w01-fig2.png}
@@ -157,7 +157,6 @@ data object AppDestinations {
     const val SETTINGS = "settings"
 }
 \end{minted}
-
 
 Centralizacja zapewnia bezpieczeństwo typów, ułatwia refaktoryzację (zmieniamy nazwę w jednym miejscu).
 
@@ -224,7 +223,7 @@ val scope = rememberCoroutineScope()
 
 Pierwsze dwie są oczywiste: jedna zarządza \textbf{stosem nawigacji}, druga \textbf{stanem szuflady}. Ale dlaczego potrzebujemy \texttt{scope}?
 
-Odpowiedź leży w naturze \texttt{drawerState}. Metody \texttt{drawerState.open()} i \texttt{drawerState.close()} są funkcjami zawieszającymi (\texttt{suspend functions}) - więcej o tych funkcjach w kolejnych rozdziałach. Nie można ich po prostu wywołać z dowolnego miejsca - muszą być uruchomione wewnątrz \textbf{korutyny}. Zmiana \texttt{drawerState} automatycznie spowoduje \textbf{rekompozycję} i wizualne otwarcie szuflady.
+Odpowiedź leży w naturze \texttt{drawerState}. Metody \texttt{drawerState.open()} i \path{drawerState.close()} są funkcjami zawieszającymi (\texttt{suspend functions}) - więcej o tych funkcjach w kolejnych rozdziałach. Nie można ich po prostu wywołać z dowolnego miejsca - muszą być uruchomione wewnątrz \textbf{korutyny}. Zmiana \texttt{drawerState} automatycznie spowoduje \textbf{rekompozycję} i wizualne otwarcie szuflady.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 {scope.launch { drawerState.apply { if (isClosed) open() else close() } }})
@@ -279,7 +278,7 @@ Wewnątrz \texttt{ModalDrawerSheet} definiujemy elementy będące wyświetlane w
 Po kliknięciu elementu w szufladzie wykonujemy dwie akcje:
 \begin{itemize}
   \item \textbf{Nawigujemy}: Wywołujemy \texttt{navController.navigate()}, aby zmienić zawartość \texttt{NavHost}.
-  \item \textbf{Zamykamy szufladę}: Uruchamiamy korutynę (\texttt{scope.launch}), aby wywołać \texttt{drawerState.close()}.
+  \item \textbf{Zamykamy szufladę}: Uruchamiamy korutynę (\texttt{scope.launch}), aby wywołać \path{drawerState.close()}.
 \end{itemize}
 
 Jak widzimy, nawigacja w Jetpack Compose to znacznie więcej niż tylko wywoływanie \texttt{navController.navigate()}. To przemyślana integracja kontrolera nawigacji z innymi komponentami interfejsu, takimi jak \texttt{ModalNavigationDrawer}. Istotnym elementem jest zrozumienie, jak zarządzać wieloma stanami (\texttt{navController, drawerState}) oraz jak obsługiwać \textbf{asynchroniczne wywołania} (funkcje \texttt{suspend} do otwierania/zamykania szuflady) za pomocą odpowiednich narzędzi, takich jak \texttt{rememberCoroutineScope}.
@@ -434,7 +433,7 @@ Problem polega na tym, że te dwa przepływy mają zupełnie inne zasady. Co naj
 
 Przeanalizujmy prosty przykład pokazujący takie rozwiązanie. Zamiast traktować \texttt{NavHost} jak jeden wielki kontener, traktujemy go jak folder, który może zawierać zarówno pojedyncze pliki (ekrany), jak i inne foldery (zagnieżdżone grafy).
 
-Zamiast używać surowych ciągów znaków (Stringów) bezpośrednio w kodzie, co sprzyja literówkom, dobrą praktyką jest stworzenie obiektu, który trzyma wszystkie trasy w jednym miejscu:
+Zamiast używać surowych ciągów znaków (Stringów) bezpośrednio w kodzie, dobrą praktyką jest stworzenie obiektu, który trzyma wszystkie trasy w jednym miejscu:
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 data object AppDestinations {
@@ -539,7 +538,7 @@ To jest najważniejszy fragment kodu w całym przykładzie. Rozbijmy go na czę�
 \item \texttt{inclusive = true}: Po znalezieniu na stosie \texttt{AUTH\_GRAPH} jest on również usuwany.
 \end{itemize}
 
-Co się dzieje w praktyce? Użytkownik klika \textit{Zaloguj}. \texttt{NavController}:
+Prześledźmy wykonanie: Użytkownik klika \textit{Zaloguj}. \texttt{NavController} następnie:
 \begin{itemize}
 \item Znajduje na stosie powrotu graf \texttt{AUTH\_GRAPH}.
 \item Usuwa ze stosu \texttt{LOGIN, REGISTER, FORGOT\_PASSWORD} i sam \texttt{AUTH\_GRAPH}.
@@ -548,7 +547,7 @@ Co się dzieje w praktyce? Użytkownik klika \textit{Zaloguj}. \texttt{NavContro
 
 Stos powrotu jest czysty. Zawiera tylko \texttt{MAIN\_APP\_GRAPH}. Jeśli użytkownik naciśnie teraz przycisk \textit{Wstecz}, nie wróci do ekranu logowania. Opuści aplikację. Osiągnęliśmy dokładnie taki przepływ, jakiego oczekują użytkownicy.
 
-Zagnieżdżona nawigacja to nie jest skomplikowana funkcja dla zaawansowanych. To podstawowe narzędzie do organizacji w każdej aplikacji, która ma więcej niż jeden logiczny przepływ. Jak widzieliśmy w kodzie, ten wzorzec zapewnia trzy kluczowe korzyści:
+Zagnieżdżona nawigacja to podstawowe narzędzie do organizacji w każdej aplikacji, która ma więcej niż jeden logiczny przepływ. Jak widzieliśmy w kodzie, ten wzorzec zapewnia trzy kluczowe korzyści:
 \begin{enumerate}
 \item Organizację: Grupuje powiązane ekrany.
 \item Modularność: Utrzymuje główny \texttt{NavHost} czysty i pozwala definiować przepływy w oddzielnych funkcjach.

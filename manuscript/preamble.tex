@@ -45,3 +45,16 @@
 \newcommand{\term}[1]{\textbf{#1}}
 \newlist{learningobjectives}{itemize}{1}
 \setlist[learningobjectives]{label=\textbullet,leftmargin=*}
+
+\usepackage{fancyhdr}
+\usepackage{truncate}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[LO,RE]{\footnotesize\slshape\truncate{0.85\textwidth}{\nouppercase{\leftmark}}}
+
+\setlength{\headheight}{14.5pt}
+
+\usepackage{xurl} % albo: \usepackage{url}
+\urlstyle{same}

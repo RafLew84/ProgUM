@@ -72,7 +72,7 @@ Potrzebujemy więc \textit{Kierownika Budowy}, który ma plany w biurze (bezpiec
 
 Skoro wiemy już, że wrzucanie wszystkiego do jednego worka ("God Composable") jest nie najlepszym rozwiązaniem, musimy zastanowić się, jak podzielić aplikację. W inżynierii oprogramowania ten problem nie jest nowy. Przez dekady wykształciło się wiele różnych podejść do tego problemu. Jednym z nich jest rodzina wzorców MVx, które różnią się sposobem, w jaki warstwa danych komunikuje się z warstwą wizualną.
 
-Aby zrozumieć różnice między nimi, posłużymy się analogiami z życia codziennego.
+Aby zrozumieć różnice między nimi, posłużymy się prostymi analogiami.
 
 \subsection{MVC (Model-View-Controller)}
 
@@ -103,13 +103,13 @@ Jest to najstarsze podejście, które można porównać do wizyty w tradycyjnym 
 Druga odmiana wzorca z rodziny MVx.
 
 \begin{itemize}
-    \item \textbf{Klient przy stoliku (View):} Siedzisz i czekasz. Nie wiesz i nieinteresuje Cię, co się dzieje w kuchni.
+    \item \textbf{Klient przy stoliku (View):} Siedzisz i czekasz. Nie wiesz i nie interesuje Cię, co się dzieje w kuchni.
     \item \textbf{Kelner (Presenter):} Przyjmuje zamówienie i idzie do kuchni (Model).
     \item \textbf{Kluczowa cecha:} Kelner wraca z kuchni i \textbf{własnoręcznie stawia talerz na Twoim stole}.
 \end{itemize}
 
 W kodzie wygląda to tak, że Presenter (Kelner) posiada referencję do Widoku (Klienta). Wywołuje na nim konkretną metodę, np. \texttt{view.showDinner()}.
-\textbf{Problem:} Jest to sztywne połączenie 1:1. Kelner musi znać konkretny stolik. Jeśli Klient wyjdzie do toalety (Rotacja Ekranu/Zniszczenie Widoku), a Kelner wróci z talerzem i spróbuje go postawić na pustym miejscu, dojdzie do błędu (\texttt{NullPointerException}).
+\textbf{Problem:} Jest to sztywne połączenie 1:1. Kelner musi znać konkretny stolik. Jeśli Klient wyjdzie do toalety (Rotacja Ekranu/Zniszczenie Widoku), a Kelner wróci z talerzem i spróbuje go postawić na pustym miejscu, dojdzie do błędu (\texttt{NullPointerException}) - klient musi być dostępny.
 
 \subsection{MVVM (Model-View-ViewModel)}
 
@@ -119,7 +119,7 @@ W kodzie wygląda to tak, że Presenter (Kelner) posiada referencję do Widoku (
     \label{fig:Figura MVVM}
 \end{figure}
 
-To podejście jest standardem we współczesnym Androidzie i idealnie współgra z Jetpack Compose.
+To podejście jest często wykorzystywane we współczesnym Androidzie.
 
 \begin{itemize}
     \item \textbf{Użytkownik (View):} Podchodzi do maszyny i naciska przycisk (Wysyła Event).
@@ -156,13 +156,13 @@ Jest to ewolucja wzorca MVVM, która kładzie rygorystyczny nacisk na jednokieru
 W przeciwieństwie do MVVM, gdzie ViewModel może mieć wiele różnych strumieni danych (osobno imię, osobno lista, osobno błędy), w MVI dążymy do posiadania \textbf{jednego obiektu stanu} (np. \texttt{OrderUiState}).
 W naszej metaforze: Nie możesz wziąć długopisu i dopisać frytek do wydrukowanego paragonu. Musisz wysłać żądanie, a system wydrukuje Ci nowy, zaktualizowany paragon. To zapewnia przewidywalność aplikacji - zawsze wiemy, co doprowadziło do obecnego stanu ekranu.
 
-W Jetpack Compose naturalnie dążymy do MVI, używając pojedynczego \texttt{StateFlow<UiState>} w ViewModelu.
+Naturalnie dążymy do MVI, używając pojedynczego \texttt{StateFlow<UiState>} w ViewModelu.
 
 \section{Implementacja MVVM: Analiza Techniczna}
 
 W tej sekcji przeanalizujemy implementację wzorca MVVM na prostym przykładzie. Skupimy się na separacji warstw oraz mechanizmie zachowania stanu przy zmianach konfiguracji.
 
-Klasa \texttt{ViewModel} pełni rolę zarządcy stanu. zwróćmy uwagę na wzorzec \textbf{Backing Property}, który zapewnia pełną enkapsulację danych.
+Klasa \texttt{ViewModel} pełni rolę zarządcy stanu. Zwróćmy uwagę na wzorzec \textbf{Backing Property}, który zapewnia pełną enkapsulację danych.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 class WordViewModel : ViewModel() {
@@ -292,9 +292,9 @@ class WordViewModel(private val repository: WordRepository) : ViewModel() { ... 
 \end{minted}
 
 I tu pojawia się problem. Gdy w kodzie Composable wywołamy standardową funkcję:
-\texttt{val viewModel: WordViewModel = viewModel()}, aplikacja wyrzuci błąd \texttt{RuntimeException}.
+\texttt{val viewModel: WordViewModel = viewModel()}, aplikacja wyrzuci błąd \path{RuntimeException}.
 
-Funkcja biblioteczna \texttt{viewModel()} domyślnie potrafi tworzyć tylko obiekty posiadające pusty konstruktor (bez parametrów). Działa ona na zasadzie refleksji - próbuje utworzyć instancję klasy, ale nie ma pojęcia, skąd wziąć obiekt \texttt{WordRepository}, którego wymaga nasz konstruktor.
+Funkcja biblioteczna \texttt{viewModel()} domyślnie potrafi tworzyć tylko obiekty posiadające pusty konstruktor (bez parametrów). Działa ona na zasadzie refleksji.
 
 Aby to zrozumieć, wyobraźmy sobie salon samochodowy:
 \begin{itemize}
@@ -302,7 +302,7 @@ Aby to zrozumieć, wyobraźmy sobie salon samochodowy:
     \item \textbf{ViewModel z Repozytorium (Zamówienie Specjalne):} Mówisz \textit{Poproszę Passata, ale z silnikiem V6 (Repozytorium)}. Sprzedawca rozkłada ręce - nie ma takiego na placu. Musi wysłać zamówienie do \textbf{Fabryki}, podając dokładną specyfikację, jak ten samochód złożyć.
 \end{itemize}
 
-W Androidzie tą specyfikacją jest wzorzec \textbf{Factory}.
+W programowaniu tą specyfikacją jest wzorzec \textbf{Factory}.
 
 Musimy dostarczyć \textit{instrukcję obsługi}, która powie systemowi: \textit{Jeśli ktoś poprosi Cię o WordViewModel, to najpierw stwórz Repozytorium, a potem włóż je do środka}.
 
