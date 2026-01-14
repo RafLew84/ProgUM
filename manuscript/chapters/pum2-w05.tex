@@ -1,6 +1,6 @@
 \chapter{Reaktywne Zarządzanie Stanem (Wykład 5)}
 
-\section{Wstęp: Od danych statycznych do strumieni}
+\section{Strumienie}
 
 W poprzednich rozdziałach (szczególnie przy omawianiu Coroutines i MVVM) nauczyliśmy się pobierać dane z wykorzystaniem funkcji zawieszających (\texttt{suspend}). Typowa funkcja w naszym repozytorium wyglądała tak:
 
@@ -25,7 +25,6 @@ Współczesne aplikacje rzadko działają na danych statycznych. Większość fu
 
 Potrzebujemy mechanizmu, który nie zwraca \textit{jednej paczki danych}, ale otwiera \textit{kanał}, którym dane mogą płynąć tak długo, jak to konieczne.
 
-\subsection{Definicja: Kotlin Flow}
 Odpowiedzią na to zapotrzebowanie jest \textbf{Flow} (Strumień). Jest to asynchroniczny strumień danych, który emituje wartości sekwencyjnie. 
 
 Różnice między klasyczną listą a strumieniem są fundamentalne:
@@ -40,7 +39,6 @@ Różnice między klasyczną listą a strumieniem są fundamentalne:
     \label{fig:Figura flow1}
 \end{figure}
 
-\subsection*{Pytanie: Czy mutableStateOf to nie to samo?}
 Możemy zapytać: \textit{"Przecież używaliśmy \texttt{mutableStateOf} i UI też odświeżało się automatycznie. Po co nam Flow?"}.
 
 To kluczowe pytanie dla zrozumienia architektury. Choć oba mechanizmy są reaktywne, służą do czegoś innego:
@@ -51,13 +49,13 @@ To kluczowe pytanie dla zrozumienia architektury. Choć oba mechanizmy są reakt
     \item \textbf{Flow (Transport Danych):} To mechanizm przesyłania danych z warstw niższych (Baza Danych, Sieć) do ViewModelu. Jest to czysty Kotlin, \textbf{niezależny od Androida}. Posiada operatory (jak \texttt{map}, \texttt{filter}, \texttt{combine}), które pozwalają obrabiać dane \textit{w locie}.
 \end{enumerate}
 
-\textbf{Wzorzec architektury wygląda więc tak:}
+Wzorzec architektury wygląda więc tak:
 \begin{center}
 \textbf{Repozytorium (Flow)} $\xrightarrow{strumień}$ \textbf{ViewModel (State)} $\xrightarrow{stan}$ \textbf{Widok (UI)}
 \end{center}
 Repozytorium dostarcza strumień zmian (Flow), a ViewModel zamienia go na stabilny stan dla widoku (State).
 
-\section{Zimny Strumień (Cold Stream)}
+\section{Flow - Zimny Strumień}
 
 Podstawowy typ \texttt{Flow} w Kotlinie jest tzw. strumieniem zimnym (\textit{Cold Stream}). Oznacza to, że kod produkujący dane (wewnątrz bloku \texttt{flow \{ ... \}}) jest \textbf{pasywny}. Nie wykonuje się, dopóki ktoś nie zażąda danych.
 
@@ -82,7 +80,6 @@ Aby to zrozumieć, wyobraźmy sobie film w serwisie streamingowym (np. YouTube l
     \label{fig:Figura flow2}
 \end{figure}
 
-\subsection{Analiza Przykładu}
 Spójrzmy na przykład:
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -225,11 +222,9 @@ fun ColdStreamScreen() {
 }
 \end{minted}
 
-\section{StateFlow: Zarządzanie Stanem UI}
+\section{StateFLow - Gorący Strumień}
 
 Wiemy już, że zwykły \texttt{Flow} jest strumieniem zimnym. Oznacza to, że każda subskrypcja uruchamia go od nowa. W kontekście warstwy danych (np. pobieranie pliku) jest to pożądane, ale w warstwie UI staje się poważnym problemem. W poprzednim rozdziale pojawił się przykład z wykorzystaniem Flow w warstwie UI i przypadku obrócenia urządzenia. Ponieważ Flow jest zimny, cały proces uruchamia się od początku. Potrzebujemy strumienia, który \textit{pamięta} ostatnią wartość i działa niezależnie od tego, czy ktoś patrzy na ekran, czy nie. Takim strumieniem jest \textbf{StateFlow}.
-
-\subsection{Gorący Strumień (Hot Stream)}
 
 \texttt{StateFlow} jest strumieniem gorącym. Różni się od zimnego dwoma kluczowymi cechami:
 \begin{itemize}
@@ -263,8 +258,6 @@ Dobrą analogią dla StateFlow jest transmisja na żywo (Live Stream):
     \caption{Wizualizacja StateFlow.}
     \label{fig:Figura stateflow}
 \end{figure}
-
-\subsection{Analiza Przykładu}
 
 Przejdźmy do przykładu:
 
@@ -409,7 +402,6 @@ Wróćmy do naszej transmisji. O ile obraz wideo (StateFlow) musi być ciągły 
 
 Działa to jak dzwonek do drzwi: słyszysz go tylko wtedy, gdy naciska go kurier. Jeśli wrócisz do domu godzinę później, dzwonek nie zaczyna nagle dzwonić, informując, że \textit{ktoś był}.
 
-\subsection{Analiza Kodu}
 Zobaczmy przykład. Różnice względem StateFlow są kluczowe:
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}

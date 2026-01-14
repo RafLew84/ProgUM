@@ -4,9 +4,9 @@ W poprzednich rozdziałach nauczyliśmy się pobierać dane z Internetu (Retrofi
 
 W tym rozdziale połączymy te technologie, aby stworzyć aplikację typu \textbf{Offline-First}.
 
-\section{Wstęp: Paradygmat Offline-First}
+\section{Offline-First}
 
-Urządzenia mobilne, ze swojej natury, działają w środowisku o zmiennej jakości połączenia sieciowego. Użytkownik może wejść do windy, przejechać przez tunel w metrze lub po prostu znaleźć się w strefie słabego zasięgu (EDGE/HSPA).
+Urządzenia mobilne, ze swojej natury, działają w środowisku o zmiennej jakości połączenia sieciowego. Użytkownik może wejść do windy, przejechać przez tunel w metrze lub po prostu znaleźć się w strefie słabego zasięgu.
 
 W prostych aplikacjach przepływ danych wygląda następująco:
 \begin{center}
@@ -227,8 +227,6 @@ Zastosujemy architekturę opartą na dwóch tabelach:
 \end{enumerate}
 
 Ostateczny obiekt domenowy (\texttt{Movie}), który trafi do UI, powstanie w wyniku połączenia tych dwóch tabel w czasie rzeczywistym.
-
-\subsection{Krok 1: Definicja Encji}
 
 Potrzebujemy dwóch osobnych encji w bazie danych Room.
 

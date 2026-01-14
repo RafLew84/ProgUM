@@ -359,17 +359,3 @@ Co tu się dzieje krok po kroku?
     \end{tabular}
     \caption{Porównanie starej wersji (Thread.sleep) i nowej wersji (delay + Korutyny)}
 \end{table}
-
-\section{Podsumowanie}
-
-Współczesne programowanie aplikacji mobilnych to nieustanna walka o płynność. Każda aplikacja na Androida posiada jeden, newralgiczny zasób: Wątek Główny (UI Thread). Jest on odpowiedzialny za wszystko, co widzi użytkownik - od rysowania interfejsu po obsługę dotyku. Jego zablokowanie, choćby na ułamek sekundy, jest niedopuszczalne i prowadzi do niesławnego błędu \textit{Application Not Responding} (ANR).
-
-Tradycyjne podejście do wielowątkowości, oparte na ręcznym tworzeniu wątków (\texttt{Thread}) i obsłudze callbacków, często prowadziło do kodu trudnego w utrzymaniu i podatnego na błędy. Odpowiedzią Kotlina na te wyzwania są korutyny.
-
-Korutyny często nazywa się \textit{lekkimi wątkami}, ale precyzyjniejsza definicja to \textit{zawieszalne obliczenie} (suspendable computation). W klasycznym modelu (blokującym), gdy kucharz czeka na zagotowanie wody, stoi bezczynnie nad garnkiem. W modelu opartym na korutynach, kucharz \textit{zawiesza} to zadanie - nastawia minutnik i w międzyczasie zajmuje się krojeniem warzyw. Dzięki temu jeden wątek może obsługiwać wiele korutyn jednocześnie, nigdy nie marnując czasu na bezczynne oczekiwanie.
-
-Kluczem do tego mechanizmu jest słowo kluczowe \texttt{suspend}. Oznacza ono funkcję, która może zostać wstrzymana (zapauzowana) bez blokowania wątku, na którym jest wykonywana. Gdy korutyna napotyka funkcję zawieszającą (np. \texttt{delay} lub zapytanie sieciowe), zapisuje swój stan i zwalnia wątek, oddając go do dyspozycji innym zadaniom (np. odświeżaniu UI). Gdy operacja w tle się zakończy, korutyna jest wznawiana dokładnie w miejscu, w którym skończyła. Ważne jest jednak zrozumienie, że samo \texttt{suspend} nie oznacza automatycznego przeniesienia pracy do innego wątku - daje jedynie możliwość zawieszenia.
-
-Korutyny w Kotlinie nie działają w próżni. Aby je uruchomić, musimy skorzystać z \texttt{CoroutineScope} (np. \texttt{viewModelScope} lub \texttt{rememberCoroutineScope}). Definiuje on \textit{czas życia} korutyny. Mechanizm ten, zwany Ustrukturyzowaną Współbieżnością, tworzy hierarchię rodzic-dziecko. Każda uruchomiona korutyna (\texttt{launch}) zwraca obiekt \texttt{Job}, który jest przypisany do swojego zakresu. Gwarantuje to bezpieczeństwo aplikacji: jeśli użytkownik zamknie ekran (anulując zakres-rodzica), wszystkie podrzędne operacje (pobieranie danych, liczniki) zostaną automatycznie anulowane. Zapobiega to wyciekom pamięci i wykonywaniu niepotrzebnej pracy w tle.
-
-Podsumowując, korutyny pozwalają pisać kod asynchroniczny w sposób sekwencyjny i czytelny, jednocześnie zapewniając bezpieczeństwo zasobów i responsywność aplikacji, której oczekują użytkownicy.

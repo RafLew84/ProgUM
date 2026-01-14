@@ -6,8 +6,6 @@ W poprzednich rozdziałach nauczyliśmy się tworzyć korutyny, używać \texttt
 
 Wróćmy do przykładów, które omawialiśmy w Rozdziale 3. Przeanalizujmy dokładnie, na jakim wątku wykonywana jest każda linijka kodu.
 
-\subsection{Analiza wątków: Async i Await}
-
 Spójrzmy na generator haseł. Użyliśmy tu \texttt{async}, co mocno sugeruje asynchroniczność. Ale gdzie tak naprawdę dzieje się \textit{praca}?
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -54,9 +52,7 @@ Spójrzmy na generator haseł. Użyliśmy tu \texttt{async}, co mocno sugeruje a
 } 
 \end{minted}
 
-\textbf{Wniosek:} Cała operacja, od kliknięcia, przez `async`, aż po wynik, odbyła się na \textbf{jednym i tym samym wątku (Main)}. Zadziałało to płynnie tylko dlatego, że `delay` jest funkcją zawieszającą. Gdybyśmy tam wstawili prawdziwą pracę procesora, UI uległoby zamrożeniu.
-
-\subsection{Analiza wątków: Struktura Rodzic-Dziecko}
+\textbf{Wniosek:} Cała operacja, od kliknięcia, przez \texttt{async}, aż po wynik, odbyła się na \textbf{jednym i tym samym wątku (Main)}. Zadziałało to płynnie tylko dlatego, że `delay` jest funkcją zawieszającą. Gdybyśmy tam wstawili prawdziwą pracę procesora, UI uległoby zamrożeniu.
 
 Drugi przykład z kucharzami pokazywał współbieżność (robienie dwóch rzeczy naraz). Czy oznacza to jednak równoległość (użycie wielu rdzeni)?
 
@@ -101,8 +97,6 @@ scope.launch {
 
 \textbf{Wniosek:} Mimo że mamy trzy korutyny (Rodzic, Kucharz 1, Kucharz 2), wszystkie \textit{skaczą} po tym samym wątku głównym. Jest to tzw. \textit{współbieżność przeplatana} na jednym wątku.
 
-\subsection{Czy launch i async mogą zmieniać wątek?}
-
 Oczywiście, zarówno \texttt{launch}, jak i \texttt{async} przyjmują opcjonalny argument typu \texttt{CoroutineContext}, który pozwala jawnie wskazać dyspozytora.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -117,11 +111,7 @@ scope.launch(Dispatchers.IO) {
 }
 \end{minted}
 
-Choć jest to możliwe, w architekturze MVVM rzadko używamy tego podejścia bezpośrednio w warstwie UI. Powoduje to problemy z aktualizacją interfejsu (musimy ręcznie wracać na Main Thread) i utrudnia testowanie.
-
-Dlatego stosujemy podejście, w którym korutyna startuje na UI (żeby mieć do niego dostęp), a \textit{skacze} na inne wątki tylko wtedy, gdy to konieczne.
-
-\subsection{Dwa podejścia do zmiany wątku}
+Choć jest to możliwe, w architekturze MVVM rzadko używamy tego podejścia bezpośrednio w warstwie UI. Powoduje to problemy z aktualizacją interfejsu (musimy ręcznie wracać na Main Thread) i utrudnia testowanie. Dlatego stosujemy podejście, w którym korutyna startuje na UI (żeby mieć do niego dostęp), a \textit{skacze} na inne wątki tylko wtedy, gdy to konieczne.
 
 Wyróżniamy dwa główne wzorce przełączania wątków, którymi zajmiemy się w tym rozdziale:
 
@@ -246,8 +236,6 @@ Podsumujmy różnice między tymi dwoma mechanizmami:
 
 Zanim poznamy operator \texttt{stateIn}, musimy zrozumieć problem architektoniczny, który on rozwiązuje. Wymaga to przypomnienia fundamentalnej różnicy między strumieniami zimnymi a gorącymi oraz przeanalizowania cyklu życia aplikacji w Androidzie.
 
-\subsection{Przypomnienie: Przepis vs Gotowe Danie}
-
 W Rozdziale 5 zdefiniowaliśmy dwa rodzaje strumieni. Spójrzmy na nie teraz z perspektywy wydajności:
 
 \begin{itemize}
@@ -359,8 +347,7 @@ val notificationEvents: SharedFlow<String> = repository.getAlerts()
 
 Gdybyśmy ustawili \texttt{replay = 1}, to każdy nowy ekran po otwarciu od razu dostałby ostatni komunikat.
 
-\subsection{Tabela Podsumowująca}
-
+Podsumujmy:
 \begin{table}[h]
 \centering
 \begin{tabular}{|l|l|l|}
@@ -391,8 +378,6 @@ Do realizacji tego celu służy operator \texttt{combine}, który nasłuchuje na
     \item Gdy \textbf{którykolwiek} ze strumieni wyemituje nową wartość, operator bierze tę nową wartość oraz \textbf{ostatnie znane wartości} z pozostałych strumieni.
     \item Uruchamia blok lambda, w którym łączymy te dane w jeden obiekt wynikowy.
 \end{enumerate}
-
-\subsection{Przykład: Koszyk z Kuponem Rabatowym}
 
 Załóżmy, że mamy repozytorium dostarczające aktualną sumę koszyka oraz pole tekstowe w ViewModelu, gdzie użytkownik wpisuje kod rabatowy.
 

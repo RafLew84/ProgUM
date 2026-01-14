@@ -174,8 +174,6 @@ Po skonfigurowaniu klasy \texttt{Application}, kontener DI jest zainicjalizowany
 
 Wyróżniamy dwie techniki wstrzykiwania: \textit{Constructor Injection} (preferowana) oraz \textit{Field Injection} (wymuszona przez architekturę systemu Android).
 
-\subsection{Wstrzykiwanie przez Konstruktor (@Inject)}
-
 Podstawową metodą rozszerzania grafu zależności w Hilt jest adnotacja \texttt{@Inject} umieszczona przy konstruktorze klasy.
 
 Zastosowanie tej adnotacji skutkuje dwoma operacjami podczas kompilacji (Annotation Processing):
@@ -484,7 +482,7 @@ class MainActivity : ComponentActivity() {
 }
 \end{minted}
 
-\subsection{Po wprowadzeniu Hilt (Rozdział 11)}
+\subsection{Po wprowadzeniu Hilt}
 
 Dzięki przeniesieniu odpowiedzialności za tworzenie obiektów do Modułów (sekcja 11.4) i zastosowaniu automatyzacji, nasza Activity staje się czysta i zgodna z zasadą Single Responsibility Principle.
 

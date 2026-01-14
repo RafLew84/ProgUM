@@ -15,7 +15,7 @@ Spójrzmy na kod ViewModelu, którym zakończyliśmy poprzedni wykład:
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 @HiltViewModel
 class NewsViewModel @Inject constructor(
-    // BŁĄD ARCHITEKTONICZNY: Zależność od konkretnej klasy!
+    // BŁĄD ARCHITEKTONICZNY: Zależność od konkretnej klasy
     private val repository: NewsRepository 
 ) : ViewModel() { ... }
 \end{minted}
@@ -191,8 +191,6 @@ class GetProductDetailsUseCase @Inject constructor(
 
 Zobaczmy, jak połączyć go z resztą aplikacji przy użyciu Hilt. Stworzymy kompletny łańcuch zależności dla scenariusza \textit{Obliczanie Ceny Końcowej}.
 
-\subsection{Krok 1: Wstrzykiwanie Zależności do UseCase}
-
 Przypadki użycia to idealne miejsce na łączenie danych z różnych źródeł (Repozytoriów) oraz konfiguracji. Hilt radzi sobie z nimi bez żadnych dodatkowych modułów - wystarczy adnotacja \texttt{@Inject constructor}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -215,8 +213,6 @@ class CalculateFinalPriceUseCase @Inject constructor(
     }
 }
 \end{minted}
-
-\subsection{Krok 2: Wstrzykiwanie UseCase do ViewModelu}
 
 Nasz ViewModel przestaje być świadomy istnienia Repozytorium czy Bazy Danych. Jego jedynym oknem na świat staje się Warstwa Domeny.
 
@@ -248,7 +244,7 @@ class CartViewModel @Inject constructor(
 
 Porównajmy konstruktor ViewModelu przed i po zmianach:
 
-\textbf{Przed (Złe podejście):}
+Przed wyczyszczeniem:
 \begin{minted}{kotlin}
 class CartViewModel(
     val repo: ProductRepository, // Dostęp do wszystkiego (pobierz, usuń, edytuj)
@@ -317,8 +313,7 @@ com.example.shop
 \end{itemize}
 
 
-
-\subsection{Rekomendacja: Podejście Hybrydowe}
+\subsection{Podejście Hybrydowe}
 
 W praktyce najlepiej sprawdza się połączenie obu podejść. Na najwyższym poziomie dzielimy aplikację na funkcje (Features), a wewnątrz funkcji zachowujemy podział na warstwy (Layers), jeśli funkcja jest skomplikowana. Dodatkowo wydzielamy elementy wspólne (\texttt{core}, \texttt{di}).
 
@@ -471,7 +466,7 @@ class CartViewModel @Inject constructor(
 }
 \end{minted}
 
-\subsection{5. Widok (Compose)}
+\subsection{Widok (Compose)}
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 // ui/CartScreen.kt

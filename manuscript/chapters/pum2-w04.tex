@@ -1,6 +1,6 @@
 \chapter{Podstawy Architektury Aplikacji (Wykład 4)}
 
-\section{Problem Monolitycznego Kodu ("God Composable")}
+\section{Problem Monolitycznego Kodu}
 
 Na początku przygody z Jetpack Compose naturalnym odruchem jest pisanie całego kodu wewnątrz funkcji \texttt{@Composable}. Skoro UI to tylko funkcja, dlaczego nie umieścić w niej również pobierania danych z sieci czy logiki biznesowej?
 
@@ -53,7 +53,6 @@ Czy to rozwiązuje problem? Tylko pozornie i tylko w trywialnych przypadkach. Gd
     \item \textbf{Testowalność:} Jak przetestować, czy nazwisko jest poprawnie zamieniane na wielkie litery? W obecnym kodzie jest to niemożliwe bez uruchamiania emulatora, bo logika jest \textit{zabetonowana} wewnątrz przycisku.
 \end{itemize}
 
-\subsection{Separacja odpowiedzialności}
 Dochodzimy do wniosku, że funkcja \texttt{Composable} nie jest odpowiednim miejscem na trzymanie danych ani wykonywanie operacji. Potrzebujemy miejsca, które:
 \begin{enumerate}
     \item Przeżyje rotację ekranu (nie jak \texttt{rememberSaveable}).
@@ -75,7 +74,7 @@ Skoro wiemy już, że wrzucanie wszystkiego do jednego worka ("God Composable") 
 
 Aby zrozumieć różnice między nimi, posłużymy się analogiami z życia codziennego.
 
-\subsection{MVC (Model-View-Controller) - Sklep z ladą}
+\subsection{MVC (Model-View-Controller)}
 
 \begin{figure}[htbp]
     \includegraphics[width=0.7\textwidth]{fig/pum2-w04-g_mvc.png}
@@ -93,7 +92,7 @@ Jest to najstarsze podejście, które można porównać do wizyty w tradycyjnym 
 
 \textbf{Wniosek:} W tym układzie Sprzedawca (Controller) decyduje o wszystkim. To on musi wiedzieć, jak wygląda magazyn i to on decyduje, co pokazać klientowi. Musi też być w stanie wskazać konkretnego klienta, któremu musi wydać towar.
 
-\subsection{MVP (Model-View-Presenter) - Restauracja}
+\subsection{MVP (Model-View-Presenter)}
 
 \begin{figure}[htbp]
     \includegraphics[width=0.7\textwidth]{fig/pum2-w04-g_mvp.png}
@@ -112,7 +111,7 @@ Druga odmiana wzorca z rodziny MVx.
 W kodzie wygląda to tak, że Presenter (Kelner) posiada referencję do Widoku (Klienta). Wywołuje na nim konkretną metodę, np. \texttt{view.showDinner()}.
 \textbf{Problem:} Jest to sztywne połączenie 1:1. Kelner musi znać konkretny stolik. Jeśli Klient wyjdzie do toalety (Rotacja Ekranu/Zniszczenie Widoku), a Kelner wróci z talerzem i spróbuje go postawić na pustym miejscu, dojdzie do błędu (\texttt{NullPointerException}).
 
-\subsection{MVVM (Model-View-ViewModel) - Automat z napojami}
+\subsection{MVVM (Model-View-ViewModel)}
 
 \begin{figure}[htbp]
     \includegraphics[width=0.7\textwidth]{fig/pum2-w04-g_mvvm.png}
@@ -128,7 +127,7 @@ To podejście jest standardem we współczesnym Androidzie i idealnie współgra
     \item \textbf{Wynik (State):} Automat wystawia kubek z kawą do szuflady odbiorczej (\textit{Emisja stanu}).
 \end{itemize}
 
-\textbf{Kluczowa różnica - Reaktywność:} Automatu nie obchodzi, kto ten kubek weźmie.
+Kluczowa różnica - Reaktywność: Automatu nie obchodzi, kto ten kubek weźmie.
 \begin{itemize}
     \item Automat tylko \textbf{wystawia stan}.
     \item Jeśli nikt nie stoi przed maszyną - kubek (dane) po prostu czeka w szufladzie.
@@ -137,7 +136,7 @@ To podejście jest standardem we współczesnym Androidzie i idealnie współgra
 
 W Compose tą \textit{szufladą} są strumienie danych, takie jak \texttt{StateFlow}. ViewModel aktualizuje \texttt{StateFlow}, a Widok (Composable) jedynie nasłuchuje zmian. To rozwiązuje nasz problem z rotacją ekranu - ViewModel trzyma \textit{napój}, niezależnie od tego, co dzieje się z \textit{klientem}.
 
-\subsection{MVI (Model-View-Intent) - Kiosk samoobsługowy}
+\subsection{MVI (Model-View-Intent)}
 
 \begin{figure}[htbp]
     \includegraphics[width=0.7\textwidth]{fig/pum2-w04-g_mvi.png}
@@ -162,8 +161,6 @@ W Jetpack Compose naturalnie dążymy do MVI, używając pojedynczego \texttt{St
 \section{Implementacja MVVM: Analiza Techniczna}
 
 W tej sekcji przeanalizujemy implementację wzorca MVVM na prostym przykładzie. Skupimy się na separacji warstw oraz mechanizmie zachowania stanu przy zmianach konfiguracji.
-
-\subsection*{Warstwa ViewModel: Enkapsulacja Stanu}
 
 Klasa \texttt{ViewModel} pełni rolę zarządcy stanu. zwróćmy uwagę na wzorzec \textbf{Backing Property}, który zapewnia pełną enkapsulację danych.
 
@@ -193,7 +190,6 @@ class WordViewModel : ViewModel() {
 
 Zastosowanie \texttt{mutableStateListOf} zamiast standardowego \texttt{List} jest krytyczne dla \textbf{reaktywności}. W Jetpack Compose system nie obserwuje standardowych kolekcji Javy/Kotlina. Typy ze świata Compose (jak \texttt{State<T>}) implementują wzorzec Obserwatora, automatycznie powiadamiając subskrybentów (funkcje Composable) o zmianach.
 
-\subsection*{Warstwa Widoku: Delegacja Odpowiedzialności}
 Widok (Composable) staje się tzw. \textbf{Passive View}. Nie posiada własnego stanu logicznego, a jedynie renderuje to, co dostarczy ViewModel.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -227,7 +223,6 @@ Aby skorzystać z funkcji \texttt{viewmodel()} musimy dodać odpowiednią zależ
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
 \end{minted}
 
-\subsection{ViewModelStore a Singleton}
 Kluczową zaletą ViewModelu jest przetrwanie rotacji ekranu. Nie dzieje się to jednak w sposób magiczny, lecz wynika z architektonicznego cyklu życia komponentów Androida.
 
 Możemy myśleć o ViewModelu jak o \textbf{Singletonie zakresowym (Scoped Singleton)}.
@@ -269,7 +264,6 @@ interface WordRepository {
 }
 \end{minted}
 
-\subsection{Zastosowanie}
 W prostym przykładzie Repozytorium może wydawać się zbędną warstwą ("przekazywaczem"). Jednak w większych aplikacjach, które będziemy budować na kolejnych wykładach, Repozytorium pełni kluczowe funkcje:
 
 \begin{itemize}
@@ -336,7 +330,6 @@ class WordViewModel(private val repository: WordRepository) : ViewModel() {
 
 Metoda \texttt{create} to miejsce, w którym przejmujemy kontrolę nad tworzeniem obiektu. To my, a nie system, decydujemy, jaka implementacja repozytorium trafi do środka.
 
-\subsection{Użycie w Composable}
 Teraz, gdy mamy już naszą \textit{fabrykę}, musimy jej użyć w widoku. Zmieniamy wywołanie w funkcji \texttt{WordScreen}:
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -351,7 +344,6 @@ fun WordScreen(
 
 Dzięki temu drobnemu dodatkowi, Android \textit{wie}, jak skonstruować nasz złożony obiekt, zachowując jednocześnie wszystkie zalety cyklu życia ViewModelu (przeżycie rotacji ekranu).
 
-\subsection*{Hilt}
 \textit{„Czy musimy pisać taki boilerplate (nadmiarowy kod) dla każdego ekranu?”}.
 Na tym etapie - tak. Jest to tzw. \textbf{Manual Dependency Injection}. Musimy rozumieć, jak obiekty są ze sobą łączone \textit{pod maską}.
 

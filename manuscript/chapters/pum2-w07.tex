@@ -45,8 +45,6 @@ To jedno z najczęstszych pytań rekrutacyjnych dotyczących korutyn. Różnica 
 
 \textit{*Uwaga: Kanał może mieć wielu odbiorców, ale wtedy działają oni jak konkurencyjni pracownicy - każdy element zostanie obsłużony tylko przez jednego z nich. W SharedFlow każdy pracownik dostałby kopie wszystkich zadań.}
 
-\subsection{Zastosowania}
-
 \begin{itemize}
     \item Użyj \textbf{StateFlow/SharedFlow}, gdy dane mają trafić do warstwy UI (Widoku). UI zazwyczaj tylko \textit{obserwuje} stan i nie \textit{konsumuje} go bezpowrotnie.
     \item Użyj \textbf{Channel}, gdy implementujesz mechanizm producent-konsument wewnątrz logiki biznesowej (np. kolejka plików do wysłania na serwer).
@@ -240,7 +238,7 @@ val result = select<String?> {
 }
 \end{minted}
 
-\section{Przykład Zastosowania}
+\section{Przykład Zastosowania Kanałów}
 
 Aby utrwalić wiedzę o kanałach, zbudujmy symulację aukcji internetowej.
 
