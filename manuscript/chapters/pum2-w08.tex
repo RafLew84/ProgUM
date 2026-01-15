@@ -49,14 +49,6 @@ Drugim parametrem metody jest flaga \texttt{mode}. Określa ona uprawnienia syst
     \item \textbf{\texttt{Context.MODE\_PRIVATE} (0):} Oznacza on, że utworzony plik może być odczytany \textit{wyłącznie} przez aplikację, która go stworzyła. Gwarantuje to, że inne aplikacje zainstalowane na telefonie nie będą mogły podglądać zapisanych tam danych.
 \end{itemize}
 
-W starszych wersjach Androida istniały inne tryby, które obecnie zostały uznane za niebezpieczne i oznaczone jako \texttt{deprecated} (przestarzałe):
-
-\begin{itemize}
-    \item \textbf{\texttt{MODE\_WORLD\_READABLE} (1):} Pozwalał dowolnej innej aplikacji na telefonie odczytać zawartość Twoich preferencji. Usunięty ze względów bezpieczeństwa (od Androida 7.0 rzuca wyjątek \texttt{SecurityException}).
-    \item \textbf{\texttt{MODE\_WORLD\_WRITEABLE} (2):} Pozwalał innym aplikacjom na zapisywanie danych do Twojego pliku. Bardzo niebezpieczny, usunięty podobnie jak powyższy.
-    \item \textbf{\texttt{MODE\_MULTI\_PROCESS} (4):} Teoretycznie pozwalał na modyfikację preferencji przez wiele procesów tej samej aplikacji. W praktyce nigdy nie działał poprawnie (nie gwarantował spójności danych) i również został wycofany.
-\end{itemize}
-
 Mimo prostoty, \texttt{SharedPreferences} posiada istotne wady architektoniczne, które stały się problematyczne w nowoczesnym, reaktywnym programowaniu.
 
 \begin{enumerate}
@@ -131,9 +123,7 @@ class UserPreferencesRepository(private val context: Context) {
 
 \section{Integracja z architekturą MVVM}
 
-Posiadając warstwę repozytorium (\texttt{UserPreferencesRepository}), która wystawia dane w postaci strumienia \texttt{Flow}, możemy przystąpić do integracji z warstwą prezentacji.
-
-Kluczowym wyzwaniem jest tutaj konwersja \textit{zimnego} strumienia z DataStore na \textit{gorący} stan UI, dostępny natychmiast dla widoku. Wykorzystamy do tego operator \texttt{stateIn}.
+Posiadając warstwę repozytorium (\texttt{UserPreferencesRepository}), która wystawia dane w postaci strumienia \texttt{Flow}, możemy zintegrować je z warstwą prezentacji. Musimy przekonwertować \textit{zimny} strumień z DataStore na \textit{gorący} stan UI, dostępny natychmiast dla widoku. Wykorzystamy do tego operator \texttt{stateIn}.
 
 Rola ViewModelu w tym procesie jest dwojaka:
 \begin{enumerate}
@@ -220,7 +210,7 @@ Prześledźmy, co dzieje się po kliknięciu przycisku:
     \item \textbf{UI:} Użytkownik klika \textit{Zapisz}. Wywołuje się \texttt{viewModel.onSaveClicked()}.
     \item \textbf{ViewModel:} Uruchamia korutynę i zleca \texttt{repository.saveUserName()}.
     \item \textbf{DataStore:} Zapisuje dane do pliku na dysku (wątek IO).
-    \item \textbf{DataStore (Callback):} Wykrywa zmianę w pliku i emituje nową wartość do strumienia `userNameFlow`.
+    \item \textbf{DataStore (Callback):} Wykrywa zmianę w pliku i emituje nową wartość do strumienia \texttt{userNameFlow}.
     \item \textbf{ViewModel:} \texttt{StateFlow} odbiera nową wartość i aktualizuje swój stan.
     \item \textbf{UI:} Komponent \texttt{UserSettingsScreen} otrzymuje powiadomienie o zmianie stanu i przerysowuje się (Recomposition) z nowym imieniem.
 \end{enumerate}

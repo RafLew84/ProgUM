@@ -2,7 +2,7 @@
 
 \section{Powrót do podstaw}
 
-W poprzednich rozdziałach nauczyliśmy się tworzyć korutyny, używać \texttt{launch}, \texttt{async} oraz synchronizować zadania za pomocą \texttt{join}. Zanim jednak przejdziemy do zaawansowanych wzorców architektonicznych, musimy obalić jeden z najczęstszych mitów dotyczących współbieżności w Kotlinie.
+W poprzednich rozdziałach nauczyliśmy się tworzyć korutyny, używać \texttt{launch}, \texttt{async} oraz synchronizować zadania za pomocą \texttt{join}. Zanim jednak przejdziemy do zaawansowanych wzorców architektonicznych, musimy wyjaśnić jedno z najczęstszych nieporozumień dotyczących współbieżności w Kotlinie.
 
 Wróćmy do przykładów, które omawialiśmy w Rozdziale 3. Przeanalizujmy dokładnie, na jakim wątku wykonywana jest każda linijka kodu.
 
@@ -52,7 +52,7 @@ Spójrzmy na generator haseł. Użyliśmy tu \texttt{async}, co mocno sugeruje a
 } 
 \end{minted}
 
-\textbf{Wniosek:} Cała operacja, od kliknięcia, przez \texttt{async}, aż po wynik, odbyła się na \textbf{jednym i tym samym wątku (Main)}. Zadziałało to płynnie tylko dlatego, że `delay` jest funkcją zawieszającą. Gdybyśmy tam wstawili prawdziwą pracę procesora, UI uległoby zamrożeniu.
+\textbf{Wniosek:} Cała operacja, od kliknięcia, przez \texttt{async}, aż po wynik, odbyła się na \textbf{jednym i tym samym wątku (Main)}. Zadziałało to płynnie tylko dlatego, że \texttt{delay} jest funkcją zawieszającą. Gdybyśmy tam wstawili prawdziwą pracę procesora, UI uległoby zamrożeniu.
 
 Drugi przykład z kucharzami pokazywał współbieżność (robienie dwóch rzeczy naraz). Czy oznacza to jednak równoległość (użycie wielu rdzeni)?
 
@@ -61,7 +61,7 @@ Drugi przykład z kucharzami pokazywał współbieżność (robienie dwóch rzec
 // scope.launch domyślnie używa Dispatchers.Main
 scope.launch {
     // WĄTEK: Main Thread
-    logs.add("Szef kuchni (rodzic): Zaczynamy!")
+    logs.add("Szef kuchni (rodzic): Zaczynamy")
 
     // 2. Zlecenie zadania Pomocnikowi 1
     // launch dziedziczy kontekst -> Dispatchers.Main
@@ -95,9 +95,9 @@ scope.launch {
 }
 \end{minted}
 
-\textbf{Wniosek:} Mimo że mamy trzy korutyny (Rodzic, Kucharz 1, Kucharz 2), wszystkie \textit{skaczą} po tym samym wątku głównym. Jest to tzw. \textit{współbieżność przeplatana} na jednym wątku.
+\textbf{Wniosek:} Mimo że mamy trzy korutyny (Rodzic, Kucharz 1, Kucharz 2), wszystkie \textit{skaczą} po tym samym wątku głównym.
 
-Oczywiście, zarówno \texttt{launch}, jak i \texttt{async} przyjmują opcjonalny argument typu \texttt{CoroutineContext}, który pozwala jawnie wskazać dyspozytora.
+Oczywiście, zarówno \texttt{launch}, jak i \texttt{async} przyjmują opcjonalny argument typu \path{CoroutineContext}, który pozwala jawnie wskazać dyspozytora.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 // Możemy wymusić inny wątek w momencie startu
@@ -106,7 +106,7 @@ scope.launch(Dispatchers.IO) {
     // Dobre dla zapisu do pliku.
     saveToFile()
     
-    // PROBLEM: Nie możemy stąd bezpiecznie dotknąć UI!
+    // PROBLEM: Nie możemy stąd bezpiecznie dotknąć UI
     // textLabel.text = "Zapisano" // BŁĄD!
 }
 \end{minted}
@@ -116,13 +116,13 @@ Choć jest to możliwe, w architekturze MVVM rzadko używamy tego podejścia bez
 Wyróżniamy dwa główne wzorce przełączania wątków, którymi zajmiemy się w tym rozdziale:
 
 \begin{enumerate}
-    \item \textbf{Podejście Imperatywne (\texttt{withContext}):} Stosowane wewnątrz funkcji. Mówimy: \textit{"Wykonaj ten fragment kodu na innym wątku i wróć do mnie z wynikiem"}.
-    \item \textbf{Podejście Reaktywne (\texttt{flowOn}):} Stosowane w strumieniach. Mówimy: \textit{"Wszystkie dane powyżej tego punktu mają być produkowane na innym wątku"}.
+    \item \textbf{Podejście Imperatywne (\texttt{withContext}):} Stosowane wewnątrz funkcji. Mówimy: \textit{Wykonaj ten fragment kodu na innym wątku i wróć do mnie z wynikiem}.
+    \item \textbf{Podejście Reaktywne (\texttt{flowOn}):} Stosowane w strumieniach. Mówimy: \textit{Wszystkie dane powyżej tego punktu mają być produkowane na innym wątku}.
 \end{enumerate}
 
 \section{Podejście Imperatywne: Bezpieczeństwo funkcji z withContext}
 
-Wróćmy do problemu blokowania UI. Wiemy już, że wywołanie trudnej obliczeniowo funkcji wewnątrz `viewModelScope.launch` zablokuje ekran.
+Wróćmy do problemu blokowania UI. Wiemy już, że wywołanie trudnej obliczeniowo funkcji wewnątrz \texttt{viewModelScope.launch} zablokuje ekran.
 
 Rozwiązaniem tego problemu w podejściu imperatywnym jest funkcja \texttt{withContext}:
 \begin{enumerate}
@@ -173,9 +173,9 @@ fun onCalculateClicked() {
 
 O ile \texttt{withContext} świetnie sprawdza się w funkcjach, które \textit{wchodzą i wychodzą}, o tyle w przypadku strumieni (\texttt{Flow}) sytuacja jest bardziej złożona. Strumień to \textit{rurociąg}, przez który dane \textit{płyną} w czasie.
 
-We \texttt{Flow} obowiązuje zasada: \textbf{kod wewnątrz bloku `flow { ... }` wykonuje się w tym samym kontekście, w którym wywołano `collect()`}.
+We \texttt{Flow} obowiązuje zasada: \textbf{kod wewnątrz bloku \texttt{flow { ... }} wykonuje się w tym samym kontekście, w którym wywołano \texttt{collect()}}.
 
-Ponieważ w Androidzie zazwyczaj zbieramy dane (`collect`) w warstwie widoku (Activity/Composable), która działa na wątku głównym, oznacza to, że domyślnie \textbf{producent danych też działałby na wątku głównym}.
+Ponieważ w Androidzie zazwyczaj zbieramy dane (\texttt{collect}) w warstwie widoku (Activity/Composable), która działa na wątku głównym, oznacza to, że domyślnie \textbf{producent danych też działałby na wątku głównym}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 // BŁĘDNE PODEJŚCIE
@@ -225,7 +225,7 @@ Podsumujmy różnice między tymi dwoma mechanizmami:
 \hline
 \textbf{Cecha} & \textbf{withContext} & \textbf{flowOn} \\ \hline
 \textbf{Typ danych} & Pojedynczy wynik (T) & Strumień danych (Flow<T>) \\ \hline
-\textbf{Kierunek zmian} & Zmienia kontekst dla bloku kodu "tu i teraz". & Zmienia kontekst dla źródła danych ("w górę rzeki"). \\ \hline
+\textbf{Kierunek zmian} & Zmienia kontekst dla bloku kodu \textit{tu i teraz}. & Zmienia kontekst dla źródła danych (\textit{w górę rzeki}). \\ \hline
 \textbf{Bezpieczeństwo} & Musi być wywołany wewnątrz funkcji \texttt{suspend}. & Jest operatorem nakładanym na obiekt \texttt{Flow}. \\ \hline
 \textbf{Zastosowanie} & Krótkie operacje (np. sortowanie listy, zapis do pliku). & Długotrwałe obserwowanie danych (np. z bazy Room). \\ \hline
 \end{tabular}
@@ -243,20 +243,18 @@ W Rozdziale 5 zdefiniowaliśmy dwa rodzaje strumieni. Spójrzmy na nie teraz z p
     \begin{itemize}
         \item Nie przechowuje danych.
         \item Kod wewnątrz bloku \texttt{flow \{ ... \}} nie wykonuje się, dopóki ktoś nie zacznie nasłuchiwać (\texttt{collect}).
-        \item \textbf{Kluczowa cecha:} Każdy nowy subskrybent powoduje ponowne wykonanie kodu producenta od początku.
+        \item Każdy nowy subskrybent powoduje ponowne wykonanie kodu producenta od początku.
     \end{itemize}
     
     \item \textbf{Gorący Strumień (StateFlow/SharedFlow):} To jest \textbf{gotowe danie} na stole.
     \begin{itemize}
         \item Przechowuje dane (stan) w pamięci.
         \item Produkuje dane niezależnie od tego, czy ktoś ich słucha.
-        \item \textbf{Kluczowa cecha:} Nowy subskrybent otrzymuje natychmiast aktualny stan (talerz z jedzeniem), bez konieczności gotowania wszystkiego od nowa.
+        \item Nowy subskrybent otrzymuje natychmiast aktualny stan (talerz z jedzeniem), bez konieczności gotowania wszystkiego od nowa.
     \end{itemize}
 \end{itemize}
 
-W Androidzie zmiana konfiguracji (np. obrót ekranu, zmiana trybu jasny/ciemny) powoduje całkowite zniszczenie i odtworzenie Aktywności (Activity) lub Fragmentu.
-
-Jeśli w warstwie UI (Activity) nasłuchujemy na \textbf{zimny} strumień (zwykły \texttt{Flow}) pochodzący bezpośrednio z repozytorium, dochodzi do marnotrawstwa zasobów.
+W Androidzie zmiana konfiguracji (np. obrót ekranu, zmiana trybu jasny/ciemny) powoduje całkowite zniszczenie i odtworzenie Aktywności. Jeśli w warstwie UI nasłuchujemy na \textbf{zimny} strumień (zwykły \texttt{Flow}) pochodzący bezpośrednio z repozytorium, dochodzi do marnotrawstwa zasobów.
 
 Prześledźmy ten scenariusz krok po kroku:
 
@@ -341,7 +339,7 @@ val notificationEvents: SharedFlow<String> = repository.getAlerts()
     .shareIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        replay = 0 // Ważne: Nie odtwarzaj starych zdarzeń nowym subskrybentom!
+        replay = 0
     )
 \end{minted}
 
@@ -420,7 +418,7 @@ class CartViewModel(repository: CartRepository) : ViewModel() {
 }
 \end{minted}
 
-Dzięki `combine`, nasz UI jest w pełni reaktywny. Jeśli użytkownik wpisze poprawny kod, cena przeliczy się natychmiast. Jeśli w międzyczasie w tle przyjdzie aktualizacja ceny z bazy danych - cena również przeliczy się automatycznie, uwzględniając wpisany kod.
+Dzięki \texttt{combine}, nasz UI jest w pełni reaktywny. Jeśli użytkownik wpisze poprawny kod, cena przeliczy się natychmiast. Jeśli w międzyczasie w tle przyjdzie aktualizacja ceny z bazy danych - cena również przeliczy się automatycznie, uwzględniając wpisany kod.
 
 \section{Pełne Przykłady Implementacji}
 
@@ -486,9 +484,7 @@ fun CalculationScreen(viewModel: CalculationViewModel = viewmodel()) {
                 }
                 is UiState.Success -> {
                     Text(
-                        text = "Wynik: ${currentState.result}",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary
+                        text = "Wynik: ${currentState.result}"
                     )
                 }
             }

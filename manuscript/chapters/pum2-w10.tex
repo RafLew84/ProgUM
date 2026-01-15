@@ -14,11 +14,7 @@ Komunikacja sieciowa w aplikacjach mobilnych opiera się zazwyczaj na architektu
     \label{fig:Figura retrofitscheme}
 \end{figure}
 
-Operacja sieciowa jest zjawiskiem wysoce nieprzewidywalnym. Czas odpowiedzi serwera (Latency) zależy od jakości zasięgu (LTE/5G/WiFi), obciążenia łącza czy odległości geograficznej od serwera. Może to trwać od 50 ms do nawet kilku sekund.
-
-Ze względu na tę nieprzewidywalność, system Android narzuca rygorystyczne ograniczenie: \textbf{Wykonywanie jakichkolwiek operacji sieciowych na Wątku Głównym (UI Thread) jest zabronione.}
-
-Próba wykonania kodu sieciowego wewnątrz texttt{MainActivity} (bez użycia korutyn lub wątków tła) zakończy się natychmiastowym wyrzuceniem wyjątku \texttt{NetworkOnMainThreadException}.
+Operacja sieciowa jest zjawiskiem wysoce nieprzewidywalnym. Czas odpowiedzi serwera (Latency) zależy od jakości zasięgu (LTE/5G/WiFi), obciążenia łącza czy odległości geograficznej od serwera. Może to trwać od 50 ms do nawet kilku sekund. Ze względu na tę nieprzewidywalność, system Android narzuca rygorystyczne ograniczenie: \textbf{Wykonywanie jakichkolwiek operacji sieciowych na Wątku Głównym (UI Thread) jest niewskazane.} Próba wykonania kodu sieciowego wewnątrz \texttt{MainActivity} (bez użycia korutyn lub wątków tła) zakończy się natychmiastowym wyrzuceniem wyjątku \texttt{NetworkOnMainThreadException}.
 
 \section{Uprawnienia aplikacji}
 
@@ -39,7 +35,7 @@ Domyślnie aplikacja na Androida nie ma prawa łączyć się z Internetem. Aby t
 
 W początkach systemu Android do obsługi sieci używano klasy \texttt{HttpURLConnection}. Wymagało to ręcznego otwierania strumieni, buforowania danych, obsługi kodowania znaków i ręcznego parsowania tekstu zwracanego formatu (np. JSON) na obiekty Javy.
 
-Firma Square stworzyła bibliotekę \texttt{Retrofit}, która zrewolucjonizowała ten proces. Retrofit to tzw. \textit{Type-safe HTTP client}, który pozwala programiście zdefiniować API jako prosty interfejs w Kotlinie.
+Firma Square stworzyła bibliotekę \texttt{Retrofit}, która ułatwiła ten proces. Retrofit to tzw. \textit{Type-safe HTTP client}, który pozwala programiście zdefiniować API jako prosty interfejs w Kotlinie.
 Zamiast pisać kod implementujący połączenie, my tylko \textit{deklarujemy}, jak wygląda zapytanie (metoda HTTP, ścieżka, parametry). Retrofit automatycznie generuje kod wykonawczy.
 
 Główne zalety:
@@ -79,16 +75,16 @@ W powyższym przykładzie nie musimy używać \texttt{withContext(Dispatchers.IO
 
 \section{Metody protokołu HTTP (Semantyka)}
 
-W architekturze REST każda operacja na danych (tzw. CRUD) jest ściśle powiązana z odpowiednią metodą protokołu HTTP. Wybór metody informuje serwer o intencjach klienta.
+W architekturze REST każda operacja na danych (CRUD) jest ściśle powiązana z odpowiednią metodą protokołu HTTP. Wybór metody informuje serwer o intencjach klienta.
 
 Najczęściej używane metody to:
 
 \begin{itemize}
-    \item \textbf{GET (Pobierz):} Służy wyłącznie do pobierania danych. Jest operacją bezpieczną i zazwyczaj nie powinna modyfikować stanu serwera (np. pobierz listę artykułów, pobierz szczegóły użytkownika).
-    \item \textbf{POST (Wyślij/Utwórz):} Służy do wysyłania nowych danych na serwer w celu utworzenia zasobu (np. dodaj nowy komentarz, zarejestruj użytkownika). Dane przesyłane są w ciele żądania (Body).
-    \item \textbf{PUT (Zastąp):} Służy do pełnej aktualizacji istniejącego zasobu. Klient wysyła kompletną nową wersję obiektu, która zastępuje starą.
-    \item \textbf{PATCH (Łataj):} Służy do częściowej modyfikacji zasobu. Wysyłamy tylko te pola, które mają ulec zmianie (np. zmiana samego hasła, bez przesyłania reszty profilu).
-    \item \textbf{DELETE (Usuń):} Jak nazwa wskazuje, usuwa wskazany zasób z serwera.
+    \item \textbf{GET:} Służy wyłącznie do pobierania danych. Jest operacją bezpieczną i zazwyczaj nie powinna modyfikować stanu serwera (np. pobierz listę artykułów, pobierz szczegóły użytkownika).
+    \item \textbf{POST:} Służy do wysyłania nowych danych na serwer w celu utworzenia zasobu (np. dodaj nowy komentarz, zarejestruj użytkownika). Dane przesyłane są w ciele żądania (Body).
+    \item \textbf{PUT:} Służy do pełnej aktualizacji istniejącego zasobu. Klient wysyła kompletną nową wersję obiektu, która zastępuje starą.
+    \item \textbf{PATCH:} Służy do częściowej modyfikacji zasobu. Wysyłamy tylko te pola, które mają ulec zmianie (np. zmiana samego hasła, bez przesyłania reszty profilu).
+    \item \textbf{DELETE:} Jak nazwa wskazuje, usuwa wskazany zasób z serwera.
 \end{itemize}
 
 \begin{table}[h]
@@ -113,10 +109,10 @@ Serwery REST API najczęściej zwracają dane w formacie JSON (JavaScript Object
 Standardy nazewnictwa w JSON i Kotlinie często się różnią:
 \begin{itemize}
     \item \textbf{JSON:} Często używa notacji \texttt{snake\_case} (np. \texttt{first\_name}, \texttt{created\_at}).
-    \item \textbf{Kotlin:} Wymaga notacji \texttt{camelCase} (np. \texttt{firstName}, \texttt{createdAt}).
+    \item \textbf{Kotlin:} Często stosujemy notację \texttt{camelCase} (np. \texttt{firstName}, \texttt{createdAt}).
 \end{itemize}
 
-Aby rozwiązać ten konflikt bez łamania konwencji języka, używamy adnotacji \texttt{@SerializedName} (z biblioteki GSON). Działa ona jak \textit{mapa}, mówiąca konwerterowi: \textit{"Pole 'user\_avatar\_url' z JSON-a przypisz do zmiennej 'avatarUrl'"}.
+Aby rozwiązać ten konflikt bez łamania konwencji języka, używamy adnotacji \path{@SerializedName} (z biblioteki GSON). Działa ona jak \textit{mapa}, mówiąca konwerterowi: \textit{"Pole 'user\_avatar\_url' z JSON-a przypisz do zmiennej 'avatarUrl'"}.
 
 Załóżmy, że serwer zwraca następujący obiekt artykułu:
 

@@ -108,9 +108,7 @@ Wraz ze wzrostem skomplikowania aplikacji, standardowy wzorzec MVVM (Model-View-
     \item Łączy dane z kilku repozytoriów (np. profil użytkownika + historia zamówień).
 \end{itemize}
 
-Takie przeładowane klasy są trudne do czytania, utrzymania i testowania. Zjawisko to nazywamy \textbf{"Massive ViewModel"}.
-
-Rozwiązaniem jest wprowadzenie nowej, środkowej warstwy - \textbf{Warstwy Domeny}. Znajduje się ona pomiędzy warstwą Prezentacji (UI + ViewModel) a warstwą Danych (Repository).
+Takie przeładowane klasy są trudne do czytania, utrzymania i testowania. Rozwiązaniem jest wprowadzenie nowej, środkowej warstwy - \textbf{Warstwy Domeny}. Znajduje się ona pomiędzy warstwą Prezentacji (UI + ViewModel) a warstwą Danych (Repository).
 
 \begin{figure}[htbp]
     \centering
@@ -140,8 +138,6 @@ Przykłady nazw UseCaseów (Zasada: Czasownik + Rzeczownik + UseCase):
 
 Dzięki takiemu nazewnictwu, patrząc na strukturę plików w projekcie, od razu wiemy, co aplikacja \textit{robi}, a nie tylko z jakich komponentów się składa. Nazywamy to \textbf{Screaming Architecture}.
 
-\subsection{Implementacja w Kotlin (operator invoke)}
-
 W języku Kotlin implementacja UseCaseów jest bardzo prosta dzięki możliwości przeciążania operatorów. Używamy operatora \texttt{invoke}, co pozwala traktować instancję klasy tak, jakby była funkcją. Stwórzmy przykładowy UseCase do obliczania ceny z podatkiem VAT:
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -161,8 +157,6 @@ class CalculateVatPriceUseCase @Inject constructor() {
 }
 \end{minted}
 
-\subsection{UseCase korzystający z Repozytorium}
-
 Bardziej zaawansowane przypadki użycia muszą pobierać dane. Wstrzykujemy do nich repozytoria (zdefiniowane w punkcie 12.1).
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -179,8 +173,7 @@ class GetProductDetailsUseCase @Inject constructor(
 }
 \end{minted}
 
-\subsection{Korzyści z takiego podejścia}
-
+Korzyści z takiego podejścia:
 \begin{enumerate}
     \item \textbf{Reużywalność:} Tego samego \texttt{CalculateVatPriceUseCase} możemy użyć w \texttt{CartViewModel}, \texttt{ProductDetailsViewModel} i \texttt{CheckoutViewModel}. Nie musimy kopiować wzoru na VAT w trzech miejscach.
     \item \textbf{Testowalność:} Testowanie UseCasea jest trywialne - to czysta funkcja, która przyjmuje dane wejściowe i zwraca wynik. Nie potrzebujemy emulatora ani bibliotek do testowania UI.
@@ -516,7 +509,7 @@ fun CartScreen(
 }
 \end{minted}
 
-\subsection{Konfiguracja Aplikacji (Glue Code)}
+\subsection{Konfiguracja Aplikacji}
 
 Aby całość zadziałała, potrzebujemy jeszcze punktów startowych dla systemu Android i Hilta.
 
@@ -545,28 +538,3 @@ class MainActivity : ComponentActivity() {
 
 W pliku \texttt{AndroidManifest.xml} musisz zarejestrować klasę aplikacji w atrybucie \texttt{android:name}:
 \texttt{<application android:name=".ShopApplication" ... >}
-
-\section{Podsumowanie: Czysta Architektura w Praktyce}
-
-W tym wykładzie dokonaliśmy znaczącej transformacji naszej aplikacji. Przeszliśmy z prostej architektury MVVM (często wystarczającej dla małych projektów) do \textbf{Czystej Architektury (Clean Architecture)}, gotowej na skalowanie.
-
-Kluczowe wnioski, które należy zapamiętać:
-
-\begin{enumerate}
-    \item \textbf{Zasada Odwrócenia Zależności (DIP):}
-    ViewModel nie powinien zależeć od szczegółów implementacyjnych (np. \texttt{ProductRepositoryImpl}), ale od abstrakcji (interfejsu \texttt{ProductRepository}). Pozwala to na łatwe testowanie i wymianę źródeł danych.
-
-    \item \textbf{Optymalizacja Hilt (@Binds):}
-    Do wstrzykiwania interfejsów, których implementacje kontrolujemy, używamy adnotacji \texttt{@Binds}. Jest ona wydajniejsza od \texttt{@Provides}, ponieważ nie generuje dodatkowego kodu fabryki, a jedynie rzutowanie typów.
-
-    \item \textbf{Warstwa Domeny (Domain Layer):}
-    To serce aplikacji, niezależne od frameworka Android (UI) oraz od bazy danych. To tutaj zapadają decyzje biznesowe (np. "czy przyznać rabat?").
-
-    \item \textbf{Przypadki Użycia (Use Cases):}
-    Unikamy "Otyłych ViewModeli" (God Objects). Logikę biznesową dzielimy na małe, wyspecjalizowane klasy (zgodnie z SRP), które wykonują jedno konkretne zadanie. Dzięki operatorowi \texttt{invoke}, używanie ich w kodzie jest intuicyjne.
-
-    \item \textbf{Organizacja Kodu:}
-    Wraz ze wzrostem liczby plików, pakietowanie \textit{według funkcjonalności} (Package by Feature) staje się znacznie bardziej czytelne niż klasyczne pakietowanie warstwami (Package by Layer).
-\end{enumerate}
-
-Choć wprowadzenie tych warstw wymaga napisania większej ilości kodu początkowego (boilerplate), inwestycja ta zwraca się wielokrotnie w fazie utrzymania i rozwoju oprogramowania. Kod staje się modularny, czytelny (Screaming Architecture) i odporny na zmiany technologii zewnętrznych.

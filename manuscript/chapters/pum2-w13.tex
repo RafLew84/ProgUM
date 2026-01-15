@@ -20,9 +20,7 @@ Wady tego rozwiązania są krytyczne dla User Experience (UX):
     \item \textbf{Utrata danych:} Jeśli użytkownik wypełni formularz i kliknie \textit{Wyślij} w momencie utraty zasięgu, dane przepadają.
 \end{itemize}
 
-Paradygmat Offline-First odwraca tę logikę. Zakłada on, że brak dostępu do Internetu nie jest błędem, lecz normalnym stanem pracy aplikacji.
-
-W tym modelu aplikacja działa \textbf{zawsze}, niezależnie od sieci. Wyświetla dane, które pobrała wcześniej (cache), a Internet służy jedynie do \textit{synchronizacji} (aktualizacji) tych danych w tle.
+Paradygmat Offline-First odwraca tę logikę. Zakłada on, że brak dostępu do Internetu nie jest błędem, lecz normalnym stanem pracy aplikacji. W tym modelu aplikacja działa \textbf{zawsze}, niezależnie od sieci. Wyświetla dane, które pobrała wcześniej (cache), a Internet służy jedynie do \textit{synchronizacji} (aktualizacji) tych danych w tle.
 
 \textbf{Główne założenia:}
 \begin{enumerate}
@@ -37,9 +35,7 @@ Aby zrealizować ten cel, musimy gruntownie przebudować architekturę naszych R
 
 Wzorzec \textbf{Single Source of Truth (SSoT)} (Pojedyncze Źródło Prawdy) to fundament nowoczesnych aplikacji mobilnych. Interfejs użytkownika (UI) oraz ViewModel nigdy nie powinny komunikować się bezpośrednio z siecią (API). Jedynym zaufanym źródłem danych dla widoku jest \textbf{lokalna baza danych}.
 
-Oznacza to, że nawet jeśli mamy świetne połączenie z Internetem, dane najpierw trafiają do bazy (Room), a dopiero stamtąd są wyświetlane na ekranie.
-
-W tym podejściu przepływ danych przestaje być liniowy (Pobierz $\rightarrow$ Wyświetl). Dzieli się on na dwa niezależne procesy:
+Oznacza to, że nawet jeśli mamy świetne połączenie z Internetem, dane najpierw trafiają do bazy (Room), a dopiero stamtąd są wyświetlane na ekranie. W tym podejściu przepływ danych przestaje być liniowy (Pobierz $\rightarrow$ Wyświetl). Dzieli się on na dwa niezależne procesy:
 
 \begin{enumerate}
     \item \textbf{Ścieżka Odczytu (Read Path):}
@@ -218,17 +214,13 @@ Wyobraźmy sobie, że dodajemy do encji pole \texttt{isFavorite: Boolean}, któr
 
 \section{Zaawansowany Caching}
 
-Aby rozwiązać problem znikających \textit{serduszek} przy odświeżaniu danych, musimy fizycznie odseparować dane pochodzące z serwera od danych generowanych przez użytkownika.
-
-Zastosujemy architekturę opartą na dwóch tabelach:
+Aby rozwiązać problem znikających \textit{serduszek} przy odświeżaniu danych, musimy fizycznie odseparować dane pochodzące z serwera od danych generowanych przez użytkownika. Zastosujemy architekturę opartą na dwóch tabelach:
 \begin{enumerate}
     \item \textbf{Tabela Cache (np. \texttt{movies\_cache}):} Zawiera surowe dane z API (tytuł, opis, plakat). Ta tabela jest \textit{tymczasowa} - strategia \texttt{refresh()} może ją do woli czyścić i nadpisywać.
     \item \textbf{Tabela Stanu (np. \texttt{favorite\_ids}):} Zawiera tylko identyfikatory elementów oznaczonych przez użytkownika. Ta tabela jest trwała - proces synchronizacji z siecią nigdy jej nie modyfikuje.
 \end{enumerate}
 
-Ostateczny obiekt domenowy (\texttt{Movie}), który trafi do UI, powstanie w wyniku połączenia tych dwóch tabel w czasie rzeczywistym.
-
-Potrzebujemy dwóch osobnych encji w bazie danych Room.
+Ostateczny obiekt domenowy (\texttt{Movie}), który trafi do UI, powstanie w wyniku połączenia tych dwóch tabel w czasie rzeczywistym. Potrzebujemy dwóch osobnych encji w bazie danych Room.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 // data/local/MovieCacheEntity.kt
@@ -256,9 +248,7 @@ data class Movie(
 )
 \end{minted}
 
-Najważniejszą częścią jest zapytanie w DAO. Musimy pobrać wszystkie filmy z cache i \textit{dokleić} do nich informację, czy ich ID znajduje się w tabeli ulubionych.
-
-Używamy do tego klauzuli \texttt{LEFT JOIN}.
+Najważniejszą częścią jest zapytanie w DAO. Musimy pobrać wszystkie filmy z cache i \textit{dokleić} do nich informację, czy ich ID znajduje się w tabeli ulubionych. Używamy do tego klauzuli \texttt{LEFT JOIN}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 // data/local/MovieDao.kt
@@ -315,15 +305,11 @@ Prześledźmy ten sam scenariusz co w poprzedniej sekcji:
     \item UI odświeża się z nowymi opisami filmów, ale serduszko przy ID=5 \textbf{pozostaje na miejscu}.
 \end{enumerate}
 
-To podejście jest odporne na błędy i stanowi podstawę aplikacji Offline-First.
-
-W tym modelu, jeśli serwer przestanie zwracać film o ID=5 (zostanie on usunięty z oferty), zniknie on również z listy w aplikacji (bo \texttt{FROM movies\_cache} go nie zwróci), nawet jeśli jego ID wciąż jest w tabeli ulubionych. Jest to zazwyczaj pożądane zachowanie (tzw. \textit{Orphaned Record} w ulubionych nie przeszkadza).
+To podejście jest odporne na błędy i stanowi podstawę aplikacji Offline-First. W tym modelu, jeśli serwer przestanie zwracać film o ID=5 (zostanie on usunięty z oferty), zniknie on również z listy w aplikacji (bo \texttt{FROM movies\_cache} go nie zwróci), nawet jeśli jego ID wciąż jest w tabeli ulubionych. Jest to zazwyczaj pożądane zachowanie (tzw. \textit{Orphaned Record} w ulubionych nie przeszkadza).
 
 \section{Współbieżność (Race Conditions)}
 
-Mamy system, który działa poprawnie w 99\% przypadków. Jednak w specyficznych warunkach (np. wolna sieć + niecierpliwy użytkownik) może dojść do uszkodzenia danych.
-
-Rozważmy następujący scenariusz wyścigu (Race Condition):
+Mamy system, który działa poprawnie w 99\% przypadków. Jednak w specyficznych warunkach (np. wolna sieć + niecierpliwy użytkownik) może dojść do uszkodzenia danych. Rozważmy następujący scenariusz wyścigu (Race Condition):
 
 \begin{enumerate}
     \item Aplikacja rozpoczyna pobieranie danych z sieci (trwa to 2 sekundy).
@@ -365,11 +351,7 @@ Aby zabezpieczyć się przed takimi sytuacjami, musimy zsynchronizować dostęp 
 
 Aby zapobiec wyścigom (Race Conditions), musimy zagwarantować, że operacje zapisu do bazy danych będą wykonywane \textbf{sekwencyjnie}, a nie równolegle. W świecie Kotlin Coroutines służy do tego narzędzie o nazwie \texttt{Mutex} (od ang. \textit{Mutual Exclusion} - Wzajemne Wykluczanie).
 
-Działa ono jak zamek w drzwiach: tylko jedna osoba (korutyna) może być w środku (w sekcji krytycznej). Inne muszą czekać w kolejce, aż zamek zostanie zwolniony.
-
-Klasa \texttt{Mutex} pochodzi z biblioteki \texttt{kotlinx.coroutines.sync}. Używamy metody \texttt{withLock \{ ... \}}, która automatycznie zamyka zamek na początku bloku i otwiera go na końcu (nawet jeśli wystąpi wyjątek).
-
-Zmodyfikujmy nasze repozytorium:
+Działa ono jak zamek w drzwiach: tylko jedna osoba (korutyna) może być w środku (w sekcji krytycznej). Inne muszą czekać w kolejce, aż zamek zostanie zwolniony. Klasa \texttt{Mutex} pochodzi z biblioteki \texttt{kotlinx.coroutines.sync}. Używamy metody \texttt{withLock \{ ... \}}, która automatycznie zamyka zamek na początku bloku i otwiera go na końcu (nawet jeśli wystąpi wyjątek). Zmodyfikujmy nasze repozytorium:
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 // data/MovieRepository.kt
@@ -530,7 +512,7 @@ Zalety metody:
 \begin{itemize}
     \item Brak klasycznego blokowania (deadlocks są niemożliwe).
     \item Gwarancja kolejności wykonywania operacji (FIFO).
-    \item \textbf{Responsywność:} UI nie czeka na wykonanie operacji zapisu (Fire and Forget).
+    \item  UI nie czeka na wykonanie operacji zapisu (Fire and Forget).
 \end{itemize}
 
 Wady metody:

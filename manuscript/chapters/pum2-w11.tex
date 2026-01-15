@@ -6,7 +6,7 @@ W poprzednich dwóch rozdziałach zbudowaliśmy solidne fundamenty warstwy danyc
     \item \textbf{Retrofit (Rozdział 10)} do pobierania danych z sieci.
 \end{itemize}
 
-Jednakże, aby połączyć te elementy z widokiem (Compose), musieliśmy pisać dużo kodów \textit{sklejającego} w \texttt{MainActivity}. Tworzyliśmy tam ręcznie instancje bazy danych, sieci, repozytoriów i fabryk. W tym rozdziale nauczymy się, jak zautomatyzować ten proces, używając standardu przemysłowego w świecie Androida - biblioteki \textbf{Hilt}.
+Jednakże, aby połączyć te elementy z widokiem (Compose), musieliśmy pisać dużo kodu \textit{sklejającego} w \texttt{MainActivity}. Tworzyliśmy tam ręcznie instancje bazy danych, sieci, repozytoriów i fabryk. W tym rozdziale nauczymy się, jak zautomatyzować ten proces, używając standardu przemysłowego w świecie Androida - biblioteki \textbf{Hilt}.
 
 \section{Manualne Wstrzykiwanie Zależności}
 
@@ -85,9 +85,7 @@ val gamingComputer = Computer(GamingMouseRGB())
 
 \section{Odwrócenie Sterowania}
 
-Aby DI działało w dużej skali, potrzebujemy kogoś, kto będzie zarządzał tymi wszystkimi zależnościami - \textit{kontenera}, który wie, jak stworzyć wszystkie niezbędne elementy i jak dostarczyć go do komputera.
-
-Tę koncepcję nazywamy \textbf{Odwróceniem Sterowania (Inversion of Control)}. Zamiast: \textit{Ja (Activity) tworzę Repozytorium}, mówimy: \textit{Ja (Activity) potrzebuję Repozytorium, dostarcz mi je}.
+Aby DI działało w dużej skali, potrzebujemy kogoś, kto będzie zarządzał tymi wszystkimi zależnościami - \textit{kontenera}, który wie, jak stworzyć wszystkie niezbędne elementy i jak dostarczyć go do komputera. Tę koncepcję nazywamy \textbf{Odwróceniem Sterowania (Inversion of Control)}. Zamiast: \textit{Ja (Activity) tworzę Repozytorium}, mówimy: \textit{Ja (Activity) potrzebuję Repozytorium, dostarcz mi je}.
 
 W świecie Androida rolę takiego inteligentnego kontenera pełni biblioteka \textbf{Hilt}.
 
@@ -172,9 +170,7 @@ Po skonfigurowaniu klasy \texttt{Application}, kontener DI jest zainicjalizowany
     \item \textbf{Injection Targets (Cele Wstrzykiwania):} Komponenty systemu Android, które mają otrzymać zależności z kontenera.
 \end{enumerate}
 
-Wyróżniamy dwie techniki wstrzykiwania: \textit{Constructor Injection} (preferowana) oraz \textit{Field Injection} (wymuszona przez architekturę systemu Android).
-
-Podstawową metodą rozszerzania grafu zależności w Hilt jest adnotacja \texttt{@Inject} umieszczona przy konstruktorze klasy.
+Wyróżniamy dwie techniki wstrzykiwania: \textit{Constructor Injection} (preferowana) oraz \textit{Field Injection} (wymuszona przez architekturę systemu Android). Podstawową metodą rozszerzania grafu zależności w Hilt jest adnotacja \texttt{@Inject} umieszczona przy konstruktorze klasy.
 
 Zastosowanie tej adnotacji skutkuje dwoma operacjami podczas kompilacji (Annotation Processing):
 \begin{itemize}
@@ -202,7 +198,7 @@ W powyższym przykładzie, każde żądanie wstrzyknięcia typu \texttt{NewsRepo
 
 W systemie Android cykl życia kluczowych komponentów (\texttt{Activity}, \texttt{Fragment}, \texttt{Service}, \texttt{BroadcastReceiver}) jest zarządzany przez system operacyjny, a nie przez programistę. Instancjonowanie tych klas odbywa się za pomocą mechanizmu refleksji systemowej, co uniemożliwia zastosowanie wstrzykiwania przez konstruktor.
 
-W takich przypadkach stosujemy wzorzec \textit{Field Injection} (Wstrzykiwanie do pól). Aby umożliwić wstrzykiwanie do klas systemowych, musimy oznaczyć je adnotacją \texttt{@AndroidEntryPoint}.
+W takich przypadkach stosujemy wzorzec \textit{Field Injection} (Wstrzykiwanie do pól). Aby umożliwić wstrzykiwanie do klas systemowych, musimy oznaczyć je adnotacją \path{@AndroidEntryPoint}.
 
 Adnotacja ta generuje indywidualny kontener DI (Hilt Component) dla danej klasy, powiązany z jej cyklem życia (np. \texttt{ActivityComponent}).
 
@@ -348,7 +344,7 @@ Przypisanie zakresu do wiązania (klasy lub metody \texttt{@Provides}) sprawia, 
 
 \begin{table}[h]
 \centering
-\begin{tabular}{|l|l|l|}
+\begin{tabularx}{\linewidth}{|l|l|X|}
 \hline
 \textbf{Komponent Hilt} & \textbf{Adnotacja Zakresu} & \textbf{Czas życia obiektu} \\ \hline
 SingletonComponent      & \texttt{@Singleton}        & Cały czas działania aplikacji (Application) \\ \hline
@@ -356,7 +352,7 @@ ActivityRetainedComponent & \texttt{@ActivityRetainedScoped} & Przetrwa obrót e
 ActivityComponent       & \texttt{@ActivityScoped}   & Czas życia pojedynczej Aktywności \\ \hline
 ViewModelComponent      & \texttt{@ViewModelScoped}  & Czas życia ViewModelu \\ \hline
 FragmentComponent       & \texttt{@FragmentScoped}   & Czas życia Fragmentu \\ \hline
-\end{tabular}
+\end{tabularx}
 \caption{Mapowanie komponentów Hilt na zakresy.}
 \end{table}
 

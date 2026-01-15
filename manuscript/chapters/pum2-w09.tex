@@ -45,7 +45,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
 }
-end{minted}
+\end{minted}
 
 \section{Architektura Room}
 
@@ -125,7 +125,7 @@ Metody oznaczone adnotacjami \texttt{@Insert}, \texttt{@Delete} oraz \texttt{@Up
     \item \textbf{Strategia Konfliktów:} Parametr \texttt{onConflict = OnConflictStrategy.REPLACE} instruuje silnik bazy danych, jak zachować się w przypadku naruszenia unikalności klucza głównego (Primary Key). W tym przypadku, próba wstawienia zadania o istniejącym już ID spowoduje nadpisanie starego rekordu nowym (tzw. operacja \textit{UPSERT}).
 \end{itemize}
 
-Metoda \texttt{getAllTasks()} zwraca typ \texttt{Flow<List<TaskEntity>>}. Jest to kluczowy mechanizm dla architektury sterowanej danymi (Data-Driven Architecture).
+Metoda \texttt{getAllTasks()} zwraca typ \texttt{Flow<List<TaskEntity>>}.
 
 \begin{itemize}
     \item \textbf{Brak \texttt{suspend}:} Zauważmy, że ta metoda \textbf{nie jest} funkcją zawieszającą. Wynika to z faktu, że samo wywołanie metody nie wykonuje zapytania SQL. Tworzy ono jedynie i zwraca instancję strumienia (\texttt{Flow}). Dopiero zasubskrybowanie się do strumienia (operacja \texttt{collect}) uruchamia zapytanie.
@@ -188,7 +188,7 @@ Zmienna statyczna \texttt{INSTANCE} została oznaczona jako \texttt{@Volatile}. 
 
 Funkcja \texttt{getDatabase} implementuje mechanizm leniwej inicjalizacji (Lazy Initialization) z optymalizacją wydajności:
 \begin{enumerate}
-    \item \textbf{Pierwsze sprawdzenie (Bez blokady):} \texttt{return INSTANCE ?: ...} sprawdza, czy instancja już istnieje. Jeśli tak, zwraca ją natychmiast, unikając kosztownego wchodzenia w blok synchronizowany. Jest to ścieżka wykonania dla 99\% wywołań w cyklu życia aplikacji.
+    \item \textbf{Pierwsze sprawdzenie (Bez blokady):} \texttt{return INSTANCE ?: ...} sprawdza, czy instancja już istnieje. Jeśli tak, zwraca ją natychmiast, unikając kosztownego wchodzenia w blok synchronizowany.
     \item \textbf{Sekcja Krytyczna (Synchronizacja):} \texttt{synchronized(this)} zapewnia, że tylko jeden wątek jednocześnie może wykonywać kod wewnątrz bloku. Chroni to przed sytuacją \textit{Race Condition}, gdzie dwa wątki równocześnie stwierdziłyby brak instancji i utworzyłyby dwie niezależne kopie bazy danych.
     \item \textbf{Drugie sprawdzenie (Wewnątrz blokady):} Wewnątrz bloku \texttt{synchronized} (ukryte w logice operatora Elvis i przypisania) następuje ponowna weryfikacja. Jest to konieczne, gdyż między pierwszym sprawdzeniem a wejściem do sekcji krytycznej inny wątek mógł zdążyć utworzyć instancję.
 \end{enumerate}
@@ -441,14 +441,3 @@ class MainActivity : ComponentActivity() {
     }
 }
 \end{minted}
-
-\section{Podsumowanie Rozdziału}
-
-W tym rozdziale zbudowaliśmy kompletną architekturę \textbf{Offline-First}.
-\begin{itemize}
-    \item \textbf{Room} dba o bezpieczne przechowywanie danych strukturalnych.
-    \item \textbf{DAO} i \textbf{Flow} zapewniają automatyczną synchronizację widoku z bazą danych.
-    \item \textbf{Repozytorium} izoluje logikę biznesową od szczegółów implementacji bazy.
-\end{itemize}
-
-W kolejnym rozdziale (Wykład 10) wyjdziemy poza urządzenie i połączymy naszą aplikację z Internetem, wykorzystując bibliotekę \textbf{Retrofit}.

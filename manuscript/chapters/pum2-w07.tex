@@ -2,9 +2,7 @@
 
 W poprzednich rozdziałach do przesyłania danych używaliśmy strumieni (\texttt{Flow}). Strumień działał jak radio: stacja nadawcza emitowała sygnał, a każdy, kto nastroił odbiornik (\texttt{collect}), otrzymywał te same dane.
 
-Co jednak w sytuacji, gdy potrzebujemy precyzyjnej komunikacji \textit{jeden-do-jednego}? Wyobraźmy sobie fabrykę: jedna maszyna produkuje śruby, a druga je pakuje. Każda śruba wyprodukowana przez maszynę A musi trafić do maszyny B. Nie chcemy, aby śruba \textit{zginęła} w eterze, ani żeby trafiła do dwóch paczek naraz.
-
-Do takich zadań Kotlin udostępnia osobny prymityw synchronizacyjny: \textbf{Kanały (Channels)}.
+Co jednak w sytuacji, gdy potrzebujemy precyzyjnej komunikacji \textit{jeden-do-jednego}? Wyobraźmy sobie fabrykę: jedna maszyna produkuje śruby, a druga je pakuje. Każda śruba wyprodukowana przez maszynę A musi trafić do maszyny B. Nie chcemy, aby śruba zaginęła, ani żeby trafiła do dwóch paczek naraz. Do takich zadań Kotlin udostępnia osobny prymityw synchronizacyjny: \textbf{Kanały (Channels)}.
 
 Kanał (\texttt{Channel}) to koncepcyjnie taśmociąg łączący dwie korutyny.
 \begin{itemize}
@@ -22,7 +20,7 @@ Kluczową cechą kanałów jest to, że służą one nie tylko do przesyłania d
 
 \section{Channel vs Flow (SharedFlow)}
 
-To jedno z najczęstszych pytań rekrutacyjnych dotyczących korutyn. Różnica jest fundamentalna i dotyczy modelu dystrybucji danych.
+Różnica jest fundamentalna i dotyczy modelu dystrybucji danych.
 
 \begin{table}[h]
 \centering
@@ -43,7 +41,7 @@ To jedno z najczęstszych pytań rekrutacyjnych dotyczących korutyn. Różnica 
     \label{fig:Figura channelvssharedflow}
 \end{figure}
 
-\textit{*Uwaga: Kanał może mieć wielu odbiorców, ale wtedy działają oni jak konkurencyjni pracownicy - każdy element zostanie obsłużony tylko przez jednego z nich. W SharedFlow każdy pracownik dostałby kopie wszystkich zadań.}
+\textit{Uwaga: Kanał może mieć wielu odbiorców, ale wtedy działają oni jak konkurencyjni pracownicy - każdy element zostanie obsłużony tylko przez jednego z nich. W SharedFlow każdy pracownik dostałby kopie wszystkich zadań.}
 
 \begin{itemize}
     \item Użyj \textbf{StateFlow/SharedFlow}, gdy dane mają trafić do warstwy UI (Widoku). UI zazwyczaj tylko \textit{obserwuje} stan i nie \textit{konsumuje} go bezpowrotnie.
@@ -52,7 +50,7 @@ To jedno z najczęstszych pytań rekrutacyjnych dotyczących korutyn. Różnica 
 
 \section{Podstawowe API: send() i receive()}
 
-W przeciwieństwie do \texttt{Flow}, który definiujemy deklaratywnie, obsługa Kanału przypomina obsługę tradycyjnej kolejki, ale z jedną kluczową różnicą: jest ona textbf{asynchroniczna}.
+W przeciwieństwie do \texttt{Flow}, który definiujemy deklaratywnie, obsługa Kanału przypomina obsługę tradycyjnej kolejki, ale z jedną kluczową różnicą: jest ona \textbf{asynchroniczna}.
 
 Interfejs \texttt{Channel<T>} implementuje dwa mniejsze interfejsy:
 \begin{itemize}
@@ -60,9 +58,7 @@ Interfejs \texttt{Channel<T>} implementuje dwa mniejsze interfejsy:
     \item \texttt{ReceiveChannel<T>} - pozwala tylko odbierać dane.
 \end{itemize}
 
-Dzięki temu możemy przekazać odbiorcy tylko interfejs \texttt{ReceiveChannel}, mając pewność, że przez pomyłkę nic nie wyśle ani nie zamknie kanału.
-
-Dwie główne metody obsługi kanału to \texttt{send(element)} oraz \texttt{receive()}. Obie są funkcjami zawieszającymi (\texttt{suspend}).
+Dzięki temu możemy przekazać odbiorcy tylko interfejs \texttt{ReceiveChannel}, mając pewność, że przez pomyłkę nic nie wyśle ani nie zamknie kanału. Dwie główne metody obsługi kanału to \texttt{send(element)} oraz \texttt{receive()}. Obie są funkcjami zawieszającymi (\texttt{suspend}).
 
 \begin{enumerate}
     \item \textbf{receive() zawiesza}, gdy kanał jest \textbf{pusty}.
@@ -105,7 +101,7 @@ Metoda \texttt{close()} wysyła specjalny sygnał \textit{koniec transmisji}.
     \item Próba odbioru (\texttt{receive}) z zamkniętego kanału (gdy bufor jest pusty) rzuci wyjątek \texttt{ClosedReceiveChannelException}.
 \end{itemize}
 
-Dlatego w praktyce rzadko używamy surowego \texttt{receive()}. Zdecydowanie lepiej używać pętli \texttt{for (item in channel)}, która automatycznie obsługuje zamknięcie kanału i bezpiecznie wychodzi z pętli.
+Częściej można się spotkać z zastosowaniem \texttt{for (item in channel)}, która automatycznie obsługuje zamknięcie kanału i bezpiecznie wychodzi z pętli.
 
 \section{Rodzaje Kanałów (Buforowanie)}
 
@@ -177,10 +173,7 @@ Warto zauważyć, że \texttt{StateFlow} działa bardzo podobnie do kanału typu
 
 \section{Instrukcja select}
 
-W standardowym kodzie asynchronicznym (używając \texttt{await} lub \texttt{receive}) czekamy sekwencyjnie: najpierw na wynik A, potem na wynik B.
-Co jednak, jeśli mamy dwa niezależne źródła danych i chcemy przetworzyć wynik z tego, które odpowie \textbf{szybciej}?
-
-Tu z pomocą przychodzi wyrażenie \texttt{select}. Pozwala ono \textit{nasłuchiwać} na wielu kanałach (lub obiektach \texttt{Deferred}) jednocześnie i uruchomić kod skojarzony tylko z tym zdarzeniem, które nastąpi jako pierwsze.
+W standardowym kodzie asynchronicznym (używając \texttt{await} lub \texttt{receive}) czekamy sekwencyjnie: najpierw na wynik A, potem na wynik B. Mamy jeszcze jedną możliwość: możemy przetworzyć wynik z tego, które odpowie \textbf{szybciej} za pomocą wyrażenia \texttt{select}. Pozwala ono \textit{nasłuchiwać} na wielu kanałach (lub obiektach \texttt{Deferred}) jednocześnie i uruchomić kod skojarzony tylko z tym zdarzeniem, które nastąpi jako pierwsze.
 
 Wyrażenie \texttt{select<T>} zwraca wynik typu \texttt{T}. Wewnątrz bloku definiujemy klauzule (np. \texttt{onReceive}), które mówią \textit{co zrobić, jeśli to źródło wygra wyścig}.
 

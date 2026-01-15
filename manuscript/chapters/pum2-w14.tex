@@ -2,9 +2,7 @@
 
 \section{Architektura Serverless i Model NoSQL}
 
-W poprzednich rozdziałach budowaliśmy aplikacje w oparciu o architekturę, w której my (jako programiści mobilni) byliśmy odpowiedzialni za lokalną bazę danych (Room), i korzystaliśmy z gotowych API (REST/Retrofit).
-
-W tym rozdziale zmieniamy podejście. Skorzystamy z modelu \textbf{Backend-as-a-Service (BaaS)}, w którym infrastruktura serwerowa jest dostarczana przez platformę zewnętrzną - w tym przypadku \textbf{Firebase}.
+W poprzednich rozdziałach budowaliśmy aplikacje w oparciu o architekturę, w której my byliśmy odpowiedzialni za lokalną bazę danych (Room), i korzystaliśmy z gotowych API (REST/Retrofit). W tym rozdziale zmieniamy podejście. Skorzystamy z modelu \textbf{Backend-as-a-Service (BaaS)}, w którym infrastruktura serwerowa jest dostarczana przez platformę zewnętrzną - w tym przypadku \textbf{Firebase}.
 
 \subsection{Backend-as-a-Service (BaaS)}
 
@@ -137,9 +135,7 @@ Ostatnim krokiem jest utworzenie samej instancji bazy danych w konsoli:
 
 Firestore jest bazą dokumentową. Oznacza to, że nie definiujemy schematu (Schema) na poziomie bazy danych. Możemy w tej samej kolekcji zapisać dokument posiadający tylko pole \texttt{name}, a obok niego dokument posiadający pola \texttt{name, age, address}.
 
-Mimo tej elastyczności, w aplikacji Androidowej (która jest silnie typowana) dążymy do narzucenia pewnej struktury poprzez klasy DTO (Data Transfer Objects).
-
-Model danych w Firestore przypomina system plików na dysku komputera:
+Mimo tej elastyczności, w aplikacji Androidowej (która jest silnie typowana) dążymy do narzucenia pewnej struktury poprzez klasy DTO (Data Transfer Objects). Model danych w Firestore przypomina system plików na dysku komputera:
 \begin{itemize}
     \item \textbf{Kolekcja} to folder. Może zawierać tylko dokumenty (nie inne kolekcje bezpośrednio).
     \item \textbf{Dokument} to plik (np. JSON). Zawiera dane oraz ewentualnie linki do podfolderów (Subkolekcji).
@@ -223,9 +219,7 @@ W architekturze MVVM zależy nam na tym, aby warstwa UI (ViewModel) otrzymywała
 
 Wyzwanie polega na tym, że biblioteka Firestore została napisana w oparciu o mechanizm \textbf{Callbacków} (interfejsy typu \texttt{OnSuccessListener}, \texttt{addSnapshotListener}), a nie funkcje zawieszające (\texttt{suspend}). Musimy więc zbudować most między tymi technologiami.
 
-Aby zamienić nasłuchiwanie w czasie rzeczywistym na \texttt{Flow}, używamy konstruktora \texttt{callbackFlow}. Tworzy on strumień, który pozostaje otwarty tak długo, jak długo ktoś go obserwuje (collect), i pozwala nam ręcznie emitować wartości wewnątrz callbacka.
-
-Oto schemat implementacji metody \texttt{getMoviesStream()} w repozytorium:
+Aby zamienić nasłuchiwanie w czasie rzeczywistym na \texttt{Flow}, używamy konstruktora \texttt{callbackFlow}. Tworzy on strumień, który pozostaje otwarty tak długo, jak długo ktoś go obserwuje (collect), i pozwala nam ręcznie emitować wartości wewnątrz callbacka. Poniżej schemat implementacji metody \texttt{getMoviesStream()} w repozytorium:
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 // data/repository/FirestoreMovieRepository.kt
@@ -266,7 +260,7 @@ override fun getMoviesStream(): Flow<List<Movie>> = callbackFlow {
 }
 \end{minted}
 
-Pułapka awaitClose: Jeśli pominiesz blok \texttt{awaitClose}, funkcja \texttt{callbackFlow} zakończy się natychmiast po zarejestrowaniu listenera, a strumień zostanie zamknięty. \texttt{awaitClose} utrzymuje strumień przy życiu.
+Pułapka \texttt{awaitClose}: Jeśli pominiesz blok \texttt{awaitClose}, funkcja \texttt{callbackFlow} zakończy się natychmiast po zarejestrowaniu listenera, a strumień zostanie zamknięty. \texttt{awaitClose} utrzymuje strumień przy życiu.
 
 Do operacji, które nie wymagają nasłuchiwania w czasie rzeczywistym (np. dodanie produktu, usunięcie, lub jednorazowe pobranie), używamy funkcji zawieszających.
 
@@ -320,9 +314,7 @@ Warto zaznaczyć, że SDK Firestore jest zoptymalizowane.
 
 Firestore oferuje kilka metod zapisu, które różnią się sposobem generowania identyfikatorów oraz zachowaniem w przypadku istniejących danych.
 
-Wszystkie poniższe operacje zwracają obiekt \texttt{Task<Void>}, co oznacza, że w Kotlinie możemy użyć na nich funkcji \texttt{.await()}, aby zawiesić korutynę do momentu potwierdzenia zapisu przez serwer. Biblioteki Firebase są napisane w Javie, gdzie typy generyczne nie obsługują \texttt{void} (pustego zwrotu). Używana jest więc klasa-wrapper \texttt{java.lang.Void}. W Kotlinie funkcja \texttt{.await()} zwraca wtedy wartość \texttt{null}, którą po prostu ignorujemy, traktując całe wywołanie jak funkcję zwracającą \texttt{Unit}.
-
-Mamy dwie strategie tworzenia nowych dokumentów:
+Wszystkie poniższe operacje zwracają obiekt \texttt{Task<Void>}, co oznacza, że w Kotlinie możemy użyć na nich funkcji \texttt{.await()}, aby zawiesić korutynę do momentu potwierdzenia zapisu przez serwer. Biblioteki Firebase są napisane w Javie, gdzie typy generyczne nie obsługują \texttt{void} (pustego zwrotu). Używana jest więc klasa-wrapper \texttt{java.lang.Void}. W Kotlinie funkcja \texttt{.await()} zwraca wtedy wartość \texttt{null}, którą po prostu ignorujemy, traktując całe wywołanie jak funkcję zwracającą \texttt{Unit}. Mamy dwie strategie tworzenia nowych dokumentów:
 
 \begin{enumerate}
     \item \textbf{Automatyczne ID (\texttt{add}):}
@@ -467,7 +459,7 @@ Gdy spróbujesz wykonać takie zapytanie bez indeksu, aplikacja wyrzuci błąd, 
 \begin{minted}[frame=single,framesep=10pt,breaklines]{text}
 com.google.firebase.firestore.FirebaseFirestoreException: FAILED_PRECONDITION: 
 The query requires an index. You can create it here: 
-https://console.firebase.google.com/v1/r/project/my-app/firestore/indexes?create_composite=...
+https://console.firebase.google.com/v1/r/project/my-app/firestore...
 \end{minted}
 
 Firestore \textbf{nie obsługuje} klasycznego wyszukiwania tekstu (np. znalezienie słowa \textit{terminator} w długim opisie filmu).
@@ -557,94 +549,6 @@ Mimo że tryb offline działa świetnie, ma swoje granice:
     \item \textbf{Transakcje:} Operacje transakcyjne (\texttt{runTransaction}) \textbf{nie działają offline}, ponieważ wymagają one połączenia z serwerem w celu sprawdzenia spójności danych. W trybie offline należy używać \texttt{WriteBatch}.
     \item \textbf{Reguły bezpieczeństwa:} Walidacja uprawnień (Security Rules) odbywa się na serwerze. Jeśli użytkownik spróbuje wykonać niedozwoloną operację offline, dowie się o błędzie dopiero po odzyskaniu połączenia.
 \end{itemize}
-
-\section{Bezpieczeństwo (Security Rules)}
-
-W architekturze \textit{Backendless} (bez własnego serwera pośredniczącego) aplikacja mobilna łączy się bezpośrednio z bazą danych. Rodzi to uzasadnione pytanie: \textbf{Skoro kod aplikacji jest na telefonie klienta, to co powstrzyma złośliwego użytkownika przed pobraniem całej bazy lub nadpisaniem danych innych osób?}
-
-Odpowiedzią są \textbf{Firestore Security Rules}. Jest to kod logiczny, który żyje na serwerach Google (nie w aplikacji) i jest sprawdzany przy \textbf{każdym} żądaniu odczytu lub zapisu. Jeśli reguła zwróci \texttt{false}, operacja jest blokowana, a aplikacja otrzymuje błąd \texttt{PERMISSION\_DENIED}.
-
-Reguły piszemy w języku przypominającym JavaScript. Składają się one z bloków \texttt{match} (ścieżka do dokumentu) oraz instrukcji \texttt{allow} (warunek logiczny).
-
-\begin{minted}[frame=single,framesep=10pt]{javascript}
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    // Reguła dla kolekcji "movies"
-    match /movies/{movieId} {
-      // Zezwól na odczyt każdemu (publiczne dane)
-      allow read: if true;
-      
-      // Zezwól na zapis tylko administratorom (tu: wyłączone dla wszystkich)
-      allow write: if false; 
-    }
-    
-    // Reguła dla prywatnych danych użytkownika
-    match /users/{userId} {
-      // ...
-    }
-  }
-}
-\end{minted}
-
-Operacje \texttt{read} i \texttt{write} można rozbić na bardziej szczegółowe akcje:
-\begin{itemize}
-    \item \textbf{read} $\rightarrow$ \texttt{get} (pojedynczy dokument) oraz \texttt{list} (zapytania/kolekcje).
-    \item \textbf{write} $\rightarrow$ \texttt{create} (nowy), \texttt{update} (edycja), \texttt{delete} (usuwanie).
-\end{itemize}
-
-Najczęstszym scenariuszem jest zezwolenie na dostęp tylko zalogowanym użytkownikom. Firestore jest ściśle zintegrowany z \textbf{Firebase Authentication}. Obiekt \texttt{request.auth} zawiera informacje o użytkowniku wykonującym żądanie.
-
-\textbf{Przykład 1: Tylko zalogowani}
-\begin{minted}[frame=single,framesep=10pt]{javascript}
-match /posts/{postId} {
-  // Tylko zalogowani widzą posty
-  allow read: if request.auth != null;
-}
-\end{minted}
-
-\textbf{Przykład 2: Właściciel danych (User Privacy)}
-To najważniejszy wzorzec w aplikacjach mobilnych. Chcemy, aby użytkownik miał dostęp tylko do \textbf{swoich} dokumentów.
-
-\begin{minted}[frame=single,framesep=10pt]{javascript}
-// Ścieżka zawiera "wildcard" {userId}, który przejmuje ID dokumentu
-match /users/{userId} {
-  // Porównujemy ID dokumentu z UID zalogowanego użytkownika
-  allow read, write: if request.auth != null && request.auth.uid == userId;
-}
-\end{minted}
-Dzięki tej regule, jeśli zalogowany użytkownik \texttt{ABC} spróbuje przeczytać dokument \texttt{users/XYZ}, serwer zablokuje dostęp.
-
-Reguły bezpieczeństwa mogą również pełnić rolę walidatora, sprawdzając typy danych i wartości biznesowe. Chroni to bazę przed \textit{śmieciowymi} danymi wysyłanymi przez zbugowaną aplikację lub złośliwe skrypty.
-
-W regułach mamy dostęp do dwóch obiektów reprezentujących dane:
-\begin{itemize}
-    \item \textbf{\texttt{resource.data}}: Dane, które \textbf{już są} w bazie (przed edycją).
-    \item \textbf{\texttt{request.resource.data}}: Dane, które \textbf{przychodzą} w żądaniu (nowe dane).
-\end{itemize}
-
-\textbf{Przykład: Walidacja produktu}
-\begin{minted}[frame=single,framesep=10pt,fontsize=\footnotesize]{javascript}
-match /products/{productId} {
-  allow create: if request.auth != null
-                // Cena musi być liczbą dodatnią
-                && request.resource.data.price is number
-                && request.resource.data.price > 0
-                // Nazwa jest wymagana i musi być napisem
-                && request.resource.data.name is string
-                && request.resource.data.name.size() > 0;
-                
-  allow update: if request.auth != null
-                // Nie pozwalamy zmienić autora produktu przy edycji
-                && request.resource.data.authorId == resource.data.authorId;
-}
-\end{minted}
-
-Nie trzeba wdrażać reguł \textit{na ślepo}. Konsola Firebase posiada narzędzie \textbf{Rules Simulator}.
-Pozwala ono symulować żądania i pokazuje, która linijka reguł zezwoliła na dostęp lub go zablokowała.
-
-Reguły w Firestore \textbf{nie kaskadują} automatycznie. Jeśli nadasz uprawnienia do dokumentu \texttt{/posts/post1}, użytkownik nie otrzymuje automatycznie dostępu do subkolekcji \texttt{/posts/post1/comments}. Musisz napisać osobną regułę dla subkolekcji.
 
 \section{Przykład: Współdzielona Lista Zakupów (ToDo)}
 
