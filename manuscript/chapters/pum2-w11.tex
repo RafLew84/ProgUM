@@ -77,12 +77,6 @@ val gamingComputer = Computer(GamingMouseRGB())
 
 \end{itemize}
 
-\begin{figure}[htbp]
-    \includegraphics[width=0.7\textwidth]{fig/pum2-w11-discheme.png}
-    \caption{Analogia zastosowania wstrzykiwania zależności.}
-    \label{fig:Figura discheme}
-\end{figure}
-
 \section{Odwrócenie Sterowania}
 
 Aby DI działało w dużej skali, potrzebujemy kogoś, kto będzie zarządzał tymi wszystkimi zależnościami - \textit{kontenera}, który wie, jak stworzyć wszystkie niezbędne elementy i jak dostarczyć go do komputera. Tę koncepcję nazywamy \textbf{Odwróceniem Sterowania (Inversion of Control)}. Zamiast: \textit{Ja (Activity) tworzę Repozytorium}, mówimy: \textit{Ja (Activity) potrzebuję Repozytorium, dostarcz mi je}.

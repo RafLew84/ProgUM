@@ -264,7 +264,7 @@ Pułapka \texttt{awaitClose}: Jeśli pominiesz blok \texttt{awaitClose}, funkcja
 
 Do operacji, które nie wymagają nasłuchiwania w czasie rzeczywistym (np. dodanie produktu, usunięcie, lub jednorazowe pobranie), używamy funkcji zawieszających.
 
-Standardowe API Firebase zwraca obiekt \texttt{Task<T>}. Aby nie używać callbacków \texttt{addOnSuccessListener}, korzystamy z biblioteki pomocniczej \texttt{kotlinx-coroutines-play-services}, która dodaje funkcję rozszerzającą \texttt{.await()}.
+Standardowe API Firebase zwraca obiekt \texttt{Task<T>}. Aby nie używać callbacków \path{addOnSuccessListener}, korzystamy z biblioteki pomocniczej \texttt{kotlinx-coroutines-play-services}, która dodaje funkcję rozszerzającą \texttt{.await()}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 // data/repository/FirestoreMovieRepository.kt

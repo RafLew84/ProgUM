@@ -113,7 +113,7 @@ Takie przeładowane klasy są trudne do czytania, utrzymania i testowania. Rozwi
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.7\textwidth]{fig/pum2-w12-usecasescheme.png}
-    \caption{Architektura Clean MVVM: Przepływ danych odbywa się od UI do Danych, a zależności (dzięki DIP) skierowane są do wewnątrz, ku Domenie.}
+    \caption{Architektura Clean MVVM: Przepływ danych odbywa się od UI do Danych, a zależności (dzięki DI) skierowane są do wewnątrz.}
     \label{fig:Figura usecasescheme}
 \end{figure}
 
@@ -175,7 +175,7 @@ class GetProductDetailsUseCase @Inject constructor(
 
 Korzyści z takiego podejścia:
 \begin{enumerate}
-    \item \textbf{Reużywalność:} Tego samego \texttt{CalculateVatPriceUseCase} możemy użyć w \texttt{CartViewModel}, \texttt{ProductDetailsViewModel} i \texttt{CheckoutViewModel}. Nie musimy kopiować wzoru na VAT w trzech miejscach.
+    \item \textbf{Reużywalność:} Tego samego \texttt{CalculateVatPriceUseCase} możemy użyć w \path{CartViewModel}, \texttt{ProductDetailsViewModel} i \texttt{CheckoutViewModel}. Nie musimy kopiować wzoru na VAT w trzech miejscach.
     \item \textbf{Testowalność:} Testowanie UseCasea jest trywialne - to czysta funkcja, która przyjmuje dane wejściowe i zwraca wynik. Nie potrzebujemy emulatora ani bibliotek do testowania UI.
     \item \textbf{Odchudzenie ViewModelu:} ViewModel staje się prostym koordynatorem, który tylko przekazuje dane do odpowiednich UseCaseów.
 \end{enumerate}

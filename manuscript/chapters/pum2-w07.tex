@@ -24,22 +24,41 @@ Różnica jest fundamentalna i dotyczy modelu dystrybucji danych.
 
 \begin{table}[h]
 \centering
-\begin{tabular}{|l|p{6cm}|p{6cm}|}
+\begin{tabularx}{\linewidth}{|l|X|X|}
 \hline
 \textbf{Cecha} & \textbf{Flow (SharedFlow)} & \textbf{Channel} \\ \hline
-\textbf{Model komunikacji} & \textbf{Multicast} (Jeden do Wielu) & \textbf{Unicast} (Jeden do Jednego*) \\ \hline
-\textbf{Metafora} & \textbf{Radio / Telewizja}. Wszyscy subskrybenci słyszą to samo. Jeśli nikt nie słucha, audycja i tak leci (SharedFlow) lub w ogóle nie startuje (Cold Flow). & \textbf{Poczta / Walkie-Talkie}. List trafia do jednej skrzynki. Jeśli jest dwóch odbiorców, ten szybszy zabierze list, a drugi zobaczy pustą skrzynkę. \\ \hline
-\textbf{Dystrybucja elementu} & Każdy element trafia do \textbf{wszystkich} aktywnych subskrybentów. & Każdy element trafia tylko do \textbf{jednego} odbiorcy. \\ \hline
-\textbf{Zastosowanie} & Stan UI, aktualizacje bazy danych, zdarzenia globalne. & Kolejki zadań, przesyłanie wyników między wątkami tła. \\ \hline
-\end{tabular}
+
+\textbf{Model komunikacji} &
+\textbf{Multicast} (Jeden do Wielu) &
+\textbf{Unicast} (Jeden do Jednego*) \\ \hline
+
+\textbf{Metafora} &
+\textbf{Radio / Telewizja}. Wszyscy subskrybenci słyszą to samo. Jeśli nikt nie słucha, audycja i tak leci (SharedFlow) lub w ogóle nie startuje (Cold Flow). &
+\textbf{Poczta / Walkie-Talkie}. List trafia do jednej skrzynki. Jeśli jest dwóch odbiorców, ten szybszy zabierze list, a drugi zobaczy pustą skrzynkę. \\ \hline
+
+\textbf{Dystrybucja elementu} &
+Każdy element trafia do \textbf{wszystkich} aktywnych subskrybentów. &
+Każdy element trafia tylko do \textbf{jednego} odbiorcy. \\ \hline
+
+\textbf{Zastosowanie} &
+Stan UI, aktualizacje bazy danych, zdarzenia globalne. &
+Kolejki zadań, przesyłanie wyników między wątkami tła. \\ \hline
+\end{tabularx}
 \caption{Porównanie Flow i Channel}
 \end{table}
 
-\begin{figure}[htbp]
-    \includegraphics[width=0.7\textwidth]{fig/pum2-w07-channelvssharedflow.png}
-    \caption{\texttt{Channel} vs \texttt{SharedFlow}.}
-    \label{fig:Figura channelvssharedflow}
-\end{figure}
+% \begin{table}[h]
+% \centering
+% \begin{tabular}{|l|p{6cm}|p{3cm}|}
+% \hline
+% \textbf{Cecha} & \textbf{Flow (SharedFlow)} & \textbf{Channel} \\ \hline
+% \textbf{Model komunikacji} & \textbf{Multicast} (Jeden do Wielu) & \textbf{Unicast} (Jeden do Jednego*) \\ \hline
+% \textbf{Metafora} & \textbf{Radio / Telewizja}. Wszyscy subskrybenci słyszą to samo. Jeśli nikt nie słucha, audycja i tak leci (SharedFlow) lub w ogóle nie startuje (Cold Flow). & \textbf{Poczta / Walkie-Talkie}. List trafia do jednej skrzynki. Jeśli jest dwóch odbiorców, ten szybszy zabierze list, a drugi zobaczy pustą skrzynkę. \\ \hline
+% \textbf{Dystrybucja elementu} & Każdy element trafia do \textbf{wszystkich} aktywnych subskrybentów. & Każdy element trafia tylko do \textbf{jednego} odbiorcy. \\ \hline
+% \textbf{Zastosowanie} & Stan UI, aktualizacje bazy danych, zdarzenia globalne. & Kolejki zadań, przesyłanie wyników między wątkami tła. \\ \hline
+% \end{tabular}
+% \caption{Porównanie Flow i Channel}
+% \end{table}
 
 \textit{Uwaga: Kanał może mieć wielu odbiorców, ale wtedy działają oni jak konkurencyjni pracownicy - każdy element zostanie obsłużony tylko przez jednego z nich. W SharedFlow każdy pracownik dostałby kopie wszystkich zadań.}
 
@@ -106,12 +125,6 @@ Częściej można się spotkać z zastosowaniem \texttt{for (item in channel)}, 
 \section{Rodzaje Kanałów (Buforowanie)}
 
 Konstruktor klasy \texttt{Channel} przyjmuje opcjonalny parametr \texttt{capacity}. To on decyduje o tym, kiedy funkcja \texttt{send()} zawiesi nadawcę. Wybór odpowiedniego typu bufora jest kluczowy dla zarządzania przepływem danych.
-
-\begin{figure}[htbp]
-    \includegraphics[width=0.7\textwidth]{fig/pum2-w07-buffors.png}
-    \caption{Typy buforów.}
-    \label{fig:Figura buffors}
-\end{figure}
 
 \subsection{Rendezvous (Domyślny)}
 \texttt{capacity = Channel.RENDEZVOUS} (lub 0).

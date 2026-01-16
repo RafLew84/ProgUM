@@ -33,12 +33,6 @@ Różnice między klasyczną listą a strumieniem są fundamentalne:
     \item \textbf{Flow<T>:} Dane są obliczane lub pobierane asynchronicznie i emitowane pojedynczo (lub grupami) w czasie. Aplikacja nasłuchuje zmian, zamiast o nie pytać.
 \end{itemize}
 
-\begin{figure}[htbp]
-    \includegraphics[width=0.7\textwidth]{fig/pum2-w05-flow1.png}
-    \caption{\texttt{List<T>} vs \texttt{Flow<T>}.}
-    \label{fig:Figura flow1}
-\end{figure}
-
 Możemy zapytać: \textit{"Przecież używaliśmy \texttt{mutableStateOf} i UI też odświeżało się automatycznie. Po co nam Flow?"}. Choć oba mechanizmy są reaktywne, służą do czegoś innego:
 
 \begin{enumerate}
@@ -71,12 +65,6 @@ Aby to zrozumieć, wyobraźmy sobie film w serwisie streamingowym (np. YouTube l
     \end{itemize}
     Każdy subskrybent otrzymuje swoją \textbf{własną, niezależną kopię strumienia}. Strumień startuje dla niego od zera.
 \end{itemize}
-
-\begin{figure}[htbp]
-    \includegraphics[width=0.7\textwidth]{fig/pum2-w05-flow2.png}
-    \caption{Wizualizacja Zimnego Strumienia.}
-    \label{fig:Figura flow2}
-\end{figure}
 
 Spójrzmy na przykład:
 
@@ -243,12 +231,6 @@ Dobrą analogią dla StateFlow jest transmisja na żywo (Twitch):
     \item \textbf{Wspólny Obraz:} Wszyscy widzowie oglądający ten sam kanał widzą dokładnie ten sam stan (np. ten sam obraz transmisji) w tym samym momencie.
 \end{itemize}
 
-\begin{figure}[htbp]
-    \includegraphics[width=0.7\textwidth]{fig/pum2-w05-stateflow.png}
-    \caption{Wizualizacja StateFlow.}
-    \label{fig:Figura stateflow}
-\end{figure}
-
 Przejdźmy do przykładu:
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -381,12 +363,6 @@ Wróćmy do naszej transmisji. O ile obraz wideo (StateFlow) musi być ciągły 
     \item \textbf{Widz obecny (Subskrybent):} Widzi komunikat w momencie jego pojawienia się.
     \item \textbf{Widz nieobecny (Aplikacja w tle):} Jeśli widza nie ma w pokoju w momencie donacji, to po powrocie \textbf{nie widzi} starego alertu.
 \end{itemize}
-
-\begin{figure}[htbp]
-    \includegraphics[width=0.7\textwidth]{fig/pum2-w05-sharedflow.png}
-    \caption{Wizualizacja SharedFlow.}
-    \label{fig:Figura sharedflow}
-\end{figure}
 
 Działa to jak dzwonek do drzwi: słyszysz go tylko wtedy, gdy naciska go kurier. Jeśli wrócisz do domu godzinę później, dzwonek nie zaczyna nagle dzwonić, informując, że \textit{ktoś był}.
 

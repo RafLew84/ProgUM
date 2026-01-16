@@ -66,7 +66,7 @@ Google wprowadziło \textbf{DataStore} jako następcę \texttt{SharedPreferences
 Główne zalety \texttt{DataStore}:
 \begin{itemize}
     \item \textbf{Integracja z Korutynami i Flow:} Operacje odczytu są wystawiane jako strumień \texttt{Flow}, a zapisu jako funkcje zawieszające \texttt{suspend}.
-    \item \textbf{Bezpieczeństwo wątkowe:} Operacje dyskowe są domyślnie przenoszone na \texttt{Dispatchers.IO}.
+    \item \textbf{Bezpieczeństwo wątkowe:} Operacje dyskowe są domyślnie przenoszone na \path{Dispatchers.IO}.
     \item \textbf{Obsługa błędów:} Posiada wbudowane mechanizmy łapania wyjątków \texttt{IOException} podczas odczytu pliku.
 \end{itemize}
 
@@ -215,7 +215,7 @@ Prześledźmy, co dzieje się po kliknięciu przycisku:
     \item \textbf{UI:} Komponent \texttt{UserSettingsScreen} otrzymuje powiadomienie o zmianie stanu i przerysowuje się (Recomposition) z nowym imieniem.
 \end{enumerate}
 
-\section{Bezpieczeństwo wątkowe: DataStore a Dispatchers.IO}
+\section{Bezpieczeństwo wątkowe}
 
 Wróćmy na chwilę do największej bolączki \texttt{SharedPreferences} - blokowania wątku głównego. Jak pamiętamy, wywołanie \texttt{prefs.getString()} działo się dokładnie tam, gdzie zostało wywołane (często na UI Thread).
 
