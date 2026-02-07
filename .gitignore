@@ -62,3 +62,5 @@ extract_ppt.py
 extract_w0.py
 extracted_w0.txt
 extracted_w0_utf8.txt
+extract_w1.py
+extracted_w1_utf8.txt

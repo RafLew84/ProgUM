@@ -1,0 +1,225 @@
+\chapter{Podstawy języka Kotlin}
+
+Rozpoczynamy naszą przygodę z językiem Kotlin – nowoczesnym, pragmatycznym językiem, który zrewolucjonizował tworzenie aplikacji na Androida. W tym rozdziale zbudujemy solidne fundamenty, na których oprzemy całą dalszą naukę. Nie będziemy tylko uczyć się składni; spróbujemy zrozumieć \textit{dlaczego} pewne mechanizmy działają tak, a nie inaczej, i jakie problemy rozwiązują.
+
+\section{System typów – solidny fundament}
+
+W Javie, którą zapewne znacie, istnieje podział na typy prymitywne (int, double, boolean) i typy referencyjne (obiekty). Kotlin upraszcza ten obraz, traktując \textbf{wszystko jako obiekt} (przynajmniej z perspektywy programisty).
+
+\subsection{Any – matka wszystkich obiektów}
+Na szczycie hierarchii typów w Kotlinie stoi \texttt{Any}. To odpowiednik \texttt{java.lang.Object}, ale z jedną kluczową różnicą: \texttt{Any} nie jest nullowalne (o czym powiemy przy okazji Null Safety). Każda klasa, którą stworzymy, domyślnie dziedziczy po \texttt{Any}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val liczba: Any = 42
+val tekst: Any = "Hello"
+\end{minted}
+
+W językach takich jak C++ czy Java, funkcje, które nie zwracają wyniku, oznacza się słowem kluczowym \texttt{void}. W Kotlinie, w duchu spójności systemu typów, takie funkcje zwracają specjalny obiekt typu \texttt{Unit}.
+
+Można myśleć o \texttt{Unit} jak o \textit{pustej paczce}. Funkcja zawsze wysyła paczkę (zwraca wynik), tylko w tym przypadku paczka nie zawiera żadnych użytecznych informacji. \texttt{Unit} jest singletonem – istnieje tylko jedna taka \textit{pusta paczka} w całym systemie.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun przywitanie(): Unit {
+    println("Cześć!")
+    // return Unit - jest tu niejawnie dodane przez kompilator
+}
+\end{minted}
+
+Kotlin wprowadza bardzo ciekawy typ: \texttt{Nothing}. Jest to typ, który \textbf{nie ma instancji}. Oznacza to, że nie da się stworzyć zmiennej typu \texttt{Nothing}. Po co więc taki typ?
+
+Służy on do oznaczenia sytuacji, w której funkcja \textbf{nigdy nie zakończy się poprawnie} (nie zwróci sterowania). Przykłady to:
+\begin{itemize}
+    \item Funkcja rzucająca wyjątek (wyjątek przerywa normalny przepływ).
+    \item Pętla nieskończona.
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun blad(message: String): Nothing {
+    throw IllegalArgumentException(message)
+}
+\end{minted}
+
+Typ \texttt{Nothing} jest tzw. \textit{bottom type} - jest podtypem każdego innego typu. Dzięki temu możemy go użyć np. w instrukcji Elvis operator:
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val name: String = person.name ?: throw Exception("Brak imienia")
+\end{minted}
+Kompilator \textit{wie}, że prawa strona (\texttt{Nothing}) \textit{pasuje} do lewej (\texttt{String}), ponieważ \texttt{Nothing} pasuje wszędzie (bo i tak sterowanie tam nie dotrze).
+
+\section{Zmienne: val vs var vs const val}
+
+To jedna z najważniejszych decyzji projektowych, którą podejmujemy pisząc kod.
+\begin{enumerate}
+    \item \texttt{\textbf{val}} (od \textit{value}) – deklaruje referencję tylko do odczytu (read-only).
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    val imie = "Anna"
+    // imie = "Marek" // Błąd: Val cannot be reassigned
+    \end{minted}
+    \item \texttt{\textbf{var}} (od \textit{variable}) – deklaruje zmienną mutowalną.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    var wiek = 25
+    wiek = 26 // OK
+    \end{minted}
+\end{enumerate}
+
+\textbf{UWAGA!!!} \texttt{val} gwarantuje niezmienność \textit{referencji}, a nie \textit{obiektu}.
+Wyobraź sobie pudełko z etykietą.
+\begin{itemize}
+    \item \texttt{val pudełko}: Nie możesz odkleić etykiety i przykleić jej na inne pudełko. Ale możesz otworzyć pudełko i zmienić jego zawartość (np. dodać element do listy wewnątrz).
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val lista = mutableListOf("A", "B")
+// lista = mutableListOf("C") // BŁĄD! Nie można zmienić referencji val
+lista.add("C")                // OK! Stan obiektu się zmienia
+\end{minted}
+
+W przypadku typów takich jak \texttt{Int}, które same w sobie są niezmienne (immutable), \texttt{val} sprawia, że wartość jest definitywnie stała, ponieważ nie możemy zmienić samej liczby \textit{w miejscu}, a jedynie spróbować przypisać nową:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val x = 5
+// x = 6 // BŁĄD! Próba ponownego przypisania (reassignment)
+
+var y = 5
+y = 6    // OK! Zmienna 'y' wskazuje teraz na nową wartość
+\end{minted}
+
+Zwykłe \texttt{val} jest wyliczane w czasie działania programu (runtime). Gdy potrzebujemy stałej znanej już w czasie kompilacji (compile-time constant), np. do adnotacji, używamy wtedy \texttt{const val}.
+Ograniczenia:
+
+\begin{itemize}
+    \item \textbf{Umiejscowienie}: Musi być zadeklarowane na najwyższym poziomie pliku (\textit{top-level}) lub jako członek \texttt{object} (w tym \texttt{companion object}). Nie może być zmienną lokalną.
+    \item \textbf{Typy danych}: Dopuszczalne są wyłącznie typy prymitywne (np. \texttt{Int}, \texttt{Double}, \texttt{Boolean}) oraz typ \texttt{String}.
+    \item \textbf{Inicjalizacja}: Wartość musi być znana już w trakcie kompilacji. Nie może być wynikiem wywołania funkcji ani posiadać niestandardowego gettera (\textit{custom getter}).
+\end{itemize}
+
+Kompilator traktuje \texttt{const val} jako stałą, którą \textit{wstrzykuje} (inline) bezpośrednio w miejsca jej użycia, co jest niezbędne np. przy definiowaniu parametrów adnotacji.
+
+\section{Null Safety}
+
+Tony Hoare, twórca referencji \texttt{null}, nazwał to swoim \textit{błędem wartym miliard dolarów}. W Javie \texttt{NullPointerException} (NPE) to chleb powszedni – błąd ten występuje w momencie, gdy program próbuje odwołać się do metody lub pola obiektu za pomocą referencji, która w rzeczywistości nie wskazuje na żadne miejsce w pamięci (ma wartość \texttt{null}). Kotlin rozwiązuje ten problem na poziomie systemu typów, wprowadzając rygorystyczne rozróżnienie między referencjami, które mogą być \texttt{null}, a tymi, które muszą zawsze wskazywać na konkretny obiekt.
+
+Przykładowo, zmienna typu \texttt{String, Int, Boolean} \textbf{nigdy} nie może przechowywać \texttt{null}. Jeśli chcesz, aby mogła, musisz użyć typu \texttt{String?, Int?, Boolean?} (zmienna nullowalna).
+
+Kiedy mamy zmienną nullowalną (np. \texttt{text: String?}), kompilator nie pozwoli nam bezpośrednio wywołać metody np. \texttt{text.length}. Musimy obsłużyć potencjalny \texttt{null}:
+
+1. \textbf{Bezpieczne wywołanie (?.)}: \textit{Jeśli nie null, to wykonaj, w przeciwnym razie zwróć null}.
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val length: Int? = text?.length
+\end{minted}
+
+2. \textbf{Operator Elvis (?:)}: \textit{Jeśli lewa strona to null, użyj prawej}.
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val length: Int = text?.length ?: 0
+\end{minted}
+
+3. \textbf{Operator !! (Not-null assertion)}: \textit{Wiem co robię, to na pewno nie jest null}. Jeśli się mylisz -> NPE.
+
+\section{Instrukcje sterujące}
+
+W Kotlinie wiele konstrukcji, które w innych językach są instrukcjami (statements), tutaj jest wyrażeniami (expressions) – czyli zwraca wartość.
+
+W Kotlinie \texttt{if} jest \textbf{wyrażeniem} (expression), co oznacza, że zwraca wartość. Z tego powodu w języku tym nie znajdziemy tradycyjnego operatora trójargumentowego (\texttt{condition ? a : b}) – jego rolę pełni po prostu \texttt{if-else} zapisany w jednej linii.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val max = if (a > b) a else b
+\end{minted}
+
+Jeśli gałęzie \texttt{if} lub \texttt{else} zawierają bloki kodu w nawiasach klamrowych, wartością zwracaną jest \textbf{ostatnia linia} danego bloku.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val stanSilnika = if (temperatura > 100) {
+    println("Ostrzeżenie: Przegrzanie!")
+    "ALARM" // To zostanie przypisane do zmiennej
+} else {
+    "OK"
+}
+\end{minted}
+
+Ważną zasadą jest to, że używając \texttt{if} jako wyrażenia (czyli przypisując jego wynik do zmiennej lub zwracając go z funkcji), musimy zawsze dostarczyć gałąź \texttt{else}. Kompilator musi mieć pewność, że w każdej możliwej sytuacji zmienna otrzyma jakąś wartość.
+
+\texttt{when} zastępuje tradycyjny \texttt{switch}, oferując znacznie większe możliwości. Może być używany jako instrukcja (statement) lub jako wyrażenie (expression).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Jako wyrażenie - musi być wyczerpujące (zazwyczaj wymaga else)
+val opis = when (obj) {
+    1 -> "Jeden"                          // Pojedyncza wartość
+    2, 3 -> "Dwa lub trzy"                // Kilka wartości (OR)
+    in 4..10 -> "Liczba w zakresie 4-10"  // Sprawdzenie zakresu
+    is String -> "Tekst o długości ${obj.length}" // Sprawdzenie typu + Smart Cast
+    !is Int -> "To nie jest liczba całkowita"     // Zaprzeczenie typu
+    else -> "Coś innego"                  // Przypadek domyślny
+}
+\end{minted}
+
+Jedną z cech \texttt{when} jest możliwość użycia go bez argumentu. W takim przypadku każda gałąź musi zawierać wyrażenie logiczne (\texttt{Boolean}). Działa to jak czytelniejszy zamiennik długiego łańcucha \texttt{if-else if}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+when {
+    x > y -> println("x jest większe")
+    x < y -> println("y jest większe")
+    else -> println("Są równe")
+}
+\end{minted}
+
+Warto zauważyć, że dzięki mechanizmowi \textit{Smart Casts}, po sprawdzeniu typu za pomocą \texttt{is String}, kompilator pozwala nam używać zmiennej tak, jakby była typu \texttt{String} (np. wywołać \texttt{.length}) bez ręcznego rzutowania.
+
+
+\subsection{Pętle i iteracje}
+
+Pętla \texttt{for} w Kotlinie służy do iterowania po wszystkim, co udostępnia iterator (posiada funkcję \texttt{iterator()}). W przeciwieństwie do tradycyjnej pętli \texttt{for} znanej z Javy czy C++, tutaj zawsze używamy składni \texttt{in}.
+
+Najczęściej pętli \texttt{for} używamy wraz z zakresami (\textit{Ranges}):
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Zakres domknięty (włącznie z 5)
+for (i in 1..5) print(i)        // 12345
+
+// Zakres jednostronnie otwarty (bez 5)
+for (i in 1 until 5) print(i)   // 1234
+
+// Iteracja wstecz
+for (i in 5 downTo 1) print(i)  // 54321
+
+// Iteracja z określonym krokiem
+for (i in 1..10 step 2) print(i) // 13579
+\end{minted}
+
+Kotlin pozwala również na bardzo wygodną iterację po kolekcjach oraz mapach, wykorzystując mechanizm destrukturyzacji:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val lista = listOf("Kotlin", "Java", "Swift")
+for (jezyk in lista) {
+    println("Język: $jezyk")
+}
+
+// Iteracja z indeksem
+for ((index, value) in lista.withIndex()) {
+    println("Pozycja $index to $value")
+}
+
+// Iteracja po mapie
+val map = mapOf(1 to "Jeden", 2 to "Dwa")
+for ((klucz, wartosc) in map) {
+    println("$klucz -> $wartosc")
+}
+\end{minted}
+
+Oprócz pętli \texttt{for}, dostępne są również standardowe pętle \texttt{while} oraz \texttt{do-while}, których działanie jest zgodne z oczekiwaniami programistów innych języków imperatywnych.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Pętla while - sprawdza warunek przed wykonaniem
+var x = 3
+while (x > 0) {
+    println("Odliczanie: $x")
+    x--
+}
+
+// Pętla do-while - wykonuje się przynajmniej raz
+var y = 0
+do {
+    println("Wykonam się przynajmniej raz, nawet jeśli warunek jest fałszywy")
+} while (y > 0)
+\end{minted}
+
+Warto zauważyć, że w pętli \texttt{do-while} zmienne zadeklarowane wewnątrz bloku \texttt{do} są widoczne w wyrażeniu warunkowym \texttt{while}.
+
