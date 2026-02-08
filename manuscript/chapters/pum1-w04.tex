@@ -1,0 +1,348 @@
+\chapter{Kolekcje (Wykład 4)}
+
+Kolekcje to jeden z najważniejszych elementów każdego języka programowania. Służą do przechowywania grup obiektów. W Kotlinie podejście do kolekcji jest wyjątkowe ze względu na ścisły podział na kolekcje \textit{mutowalne} (zmienne) i \textit{niemutowalne} (tylko do odczytu). Ten podział jest kluczowy dla pisania bezpiecznego i przewidywalnego kodu.
+
+\section{Hierarchia Kolekcji}
+
+W standardowej bibliotece Javy (przed wprowadzeniem nowszych API) interfejs \texttt{List} posiadał metody \texttt{add()} czy \texttt{remove()}. Jeśli lista była niemutowalna (np. \texttt{Arrays.asList()}), wywołanie tych metod kończyło się błędem w czasie działania programu (\texttt{UnsupportedOperationException}).
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w04-collections-hierarchy.png}
+    \caption{Hierarchia kolekcji w Kotlinie.}
+    \label{fig:collections-hierarchy}
+\end{figure}
+
+Kotlin rozwiązuje ten problem na poziomie systemu typów, wprowadzając dwa oddzielne zestawy interfejsów:
+
+\begin{itemize}
+    \item \textbf{Interfejsy tylko do odczytu (Read-only)}: \texttt{List<T>}, \texttt{Set<T>}, \texttt{Map<K, V>}. Nie posiadają metod modyfikujących. Gwarantują, że "przez ten interfejs" nie zmienisz zawartości.
+    \item \textbf{Interfejsy mutowalne (Mutable)}: \texttt{MutableList<T>}, \texttt{MutableSet<T>}, \texttt{MutableMap<K, V>}. Rozszerzają interfejsy read-only, dodając metody takie jak \texttt{add}, \texttt{remove}, \texttt{clear}.
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Lista tylko do odczytu
+val readOnlyList: List<String> = listOf("A", "B")
+// readOnlyList.add("C") // Błąd kompilacji! Brak metody add()
+
+// Lista mutowalna
+val mutableList: MutableList<String> = mutableListOf("A", "B")
+mutableList.add("C") // OK
+\end{minted}
+
+\textbf{Ważne:} Interfejs \texttt{List} jest tylko \textit{widokiem} (view). To, że mamy referencję typu \texttt{List}, nie oznacza, że obiekt pod spodem jest niezmienny. Może to być \texttt{ArrayList}, do którego ktoś inny ma dostęp jako \texttt{MutableList} i go modyfikuje. Jednak my, mając tylko \texttt{List}, obiecujemy, że my go nie zmienimy.
+
+\section{Podstawowe typy kolekcji}
+
+\subsection{Listy (List)}
+Lista to najbardziej intuicyjny typ kolekcji. Można ją przyrównać do listy zakupów spisanej na kartce – pozycje są ułożone jedna pod drugą, w konkretnej kolejności.
+
+\textbf{Główne cechy:}
+\begin{itemize}
+    \item \textbf{Uporządkowanie}: Elementy są przechowywane w takiej kolejności, w jakiej zostały dodane.
+    \item \textbf{Indeksowanie}: Dostęp do elementów uzyskujemy za pomocą indeksu (numeru pozycji), zaczynając od 0. \texttt{list[0]} to pierwszy element.
+    \item \textbf{Duplikaty}: Ta sama wartość może wystąpić na liście wielokrotnie.
+    \item \textbf{Równość}: Dwie listy są uznawane za równe (\texttt{equals} zwraca \texttt{true}) tylko wtedy, gdy mają ten sam rozmiar i te same elementy na dokładnie tych samych pozycjach.
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val list1 = listOf("A", "B", "A")
+val list2 = listOf("A", "B", "A")
+println(list1 == list2) // true
+
+println(list1[1]) // "B"
+\end{minted}
+
+\subsection{Zbiory (Set)}
+Zbiór przypomina matematyczną definicję zbioru lub worek z unikalnymi przedmiotami. Nie interesuje nas, który element jest pierwszy czy drugi – ważne jest tylko to, czy dany element \textit{należy} do zbioru.
+
+\textbf{Główne cechy:}
+\begin{itemize}
+    \item \textbf{Unikalność}: W zbiorze nie mogą powtarzać się elementy. Jeśli spróbujesz dodać duplikat, zostanie on zignorowany.
+    \item \textbf{Brak kolejności (teoretycznie)}: W ogólnym sensie zbiory nie mają indeksów. Nie można spytać o \textit{drugi element zbioru}.
+    \item \textbf{Równość}: Dwa zbiory są równe, jeśli mają ten sam rozmiar i zawierają te same elementy, niezależnie od ich wewnętrznego ułożenia.
+\end{itemize}
+
+\textit{Uwaga:} W Kotlinie domyślną implementacją \texttt{setOf} jest \texttt{LinkedHashSet}, co oznacza, że \textit{pamięta} on kolejność wstawiania elementów przy iteracji (pętli \texttt{for}), ale nadal nie pozwala na dostęp przez indeks \texttt{set[0]}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val set1 = setOf("A", "B")
+val set2 = setOf("B", "A", "A") // Duplikat "A" zignorowany, kolejność inna
+println(set1 == set2) // true
+\end{minted}
+
+\subsection{Mapy (Map)}
+Mapa (nazywana też słownikiem lub tablicą asocjacyjną) służy do przechowywania par \textbf{Klucz-Wartość}. To jak książka telefoniczna (Nazwisko $\rightarrow$ Numer) lub słownik (Słowo $\rightarrow$ Definicja).
+
+\textbf{Główne cechy:}
+\begin{itemize}
+    \item \textbf{Klucze i Wartości}: Każdy element to para. Klucz służy do identyfikacji i wyszukiwania, Wartość to dane przypisane do klucza.
+    \item \textbf{Unikalność kluczy}: W mapie nie mogą istnieć dwa takie same klucze. Jeśli dodasz nową wartość pod istniejący klucz, stara wartość zostanie nadpisana. Wartości mogą się powtarzać.
+    \item \textbf{Równość}: Dwie mapy są równe, jeśli zawierają identyczny zestaw par klucz-wartość, niezależnie od kolejności.
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val map = mapOf("Jan" to 5, "Anna" to 4)
+println(map["Jan"]) // 5 (dostęp po kluczu, nie indeksie!)
+\end{minted}
+
+W Kotlinie można iterować po Map na kilka wygodnych sposobów.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val map = mapOf("Jan" to 5, "Anna" to 4)
+
+// 1. Po parach (klucz, wartość) - najczęstszy sposób
+for ((key, value) in map) {
+    println("$key -> $value")
+}
+
+// 2. Po kluczach (domyślnie, jeśli iterujesz po mapie)
+for (key in map.keys) {
+    println("$key -> ${map[key]}")
+}
+
+// 3. Po wartościach
+for (value in map.values) {
+    println(value)
+}
+
+// 4. Iteracja z indeksem (rzadziej używane dla map)
+for ((index, entry) in map.withIndex()) {
+    println("$index: ${entry.key} -> ${entry.value}")
+}
+\end{minted}
+
+\section{Przetwarzanie Funkcyjne (Transformacje)}
+
+
+Kotlin oferuje duży zestaw funkcji do przetwarzania kolekcji w stylu funkcyjnym. Zamiast pisać pętle \texttt{for}, opisujemy \textbf{co} chcemy zrobić z danymi.
+
+\subsection*{Mapowanie (map)}
+Przekształca każdy element kolekcji w inny element (potencjalnie innego typu). Wynikiem jest nowa lista o tej samej długości.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val numbers = listOf(1, 2, 3)
+val doubled = numbers.map { it * 2 } // [2, 4, 6]
+\end{minted}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w04-map.png}
+    \caption{Działanie funkcji \texttt{map}.}
+    \label{fig:map}
+\end{figure}
+
+Dla Map istnieją dedykowane funkcje \texttt{mapKeys} i \texttt{mapValues}, które pozwalają transformować tylko klucz lub tylko wartość.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val map = mapOf("Jan" to 5, "Anna" to 4)
+
+// Transformacja kluczy
+val upperKeys = map.mapKeys { it.key.uppercase() } // {"JAN"=5, "ANNA"=4}
+
+// Transformacja wartości
+val doubledValues = map.mapValues { it.value * 2 } // {"Jan"=10, "Anna"=8}
+\end{minted}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w04-map-keys-values.png}
+    \caption{Działanie funkcji \texttt{mapKeys} i \texttt{mapValues}.}
+    \label{fig:map-keys-values}
+\end{figure}
+
+\subsection{Zippowanie (zip i unzip)}
+Tworzy pary z elementów dwóch kolekcji o tych samych indeksach. Jeśli kolekcje mają różne długości, wynikowa lista ma długość krótszej z nich.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val names = listOf("Jan", "Anna")
+val ages = listOf(25, 30)
+val pairs = names.zip(ages) // [(Jan, 25), (Anna, 30)]
+\end{minted}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w04-zip.png}
+    \caption{Działanie funkcji \texttt{zip}.}
+    \label{fig:zip}
+\end{figure}
+
+Funkcja \texttt{unzip} robi operację odwrotną – rozdziela listę par na dwie osobne listy.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val pairs = listOf("Jan" to 25, "Anna" to 30)
+val (names, ages) = pairs.unzip() // names=["Jan", "Anna"], ages=[25, 30]
+\end{minted}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w04-unzip.png}
+    \caption{Działanie funkcji \texttt{unzip}.}
+    \label{fig:unzip}
+\end{figure}
+
+\subsection{Asocjacje (associate)}
+Często chcemy zamienić listę obiektów w mapę, aby móc je szybko wyszukiwać np. po ID.
+\begin{itemize}
+    \item \texttt{associateBy}: Elementy listy stają się wartościami mapy, a my podajemy funkcję generującą klucz.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    val users = listOf(User(1, "Jan"), User(2, "Anna"))
+    val mapById = users.associateBy { it.id } // Map<Int, User>: {1=User(Jan), 2=User(Anna)}
+    \end{minted}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.8\textwidth]{fig/pum1-w04-associateby.png}
+        \caption{Działanie funkcji \texttt{associateBy}.}
+        \label{fig:associateby}
+    \end{figure}
+    
+    \item \texttt{associateWith}: Elementy listy stają się kluczami, a my generujemy wartości.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    val items = listOf("A", "B")
+    val lengths = items.associateWith { it.length } // Map<String, Int>: {"A"=1, "B"=1}
+    \end{minted}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.8\textwidth]{fig/pum1-w04-associatewith.png}
+        \caption{Działanie funkcji \texttt{associateWith}.}
+        \label{fig:associatewith}
+    \end{figure}
+
+    \item \texttt{associate}: Elementy listy stają się kluczami i wartościami mapy, a my generujemy wartości.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    val items = listOf("A", "B")
+    val lengths = items.associate { it to it.length } // Map<String, Int>: {"A"=1, "B"=1}
+    \end{minted}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.8\textwidth]{fig/pum1-w04-associate.png}
+        \caption{Działanie funkcji \texttt{associate}.}
+        \label{fig:associate}
+    \end{figure}
+\end{itemize}
+
+\subsection{Spłaszczanie (flatten i flatMap)}
+Gdy mamy kolekcję kolekcji (np. Listę List), często chcemy je połączyć w jedną płaską strukturę.
+\begin{itemize}
+    \item \texttt{flatten()}: Po prostu łączy zagnieżdżone listy.
+    \item \texttt{flatMap()}: Najpierw przekształca każdy element w kolekcję (map), a potem spłaszcza wynik (flatten).
+\end{itemize}
+
+Wyobraź sobie, że masz listę pudełek (elementów), a w każdym pudełku jest kilka  cukierków.
+\begin{itemize}
+    \item \texttt{map} to pomalowanie każdego pudełka na inny kolor (nadal masz listę pudełek).
+    \item \texttt{flatMap} to wysypanie cukierków ze wszystkich pudełek na jeden duży stół. Nie masz już pudełek, tylko jedną długą listę cukierków.
+\end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w04-flatten.png}
+    \caption{Działanie funkcji \texttt{flatten}.}
+    \label{fig:flatten}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w04-flatmap.png}
+    \caption{Działanie funkcji \texttt{flatMap}.}
+    \label{fig:flatmap}
+\end{figure}
+
+\section{Filtrowanie i Wyszukiwanie}
+
+\subsection{Filtrowanie}
+Wybieranie elementów spełniających warunek (predykat).
+\begin{itemize}
+    \item \texttt{filter { ... }}: Zwraca elementy, dla których predykat jest \texttt{true}.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    val numbers = listOf(1, 2, 3, 4)
+    val evens = numbers.filter { it % 2 == 0 } // [2, 4]
+    \end{minted}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.8\textwidth]{fig/pum1-w04-filter.png}
+        \caption{Działanie funkcji \texttt{filter}.}
+        \label{fig:filter}
+    \end{figure}
+
+    \item \texttt{filterNot { ... }}: Zwraca elementy, dla których predykat jest \texttt{false}.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    val numbers = listOf(1, 2, 3, 4)
+    val odds = numbers.filterNot { it % 2 == 0 } // [1, 3]
+    \end{minted}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.8\textwidth]{fig/pum1-w04-filternot.png}
+        \caption{Działanie funkcji \texttt{filterNot}.}
+        \label{fig:filternot}
+    \end{figure}
+
+    \item \texttt{partition { ... }}: Dzieli kolekcję na dwie listy (Para): tych co spełniają i tych co nie spełniają warunku. Bardzo przydatne, gdy potrzebujemy obu grup.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    val (even, odd) = listOf(1, 2, 3, 4).partition { it % 2 == 0 }
+    // even: [2, 4], odd: [1, 3]
+    \end{minted}
+
+    \begin{figure}[htbp]
+        \centering
+        \includegraphics[width=0.8\textwidth]{fig/pum1-w04-partition.png}
+        \caption{Działanie funkcji \texttt{partition}.}
+        \label{fig:partition}
+    \end{figure}
+\end{itemize}
+
+\subsection{Testowanie (Predykaty)}
+Zamiast filtrować, możemy sprawdzić, czy elementy spełniają warunki:
+\begin{itemize}
+    \item \texttt{any { ... }}: Czy \textit{przynajmniej jeden} element spełnia warunek?
+    \item \texttt{all { ... }}: Czy \textit{wszystkie} elementy spełniają warunek?
+    \item \texttt{none { ... }}: Czy \textit{żaden} element nie spełnia warunku?
+\end{itemize}
+
+\section{Grupowanie (groupBy)}
+Dzieli kolekcję na grupy według pewnego klucza. Wynikiem jest mapa, gdzie kluczem jest cecha, po której grupujemy, a wartością lista elementów posiadających tę cechę.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val words = listOf("apple", "apricot", "banana", "cherry")
+val byFirstLetter = words.groupBy { it.first() }
+// Map<Char, List<String>>:
+// 'a' -> ["apple", "apricot"]
+// 'b' -> ["banana"]
+// 'c' -> ["cherry"]
+\end{minted}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w04-groupby.png}
+    \caption{Działanie funkcji \texttt{groupBy}.}
+    \label{fig:groupby}
+\end{figure}
+
+\section{Deklaracja Destrukturyzująca (Destructuring Declarations)}
+Pozwala na \textit{rozpakowanie} obiektu na zmienne składowe. Działa to dla klas danych (\texttt{data class}), par (\texttt{Pair}), trójek (\texttt{Triple}) oraz map.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val (name, age) = Person("Jan", 30) // Person musi być data class
+
+val pair = "A" to 1
+val (letter, number) = pair
+
+// Iteracja po mapie
+for ((key, value) in map) {
+    println("$key -> $value")
+}
+\end{minted}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.6\textwidth]{fig/pum1-w04-destructuring.png}
+    \caption{Działanie deklaracji destrukturyzującej.}
+    \label{fig:destructuring}
+\end{figure}
+
+Pod spodem kompilator wywołuje metody \texttt{component1()}, \texttt{component2()} itd.
