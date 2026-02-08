@@ -153,7 +153,7 @@ Kluczowe cechy i różnice względem lambd:
 
 To zestaw 5 funkcji standardowych: \texttt{let}, \texttt{run}, \texttt{with}, \texttt{apply}, \texttt{also}. Wszystkie robią coś bardzo podobnego: wykonują blok kodu na obiekcie. Różnią się tylko tym, jak ten obiekt jest dostępny w środku (\texttt{this} czy \texttt{it}) i co zwracają (sam obiekt czy wynik lambdy).
 
-Oto "ściąga", jak wybierać odpowiednią funkcję:
+Oto \textit{ściąga}, jak wybierać odpowiednią funkcję:
 
 \begin{enumerate}
     \item \textbf{\texttt{apply}}: Konfiguracja obiektu. Dostęp przez \texttt{this}, zwraca \textbf{obiekt}.
@@ -202,65 +202,59 @@ Oto "ściąga", jak wybierać odpowiednią funkcję:
 \section{Zaawansowane Koncepcje}
 
 \subsection{Funkcje Inline}
-Lambdy są obiektami, a każda alokacja obiektu to narzut pamięciowy. W krytycznych miejscach (np. pętle) może to być kosztowne.
+Każda lambda w Kotlinie jest kompilowana do anonimowej klasy. Oznacza to, że każde jej wywołanie wiąże się z utworzeniem nowego obiektu, co zajmuje pamięć i czas procesora. W przypadku funkcji wywoływanych miliony razy (np. w pętlach), narzut ten staje się zauważalny.
 
-Słowo kluczowe \texttt{inline} mówi kompilatorowi: \textit{Nie twórz obiektu dla tej lambdy. Zamiast tego skopiuj treść funkcji i wklej ją bezpośrednio w miejsce wywołania}.
+Słowo kluczowe \texttt{inline} to instrukcja dla kompilatora: \textit{Nie twórz obiektu dla tej lambdy. Zamiast tego, skopiuj kod tej funkcji i \textbf{wklej go} („kopiuj-wklej”) bezpośrednio w miejsce wywołania}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-inline fun measureTime(block: () -> Unit) {
-    val start = System.nanoTime()
-    block()
-    val end = System.nanoTime()
-    println("Czas: ${end - start} ns")
+inline fun executeOp(op: () -> Unit) {
+    op() // Treść 'op' zostanie tu wklejona
 }
 \end{minted}
 
-Dzięki \texttt{inline}, używanie lambd w funkcjach takich jak \texttt{filter} czy \texttt{map} (o których dowiemy się w przyszłych rozdziałach) nie powoduje dodatkowych alokacji pamięci.
-
-W Kotlinie zachowanie instrukcji \texttt{return} wewnątrz lambdy zależy od tego, czy funkcja przyjmująca lambdę jest oznaczona jako \texttt{inline}:
-
+Wyobraź sobie, że piszesz książkę (program).
 \begin{itemize}
-    \item \textbf{W zwykłych lambdach}: Instrukcja \texttt{return} bez etykiety jest niedozwolona. Lambda nie może bezpośrednio przerwać działania funkcji, która ją otacza.
-    \item \textbf{W funkcjach \texttt{inline}}: \texttt{return} jest dozwolony i powoduje wyjście z funkcji otaczającej (\textit{non-local return}).
+    \item Zwykła funkcja to przypis (referencja): \textit{Patrz strona 45}. Czytelnik (procesor) musi przerwać czytanie bieżącego wątku, skoczyć na stronę 45, przeczytać i wrócić.
+    \item Funkcja \texttt{inline} to operacja \textbf{Znajdź i Zamień} w edytorze. Edytor bierze treść ze strony 45 i fizycznie wkleja ją w każde miejsce, gdzie było odesłanie. Książka robi się grubsza (więcej kodu bajtowego), ale czyta się ją płynnie, bez ciągłego skakania po stronach.
 \end{itemize}
 
+\paragraph{noinline}
+ Czasami funkcja \texttt{inline} przyjmuje kilka lambd, ale tylko niektóre z nich chcemy \textit{wkleić}. Inne mogą być np. przekazywane dalej do innych funkcji (które nie są inline) lub zapisywane w polach klas. W takiej sytuacji, \textit{wklejenie jest niemożliwe} – musimy mieć fizyczny obiekt lambdy. Używamy wtedy modyfikatora \texttt{noinline}.
+
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-fun doWork() {
-    val list = listOf(1, 2, 3)
-    list.forEach {
-        if (it == 2) return // Wyjście z całej funkcji doWork()
-        println(it)
-    }
+inline fun manyOperations(
+    op1: () -> Unit,
+    noinline op2: () -> Unit // Ta lambda pozostanie obiektem
+) {
+    op1()
+    someExternalStore(op2) // Nie można przekazać kodu "wklejonego", trzeba obiektu
 }
 \end{minted}
 
-Jeśli chcemy zakończyć działanie tylko samej lambdy (odpowiednik \texttt{continue} w pętli), musimy użyć \textbf{powrotu z etykietą} (\textit{qualified return}). Możemy zdefiniować własną etykietę lub użyć domyślnej (nazwa funkcji, do której przekazujemy lambdę).
-
-\begin{minted}[frame=single,framesep=10pt]{kotlin}
-fun doWorkWithLabel() {
-    val list = listOf(1, 2, 3)
-    list.forEach {
-        if (it == 2) return@forEach // Wyjście tylko z bieżącej iteracji lambdy
-        println(it)
-    }
-    println("To się wykona")
-}
-\end{minted}
+Załóżmy, że mamy dwa dokumenty. Jeden przepisujemy ręcznie do głównego zeszytu (\texttt{inline}), ale drugi musimy włożyć do koperty i wysłać pocztą do urzędu (\texttt{noinline}). Nie możesz wysłać \textit{przepisanej treści} – urząd wymaga oryginału (obiektu w kopercie).
 
 \paragraph{crossinline}
-Słowo kluczowe \texttt{crossinline} stosujemy w funkcjach \texttt{inline}, gdy przekazana lambda jest wywoływana w innym kontekście wykonania niż sama funkcja (np. wewnątrz obiektu lokalnego lub innej funkcji pomocniczej). W takiej sytuacji kompilator zabrania stosowania \textit{non-local return}, aby zapobiec nieprzewidywalnemu przerwaniu działania programu z nieodpowiedniego miejsca.
+Jak wspomnieliśmy, w funkcjach \texttt{inline} dozwolony jest \texttt{return} (powrót nielokalny). Czasami jednak lambda jest wykonywana w innym kontekście (np. wewnątrz zagnieżdżonej funkcji lub innego wątku), gdzie nagłe przerwanie funkcji zewnętrznej byłoby niebezpieczne lub niemożliwe.
+
+Słowo kluczowe \texttt{crossinline} blokuje możliwość użycia \texttt{return} w lambdzie, mimo że funkcja jest \texttt{inline}. Pozwala to na bezpieczne użycie lambdy w zagnieżdżonych kontekstach.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-inline fun runInThread(crossinline body: () -> Unit) {
-    val thread = Thread {
-        body() // Wywołanie w innym wątku – non-local return zabroniony
+inline fun executeLater(crossinline body: () -> Unit) {
+    val runnable = Runnable {
+        body() // Wywołanie w innym kontekście – non-local return zabroniony
     }
-    thread.start()
+    runnable.run()
 }
 \end{minted}
 
+Załóżmy że jesteśmy w pokoju (funkcja).
+\begin{itemize}
+    \item Zwykły \texttt{return} to wyjście głównymi drzwiami.
+    \item Lambda \texttt{crossinline} to wejście do mniejszej, zamkniętej kabiny wewnątrz tego pokoju. Obiecujemy kompilatorowi (\texttt{crossinline}), że nie spróbujemy \textit{wyskoczyć przez okno} (return) bezpośrednio z kabiny na zewnątrz budynku, pomijając drzwi pokoju. Możemy zakończyć tylko zadanie w kabinie (\texttt{return@label}).
+\end{itemize}
+
 \subsection{Rekursja ogonowa (tailrec)}
-Rekursja jest elegancka, ale grozi przepełnieniem stosu (\texttt{StackOverflowError}). Kotlin oferuje optymalizację: jeśli wywołanie rekurencyjne jest \textbf{ostatnią} operacją w funkcji, możemy dodać modyfikator \texttt{tailrec}. Kompilator zamieni wtedy rekurencję na zwykłą, szybką i bezpieczną pętlę.
+Rekursja grozi przepełnieniem stosu (\texttt{StackOverflowError}). Kotlin oferuje optymalizację: jeśli wywołanie rekurencyjne jest \textbf{ostatnią} operacją w funkcji, możemy dodać modyfikator \texttt{tailrec}. Kompilator zamieni wtedy rekurencję na zwykłą pętlę, co zapobiega przepełnieniu stosu.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 tailrec fun silnia(n: Int, run: Int = 1): Int {
@@ -270,37 +264,54 @@ tailrec fun silnia(n: Int, run: Int = 1): Int {
 
 \section{Funkcje Generyczne}
 
-Funkcje generyczne pozwalają na tworzenie kodu, który może pracować z różnymi typami danych, zachowując pełne bezpieczeństwo typowania. Typ generyczny definiujemy w nawiasach ostrych \texttt{<T>} przed nazwą funkcji.
+Funkcje generyczne pozwalają na tworzenie kodu \textit{szablonowego}, który może pracować z różnymi typami danych, zachowując pełne bezpieczeństwo typowania i unikając rzutowania. Typ generyczny definiujemy w nawiasach ostrych \texttt{<T>} przed nazwą funkcji.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-fun <T> printElement(element: T) {
-    println("Element: $element")
+fun <T> singletonList(item: T): List<T> {
+    return listOf(item)
 }
-
-val list = listOf(1, "Dwa", 3.0)
-list.forEach { printElement(it) }
 \end{minted}
 
-Możemy również ograniczyć typy generyczne (Generic Constraints), np. aby \texttt{T} musiało dziedziczyć po konkretnej klasie:
+Czasami nasz szablon ma sens tylko dla pewnej grupy typów (np. tylko dla liczb). Możemy to wymusić po dwukropku:
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
+// T musi dziedziczyć po Number (Int, Double, Float...)
 fun <T : Number> doubleValue(value: T): Double {
     return value.toDouble() * 2
 }
 \end{minted}
 
-Jeśli jeden parametr generyczny musi spełniać kilka warunków jednocześnie (np. implementować dwa różne interfejsy), stosujemy słowo kluczowe \texttt{where} umieszczone po sygnaturze funkcji.
+Jeśli potrzebujemy kilku warunków jednocześnie (np. \textit{musi być liczbą} oraz \textit{dać się porównywać}), stosujemy słowo kluczowe \texttt{where}:
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-fun <T> processText(item: T) 
-    where T : CharSequence, T : Comparable<T> {
-    if (item.length > 5) {
-        println(item.toString().uppercase())
-    }
+fun <T> sortNumbers(list: List<T>)
+    where T : Number, T : Comparable<T> {
+    // ...
 }
 \end{minted}
 
-W powyższym przykładzie typ \texttt{T} musi być jednocześnie podtypem \texttt{CharSequence} (aby posiadać właściwość \texttt{length}) oraz \texttt{Comparable} (co pozwala na porównywanie obiektów). Tylko typy spełniające oba te ograniczenia mogą zostać przekazane do funkcji.
+W Javie (i standardowo w Kotlinie) typy generyczne podlegają \textbf{wymazywaniu typów} (\textit{type erasure}). Oznacza to, że w trakcie działania programu \texttt{List<String>} i \texttt{List<Int>} są tym samym: po prostu \texttt{List}. Wirtualna maszyna nie wie, co było w środku. Dlatego nie możemy napisać: \texttt{if (obj is T)}.
+
+Jednak dzięki funkcjom \texttt{inline}, możemy użyć specjalnego słowa kluczowego \texttt{reified}. Ponieważ kod funkcji jest \textit{wklejany} w miejsce wywołania, kompilator w tym konkretnym miejscu \textbf{zna} dokładny typ i może go \textit{utrwalić} (reify).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Zwykła funkcja - to nie zadziała:
+// fun <T> checkType(a: Any) = a is T // Błąd kompilacji! Erasure.
+
+// Funkcja inline + reified
+inline fun <reified T> isType(a: Any): Boolean {
+    return a is T // Teraz działa
+}
+
+val isString = isType<String>("Tekst") // true
+val isInt = isType<Int>("Tekst")       // false
+\end{minted}
+
+Posłużmy się analogią:
+\begin{itemize}
+    \item Zwykłe generyki to list w zaklejonej kopercie. Listonosz (runtime) wie, że niesie \textit{List}, ale nie wie co jest w środku (String czy Int), bo koperta jest nieprzezroczysta (\textit{erasure}).
+    \item \texttt{reified} w funkcji \texttt{inline} to sytuacja, w której nadawca (kompilator) otwiera kopertę tuż przed wręczeniem jej tobie w miejscu odbioru. Widzisz zawartość, więc wiesz dokładnie, co to za typ.
+\end{itemize}
 
 \section{Przeciążanie Operatorów (operator fun)}
 
