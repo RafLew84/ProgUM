@@ -1,0 +1,161 @@
+\chapter{Zarządzanie Pamięcią i Garbage Collection (Wykład 2)}
+
+Programując w językach wysokiego poziomu, takich jak Kotlin czy Java, często zapominamy o tym, co dzieje się "pod maską". Mamy luksus automatycznego zarządzania pamięcią – tworzymy obiekty, używamy ich, a potem... po prostu o nich zapominamy. Maszyna Wirtualna (JVM) lub środowisko uruchomieniowe Androida (ART) zajmuje się resztą. Dlaczego więc poświęcamy cały rozdział na omówienie pamięci i Garbage Collectora (GC)?
+
+Ponieważ \textit{nieświadomość} kosztów, jakie niosą ze sobą nasze decyzje projektowe, prowadzi do aplikacji, które działają wolno, zacinają się (tzw. \textit{jank}) i zużywają baterię w zastraszającym tempie. Zrozumienie, jak działa pamięć, pozwoli nam pisać kod nie tylko poprawny, ale i \textit{wydajny}.
+
+\section{Typy danych i organizacja pamięci}
+
+Zanim przejdziemy do sprzątania (GC), musimy zrozumieć, jak bałagan powstaje – czyli jak dane są układane w pamięci.
+
+\subsection{Typy proste i ich rozmiary}
+
+Mimo że w Kotlinie \textit{wszystko jest obiektem}, pod spodem (na poziomie JVM/ART) wciąż operujemy na typach prostych, które mają ściśle określone rozmiary. Warto mieć intuicję, ile "ważą" nasze dane:
+
+\begin{itemize}
+    \item \textbf{1 bajt}: \texttt{Boolean} (teoretycznie 1 bit, ale adresowalny jako bajt), \texttt{Byte}.
+    \item \textbf{2 bajty}: \texttt{Short}, \texttt{Char} (UTF-16).
+    \item \textbf{4 bajty}: \texttt{Int}, \texttt{Float}.
+    \item \textbf{8 bajtów}: \texttt{Long}, \texttt{Double}.
+\end{itemize}
+
+Dlaczego to ważne? Wyobraź sobie, że tworzysz tablicę milionów elementów. Użycie \texttt{Integer} (obiektu) zamiast \texttt{int} (typu prostego) to nie tylko narzut nagłówka obiektu, ale też dodatkowa referencja. W Kotlinie na JVM kompilator stara się używać typów prostych, gdzie to możliwe, ale np. w kolekcjach generycznych (\texttt{List<Int>}) mamy do czynienia z pudełkowaniem (\textit{boxing}) – co drastycznie zwiększa zużycie pamięci.
+
+\subsection{Stos (Stack) vs Sterta (Heap)}
+
+Pamięć operacyjną aplikacji możemy podzielić na dwa główne obszary, które działają w zupełnie inny sposób.
+
+\textbf{Stos (Stack)} to pamięć "podręczna" dla aktualnie wykonywanych metod. Działa bardzo szybko (LIFO - Last In, First Out).
+\begin{itemize}
+    \item Przechowuje zmienne lokalne (typy proste) oraz \textit{referencje} do obiektów.
+    \item Jest czyszczony automatycznie po wyjściu z funkcji (zdjęciu ramki stosu).
+    \item Alokacja tutaj jest niemal natychmiastowa.
+\end{itemize}
+
+\textbf{Sterta (Heap)} to wielki magazyn na obiekty.
+\begin{itemize}
+    \item Tutaj ląduje \textbf{każdy} obiekt utworzony przez \texttt{new} (w Javie) lub konstruktor (w Kotlinie).
+    \item Dostęp jest wolniejszy niż do stosu.
+    \item To tutaj działa Garbage Collector.
+\end{itemize}
+
+Model mentalny:
+\begin{quote}
+    Wyobraź sobie, że \textbf{Stos} to tablica korkowa nad twoim biurkiem. Przypinasz tam małe karteczki z notatkami (zmienne lokalne) i nitki (referencje). Nitki prowadzą do wielkiego magazynu w piwnicy – \textbf{Sterty}. Tam leżą właściwe teczki z dokumentami (obiekty). Gdy zdejmujesz karteczkę z tablicy (koniec funkcji), nitka znika. Ale teczka w piwnicy zostaje, dopóki ktoś (GC) nie zauważy, że żadna nitka do niej nie prowadzi.
+\end{quote}
+
+\section{Struktury danych w pamięci – świadomy wybór}
+
+Wybór kolekcji ma fundamentalne znaczenie dla wydajności pamięciowej i procesora. Porównajmy dwie najpopularniejsze listy: \texttt{ArrayList} i \texttt{LinkedList}.
+
+\subsection{ArrayList – ciągłość i szybkość}
+\texttt{ArrayList} pod spodem używa tablicy. Elementy są ułożone w pamięci jeden obok drugiego (w przypadku typów prostych) lub są ciągiem referencji obok siebie.
+\begin{itemize}
+    \item \textbf{Zaleta}: \textit{Cache locality}. Procesor, pobierając jeden element, pobiera też sąsiednie do pamięci podręcznej (Cache L1/L2). Iteracja jest błyskawiczna.
+    \item \textbf{Wada}: Dodawanie elementu w środku wymaga przesunięcia reszty tablicy (kopiowanie pamięci).
+\end{itemize}
+
+\subsection{LinkedList – rozsypane koraliki}
+\texttt{LinkedList} to obiekty rozsiane po całej stercie, połączone "sznurkami" (referencjami). Każdy element to osobny obiekt \texttt{Node}, zawierający dane oraz referencje do następnego i poprzedniego elementu.
+\begin{itemize}
+    \item \textbf{Zaleta}: Dodawanie w środku to tylko przepięcie referencji (tanie).
+    \item \textbf{Wada}: \textbf{Ogromny narzut pamięciowy}. Każdy element to dodatkowy obiekt \texttt{Node} (nagłówek + 2 referencje).
+    \item \textbf{Wada krytyczna}: Fatalna wydajność cache (\textit{Cache miss}). Procesor musi "skakać" po pamięci, co jest bardzo kosztowne.
+\end{itemize}
+
+\textbf{Wniosek:} W 99\% przypadków na Androidzie używaj \texttt{ArrayList} (domyślna implementacja \texttt{listOf()} w Kotlinie). \texttt{LinkedList} na platformach mobilnych rzadko ma sens.
+
+\section{Zarządzanie pamięcią: Ręczne vs Automatyczne}
+
+W językach takich jak C czy C++, programista jest panem życia i śmierci obiektów.
+\begin{itemize}
+    \item \texttt{malloc()} – alokujesz pamięć.
+    \item \texttt{free()} – musisz ją zwolnić.
+\end{itemize}
+
+Daje to pełną kontrolę, ale rodzi poważne problemy:
+\begin{itemize}
+    \item \textbf{Wycieki pamięci (Memory Leaks)}: Zapomniałeś zwolnić pamięć? Zostaje zajęta na zawsze (do restartu procesu).
+    \item \textbf{Dangling Pointers}: Zwolniłeś pamięć, ale nadal masz do niej referencję ("wskaźnik donikąd"). Próba użycia kończy się błędem (segmentation fault).
+\end{itemize}
+
+Kotlin (działający na JVM/ART) zdejmuje z nas ten obowiązek. Wprowadza \textbf{Garbage Collector (GC)} – automatycznego sprzątacza.
+
+\section{Garbage Collection – jak to działa?}
+
+Garbage Collection opiera się na prostym założeniu: \textit{Obiekt jest śmieciem, jeśli nie jest osiągalny z żadnego "korzenia" (GC Root).}
+
+\subsection{GC Roots – punkty zaczepienia}
+Co jest "korzeniem", czyli obiektem, który na pewno jest potrzebny?
+\begin{itemize}
+    \item \textbf{Zmienne lokalne na stosie}: Wszystko, co jest w aktualnie wykonujących się funkcjach.
+    \item \textbf{Pola statyczne}: Obiekty przypięte do klas (np. \texttt{companion object}).
+    \item \textbf{Aktywne wątki}: Dopóki wątek działa, jego obiekty są żywe.
+    \item \textbf{Referencje JNI}: Obiekty trzymane przez kod natywny (C/C++).
+\end{itemize}
+
+\subsection{Algorytm: Mark, Sweep & Compact}
+Proces sprzątania można podzielić na trzy fazy (w dużym uproszczeniu):
+
+\begin{enumerate}
+    \item \textbf{Mark (Oznaczanie)}:
+    GC wstrzymuje świat ("Stop the World" – choć nowoczesne GC robią to współbieżnie). Przechodzi przez cały graf obiektów, zaczynając od GC Roots. Każdy odwiedzony obiekt oznacza jako "żywy" (Live Object).
+    
+    \item \textbf{Sweep (Czyszczenie)}:
+    GC przegląda stertę. Wszystko, co \textit{nie zostało} oznaczone w fazie Mark, jest uznawane za śmieci (Dead Objects) i pamięć jest zwalniana.
+    
+    \item \textbf{Compact (Defragmentacja)}:
+    To kluczowy krok. Po usunięciu śmieci, w pamięci powstają "dziury" (fragmentacja). GC przesuwa żywe obiekty obok siebie, aby zwolnić duży, ciągły blok pamięci. Dzięki temu alokacja nowych obiektów jest bardzo szybka (wystarczy przesunąć wskaźnik).
+\end{enumerate}
+
+\section{Hipoteza Generacyjna (Generational Hypothesis)}
+
+Badania nad zachowaniem programów pokazały ciekawą prawidłowość, zwaną \textbf{Hipotezą Generacyjną}:
+\begin{quote}
+    \textit{Większość obiektów umiera młodo.}
+\end{quote}
+
+Obiekty tymczasowe (zmienne w pętlach, iteratory, zdarzenia UI) żyją bardzo krótko. Jeśli obiekt przeżyje ten początkowy okres, prawdopodobnie będzie żył bardzo długo (np. singletony, cache, główne usługi).
+
+Na tej podstawie pamięć sterty podzielono na strefy (Generacje):
+
+\subsection{Young Generation (Młoda Generacja)}
+Tu rodzą się wszystkie nowe obiekty. Jest mała i bardzo często czyszczona. Dzieli się na:
+\begin{itemize}
+    \item \textbf{Eden}: Miejsce narodzin. Gdy się zapełni, następuje \textbf{Minor GC}.
+    \item \textbf{Survivor Space (S1 i S2)}: Dwie bliźniacze przestrzenie dla ocalałych.
+\end{itemize}
+
+\textbf{Cykl życia w Young Generation:}
+\begin{enumerate}
+    \item Nowe obiekty lądują w \textbf{Edenie}.
+    \item Gdy Eden się zapełni -> \textbf{Minor GC}.
+    \item Żywe obiekty z Edenu i (na przykład) S1 są kopiowane do pustego S2.
+    \item Wiek obiektów (licznik przeżyć) jest zwiększany.
+    \item Eden i S1 są czyszczone do zera (bardzo szybko!).
+    \item W kolejnym cyklu S1 i S2 zamieniają się rolami.
+\end{enumerate}
+
+\subsection{Old Generation (Stara Generacja)}
+Jeśli obiekt przeżyje wystarczająco dużo cykli (np. 15) w Survivor Space, zostaje \textbf{promowany} do Old Generation.
+\begin{itemize}
+    \item Ta strefa zbiera "weteranów".
+    \item Jest czyszczona znacznie rzadziej, ale sprzątanie tutaj (\textbf{Major GC}) jest znacznie bardziej kosztowne i trwa dłużej.
+\end{itemize}
+
+\section{Wnioski dla programisty Androida}
+
+\begin{enumerate}
+    \item \textbf{Unikaj alokacji w pętlach i \texttt{onDraw()}}: Mimo że GC jest szybki, tworzenie tysięcy obiektów w klatce animacji (16ms) zapcha Eden i wymusi częste pauzy (GC pauses), co użytkownik odczuje jako klatkowanie interfejsu.
+    \item \textbf{Szczelność pamięci (Memory Leaks)}: GC nie posprząta obiektu, do którego wciąż masz referencję (nawet jeśli już go nie potrzebujesz). Klasyczny błąd na Androidzie: trzymanie referencji do \texttt{Activity} lub \texttt{Context} w obiekcie statycznym lub długo żyjącym wątku. To uniemożliwia zwolnienie całego ekranu z pamięci!
+    \item \textbf{Wybieraj odpowiednie struktury}: Preferuj tablice i \texttt{ArrayList} nad rozproszonymi strukturami, jeśli zależy ci na wydajności.
+\end{enumerate}
+
+Pamiętaj: \textit{Automatyczne zarządzanie pamięcią nie zwalnia z myślenia o pamięci.}
+
+\begin{figure}[htbp]
+    \centering
+    % \includegraphics[width=0.8\textwidth]{fig/pum1-w02-gc-generations.png}
+    \caption{Podział sterty na generacje: Eden, Survivor Spaces i Old Generation.}
+    \label{fig:gc-generations}
+\end{figure}
