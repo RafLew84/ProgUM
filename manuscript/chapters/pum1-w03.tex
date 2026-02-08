@@ -1,0 +1,328 @@
+\chapter{Funkcje (Wykład 3)}
+
+W Kotlinie funkcje to \textit{obywatele pierwszej kategorii} (\textit{first-class citizens}). Oznacza to, że funkcje nie są tylko nazwanymi blokami kodu wewnątrz klas (jak metody np. w Javie). Są to pełnoprawne obiekty, które możemy przekazywać jako parametry, zwracać z innych funkcji i przechowywać w zmiennych.
+
+\section{Fundamenty Funkcji}
+
+Definicja funkcji w Kotlinie jest prosta i czytelna. Używamy słowa kluczowego \texttt{fun}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun double(x: Int): Int {
+    return 2 * x
+}
+\end{minted}
+
+Typ zwracany podajemy po dwukropku. Jeśli funkcja nic nie zwraca (czyli zwraca \texttt{Unit}), możemy ten typ pominąć.
+
+
+Kotlin wprowadza \textbf{wartości domyślne} parametrów.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun connect(
+    url: String, 
+    timeout: Int = 5000, 
+    retry: Boolean = true
+) { /*...*/ }
+\end{minted}
+
+Teraz możemy wywołać tę funkcję na wiele sposobów, korzystając z mechanizmu \textbf{argumentów nazwanych}. Pozwala on na podawanie parametrów w dowolnej kolejności, o ile nazwiemy je tak, jak w definicji.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+connect("http://example.com") // timeout=5000, retry=true
+connect("http://example.com", retry = false) // timeout=5000
+connect(timeout = 1000, url = "http://example.com") // Kolejność nie ma znaczenia
+\end{minted}
+
+Jeśli potrzebujemy funkcji przyjmującej dowolną liczbę argumentów (np. lista ID do usunięcia), używamy modyfikatora \texttt{vararg}. Wewnątrz funkcji taki parametr jest widoczny jako tablica (\texttt{Array<T>}).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun printScores(vararg scores: Int) {
+    for (score in scores) {
+        print("$score ")
+    }
+}
+
+printScores(1, 2, 3, 4, 5)
+\end{minted}
+
+\section{Funkcje w stylu Kotlin (Idiomy)}
+
+Kotlin oferuje mechanizmy, które pozwalają pisać kod czytany niemal jak proza. Dwa z nich zasługują na szczególną uwagę: funkcje rozszerzające (Extensions) oraz funkcje infiksowe (Infix).
+
+Funkcje rozszerzające pozwalają \textbf{dodać nową funkcję do istniejącej klasy} bez konieczności dziedziczenia z niej ani używania wzorca Dekorator. Możemy rozszerzać nawet klasy, których nie posiadamy kodu (np. \texttt{String} z biblioteki standardowej JDK).
+
+Definiujemy je, podając nazwę typu przed nazwą funkcji:
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Rozszerzamy klasę String o metodę isEmail()
+fun String.isEmail(): Boolean {
+    // 'this' odnosi się do instancji Stringa, na którym wywołujemy funkcję
+    return this.contains("@") && this.contains(".")
+}
+
+val email = "user@example.com"
+if (email.isEmail()) { 
+    println("Poprawny email")
+}
+\end{minted}
+
+Pod maską, kompilator zamienia to na statyczną funkcję, która przyjmuje obiekt jako pierwszy parametr. Dzięki temu rozszerzenia nie łamią hermetyzacji (nie mają dostępu do prywatnych pól klasy).
+
+Funkcje infiksowe pozwalają wywoływać funkcje (które mają dokładnie jeden parametr) w sposób przypominający operatory matematyczne lub język naturalny.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+infix fun Int.times(str: String): String {
+    return str.repeat(this)
+}
+
+// Wywołanie standardowe
+3.times("Hello") 
+
+// Wywołanie infiksowe - jak zdanie
+3 times "Hello"
+\end{minted}
+
+Infixy są powszechnie stosowane w DSL-ach (Domain Specific Languages) oraz w testach (np. biblioteka AssertK: \texttt{assertThat(price) isEqualTo 100}).
+
+\section{Funkcje Wyższego Rzędu i Lambdy}
+
+Funkcja wyższego rzędu to taka funkcja, która przyjmuje inną funkcję jako parametr lub ją zwraca. To fundament programowania funkcyjnego.
+
+Wyrażenia lambda to funkcja anonimowa (bez nazwy), którą możemy zapisać w zwięzły sposób.
+
+Pełna składnia:
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val sum: (Int, Int) -> Int = { x: Int, y: Int -> x + y }
+\end{minted}
+
+Uproszczona składnia (typ wnioskowany):
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val sum = { x: Int, y: Int -> x + y }
+\end{minted}
+
+Kotlin posiada konwencję, która bardzo upraszcza kod:
+1. Jeśli funkcja jest ostatnim parametrem wywołania, lambdę możemy wyciągnąć \textbf{poza nawias}.
+2. Jeśli lambda ma tylko jeden parametr, nie musimy go nazywać – jest on dostępny pod domyślną nazwą \texttt{it}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val numbers = listOf(1, 2, 3, 4, 5)
+
+// Wersja "długa"
+numbers.filter({ x -> x > 2 })
+
+// Wersja idiomatyczna (trailing lambda + it)
+numbers.filter { it > 2 }
+\end{minted}
+
+To dlatego kod Compose (\texttt{Column \{ ... \}}) czy Gradle (\texttt{dependencies \{ ... \}}) tak wygląda. Te nawiasy klamrowe to właśnie lambdy.
+
+\section{Referencje do Funkcji (Operator \texttt{::})}
+
+Operator \texttt{::} służy do tworzenia referencji do funkcji lub właściwości. Pozwala to przekazywać istniejące funkcje jako argumenty do innych funkcji (np. funkcji wyższego rzędu) zamiast definiować nową lambdę.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun isEven(n: Int): Boolean = n % 2 == 0
+
+val numbers = listOf(1, 2, 3, 4, 5, 6)
+
+// Przekazanie referencji do funkcji zamiast lambdy { isEven(it) }
+val evenNumbers = numbers.filter(::isEven)
+
+// Referencja do metody klasy
+val list = listOf("a", "bc", "def")
+val lengths = list.map(String::length)
+\end{minted}
+
+\section{Funkcje Anonimowe}
+
+Funkcje anonimowe to funkcje, które nie mają przypisanej nazwy. Są one wyrażeniem, podobnie jak lambdy, ale ich składnia jest bliższa tradycyjnym funkcjom.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val sum = fun(x: Int, y: Int): Int {
+    return x + y
+}
+\end{minted}
+
+Kluczowe cechy i różnice względem lambd:
+\begin{itemize}
+    \item \textbf{Instrukcja \texttt{return}}: W funkcjach anonimowych słowo kluczowe \texttt{return} działa tak samo, jak w funkcjach nazwanych – zwraca wartość z samej funkcji anonimowej. W lambdach \texttt{return} bez etykiety próbuje zwrócić wartość z funkcji otaczającej (non-local return).
+    \item \textbf{Jawność typów}: Funkcje anonimowe wymagają jawnej deklaracji parametrów oraz typu zwracanego (przy użyciu ciała blokowego).
+    \item \textbf{Zastosowanie}: Są użyteczne, gdy potrzebujemy precyzyjnej kontroli nad typem zwracanym lub gdy chcemy uniknąć niejasności związanych z działaniem \texttt{return} wewnątrz lambdy.
+\end{itemize}
+
+\section{Funkcje Zakresu (Scope Functions)}
+
+To zestaw 5 funkcji standardowych: \texttt{let}, \texttt{run}, \texttt{with}, \texttt{apply}, \texttt{also}. Wszystkie robią coś bardzo podobnego: wykonują blok kodu na obiekcie. Różnią się tylko tym, jak ten obiekt jest dostępny w środku (\texttt{this} czy \texttt{it}) i co zwracają (sam obiekt czy wynik lambdy).
+
+Oto "ściąga", jak wybierać odpowiednią funkcję:
+
+\begin{enumerate}
+    \item \textbf{\texttt{apply}}: Konfiguracja obiektu. Dostęp przez \texttt{this}, zwraca \textbf{obiekt}.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    val user = User().apply {
+        name = "Jan"
+        age = 25
+        city = "Kraków"
+    }
+    \end{minted}
+    
+    \item \textbf{\texttt{let}}: Praca z obiektami nullowalnymi lub transformacja. Dostęp przez \texttt{it}, zwraca \textbf{wynik lambdy}.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    val name: String? = "Kotlin"
+    val length = name?.let { 
+        println("Przetwarzanie: $it")
+        it.length // wynik lambdy przypisany do length
+    }
+    \end{minted}
+    
+    \item \textbf{\texttt{also}}: Wykonywanie dodatkowych operacji, tzw. \textit{efektów ubocznych} (akcji, które nie zmieniają samego obiektu, ale wpływają na świat zewnętrzny, np. logowanie lub zapis do bazy), bez przerywania łańcucha wywołań. Dostęp przez \texttt{it}, zwraca \textbf{obiekt}.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    val numbers = mutableListOf(1, 2, 3)
+        .also { println("Log: utworzono listę $it") }
+        .apply { add(4) }
+    \end{minted}
+    
+    \item \textbf{\texttt{run}}: Połączenie \texttt{with} i \texttt{let}. Uruchomienie bloku kodu na obiekcie i zwrócenie wyniku. Dostęp przez \texttt{this}.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    val result = "Hello World".run {
+        println("Długość tekstu: $length")
+        length * 2
+    }
+    \end{minted}
+    
+    \item \textbf{\texttt{with}}: Podobne do \texttt{run}, ale obiekt podajemy jako argument. Używane, gdy chcemy wykonać wiele operacji na jednym obiekcie bez powtarzania jego nazwy.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    with(user) {
+        println("Imię: $name")
+        println("Wiek: $age")
+        saveToDatabase()
+    }
+    \end{minted}
+\end{enumerate}
+
+\section{Zaawansowane Koncepcje}
+
+\subsection{Funkcje Inline}
+Lambdy są obiektami, a każda alokacja obiektu to narzut pamięciowy. W krytycznych miejscach (np. pętle) może to być kosztowne.
+
+Słowo kluczowe \texttt{inline} mówi kompilatorowi: \textit{Nie twórz obiektu dla tej lambdy. Zamiast tego skopiuj treść funkcji i wklej ją bezpośrednio w miejsce wywołania}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+inline fun measureTime(block: () -> Unit) {
+    val start = System.nanoTime()
+    block()
+    val end = System.nanoTime()
+    println("Czas: ${end - start} ns")
+}
+\end{minted}
+
+Dzięki \texttt{inline}, używanie lambd w funkcjach takich jak \texttt{filter} czy \texttt{map} (o których dowiemy się w przyszłych rozdziałach) nie powoduje dodatkowych alokacji pamięci.
+
+W Kotlinie zachowanie instrukcji \texttt{return} wewnątrz lambdy zależy od tego, czy funkcja przyjmująca lambdę jest oznaczona jako \texttt{inline}:
+
+\begin{itemize}
+    \item \textbf{W zwykłych lambdach}: Instrukcja \texttt{return} bez etykiety jest niedozwolona. Lambda nie może bezpośrednio przerwać działania funkcji, która ją otacza.
+    \item \textbf{W funkcjach \texttt{inline}}: \texttt{return} jest dozwolony i powoduje wyjście z funkcji otaczającej (\textit{non-local return}).
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun doWork() {
+    val list = listOf(1, 2, 3)
+    list.forEach {
+        if (it == 2) return // Wyjście z całej funkcji doWork()
+        println(it)
+    }
+}
+\end{minted}
+
+Jeśli chcemy zakończyć działanie tylko samej lambdy (odpowiednik \texttt{continue} w pętli), musimy użyć \textbf{powrotu z etykietą} (\textit{qualified return}). Możemy zdefiniować własną etykietę lub użyć domyślnej (nazwa funkcji, do której przekazujemy lambdę).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun doWorkWithLabel() {
+    val list = listOf(1, 2, 3)
+    list.forEach {
+        if (it == 2) return@forEach // Wyjście tylko z bieżącej iteracji lambdy
+        println(it)
+    }
+    println("To się wykona")
+}
+\end{minted}
+
+\paragraph{crossinline}
+Słowo kluczowe \texttt{crossinline} stosujemy w funkcjach \texttt{inline}, gdy przekazana lambda jest wywoływana w innym kontekście wykonania niż sama funkcja (np. wewnątrz obiektu lokalnego lub innej funkcji pomocniczej). W takiej sytuacji kompilator zabrania stosowania \textit{non-local return}, aby zapobiec nieprzewidywalnemu przerwaniu działania programu z nieodpowiedniego miejsca.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+inline fun runInThread(crossinline body: () -> Unit) {
+    val thread = Thread {
+        body() // Wywołanie w innym wątku – non-local return zabroniony
+    }
+    thread.start()
+}
+\end{minted}
+
+\subsection{Rekursja ogonowa (tailrec)}
+Rekursja jest elegancka, ale grozi przepełnieniem stosu (\texttt{StackOverflowError}). Kotlin oferuje optymalizację: jeśli wywołanie rekurencyjne jest \textbf{ostatnią} operacją w funkcji, możemy dodać modyfikator \texttt{tailrec}. Kompilator zamieni wtedy rekurencję na zwykłą, szybką i bezpieczną pętlę.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+tailrec fun silnia(n: Int, run: Int = 1): Int {
+    return if (n == 1) run else silnia(n - 1, n * run)
+}
+\end{minted}
+
+\section{Funkcje Generyczne}
+
+Funkcje generyczne pozwalają na tworzenie kodu, który może pracować z różnymi typami danych, zachowując pełne bezpieczeństwo typowania. Typ generyczny definiujemy w nawiasach ostrych \texttt{<T>} przed nazwą funkcji.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun <T> printElement(element: T) {
+    println("Element: $element")
+}
+
+val list = listOf(1, "Dwa", 3.0)
+list.forEach { printElement(it) }
+\end{minted}
+
+Możemy również ograniczyć typy generyczne (Generic Constraints), np. aby \texttt{T} musiało dziedziczyć po konkretnej klasie:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun <T : Number> doubleValue(value: T): Double {
+    return value.toDouble() * 2
+}
+\end{minted}
+
+Jeśli jeden parametr generyczny musi spełniać kilka warunków jednocześnie (np. implementować dwa różne interfejsy), stosujemy słowo kluczowe \texttt{where} umieszczone po sygnaturze funkcji.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun <T> processText(item: T) 
+    where T : CharSequence, T : Comparable<T> {
+    if (item.length > 5) {
+        println(item.toString().uppercase())
+    }
+}
+\end{minted}
+
+W powyższym przykładzie typ \texttt{T} musi być jednocześnie podtypem \texttt{CharSequence} (aby posiadać właściwość \texttt{length}) oraz \texttt{Comparable} (co pozwala na porównywanie obiektów). Tylko typy spełniające oba te ograniczenia mogą zostać przekazane do funkcji.
+
+\section{Przeciążanie Operatorów (operator fun)}
+
+Kotlin umożliwia dostarczenie własnych implementacji dla ustalonego zestawu operatorów (takich jak \texttt{+}, \texttt{*}, \texttt{==}, czy \texttt{[]}). Aby funkcja mogła pełnić rolę operatora, musi być poprzedzona słowem kluczowym \texttt{operator} i posiadać konkretną, zarezerwowaną nazwę.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+data class Vector(val x: Int, val y: Int) {
+    // Przeciążenie operatora +
+    operator fun plus(other: Vector): Vector {
+        return Vector(x + other.x, y + other.y)
+    }
+}
+
+val v1 = Vector(1, 2)
+val v2 = Vector(3, 4)
+val v3 = v1 + v2 // Wynik: Vector(x=4, y=6)
+\end{minted}
+
+Najpopularniejsze operatory to:
+\begin{itemize}
+    \item \texttt{plus}, \texttt{minus}, \texttt{times}, \texttt{div}, \texttt{rem} (arytmetyczne).
+    \item \texttt{get}, \texttt{set} (dostęp przez nawiasy kwadratowe \texttt{[]}).
+    \item \texttt{invoke} (pozwala wywołać obiekt jak funkcję: \texttt{obiekt()}).
+    \item \texttt{contains} (operator \texttt{in}).
+\end{itemize}
