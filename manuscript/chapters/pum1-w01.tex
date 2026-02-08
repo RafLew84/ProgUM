@@ -2,11 +2,10 @@
 
 Rozpoczynamy naszą przygodę z językiem Kotlin – nowoczesnym, pragmatycznym językiem, który zrewolucjonizował tworzenie aplikacji na Androida. W tym rozdziale zbudujemy solidne fundamenty, na których oprzemy całą dalszą naukę. Nie będziemy tylko uczyć się składni; spróbujemy zrozumieć \textit{dlaczego} pewne mechanizmy działają tak, a nie inaczej, i jakie problemy rozwiązują.
 
-\section{System typów – solidny fundament}
+\section{System typów}
 
 W Javie, którą zapewne znacie, istnieje podział na typy prymitywne (int, double, boolean) i typy referencyjne (obiekty). Kotlin upraszcza ten obraz, traktując \textbf{wszystko jako obiekt} (przynajmniej z perspektywy programisty).
 
-\subsection{Any – matka wszystkich obiektów}
 Na szczycie hierarchii typów w Kotlinie stoi \texttt{Any}. To odpowiednik \texttt{java.lang.Object}, ale z jedną kluczową różnicą: \texttt{Any} nie jest nullowalne (o czym powiemy przy okazji Null Safety). Każda klasa, którą stworzymy, domyślnie dziedziczy po \texttt{Any}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -162,9 +161,6 @@ when {
 \end{minted}
 
 Warto zauważyć, że dzięki mechanizmowi \textit{Smart Casts}, po sprawdzeniu typu za pomocą \texttt{is String}, kompilator pozwala nam używać zmiennej tak, jakby była typu \texttt{String} (np. wywołać \texttt{.length}) bez ręcznego rzutowania.
-
-
-\subsection{Pętle i iteracje}
 
 Pętla \texttt{for} w Kotlinie służy do iterowania po wszystkim, co udostępnia iterator (posiada funkcję \texttt{iterator()}). W przeciwieństwie do tradycyjnej pętli \texttt{for} znanej z Javy czy C++, tutaj zawsze używamy składni \texttt{in}.
 
