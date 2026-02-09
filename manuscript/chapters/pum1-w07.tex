@@ -1,176 +1,114 @@
-\chapter{Obiekty i Interfejsy (Wykład 7)}
+\chapter{Inicjalizacja i Delegacja (Wykład 7)}
 
-W poprzednim rozdziale omówiliśmy klasy i dziedziczenie. Kotlin wprowadza jednak kilka unikalnych konstrukcji, które znacznie upraszczają typowe wzorce projektowe, takie jak Singleton czy anonimowe klasy wewnętrzne. Mowa o słowie kluczowym \texttt{object}. Ponadto, przyjrzymy się bliżej interfejsom, które w Kotlinie są bardzo potężne.
+W tym rozdziale zajmiemy się mechanizmami, które pozwalają na efektywne zarządzanie inicjalizacją właściwości oraz przekazywaniem odpowiedzialności za ich obsługę do innych obiektów. Poznamy słowa kluczowe \texttt{lateinit}, \texttt{by lazy} oraz wzorzec Delegata.
 
-\section{Słowo kluczowe \texttt{object}}
+\section{Opóźniona Inicjalizacja (\texttt{lateinit})}
 
-W Kotlinie \texttt{object} to specjalna konstrukcja, która \textbf{jednocześnie definiuje klasę i tworzy jej jedyną instancję}. Jest to realizacja wzorca \textbf{Singleton} (wbudowana w język).
+W Kotlinie właściwości klasy, które nie są nullowalne (nie mają \texttt{?}), muszą zostać zainicjalizowane w konstruktorze lub od razu przy deklaracji. Czasami jednak nie znamy wartości początkowej w momencie tworzenia obiektu – np. gdy jest ona wstrzykiwana przez framework (np. Dependency Injection w Androidzie) lub ustawiana w metodzie \texttt{setUp()} w testach jednostkowych.
 
-\subsection{Deklaracja Obiektu (Singleton)}
-
-Gdy chcemy mieć pewność, że w całej aplikacji istnieje tylko jeden egzemplarz danej klasy (np. konfiguracja, menedżer bazy danych), używamy deklaracji obiektu:
+W takich sytuacjach używamy modyfikatora \texttt{lateinit}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-object DatabaseConfig {
-    const val DB_URL = "jdbc:mysql://localhost:3306/db"
-    var connectionCount = 0
-
-    fun connect() {
-        connectionCount++
-        println("Connected to $DB_URL")
-    }
-}
-\end{minted}
-
-Do składowych takiego obiektu odwołujemy się bezpośrednio przez nazwę (bez tworzenia instancji operatorem \texttt{()}):
-
-\begin{minted}[frame=single,framesep=10pt]{kotlin}
-DatabaseConfig.connect()
-println(DatabaseConfig.connectionCount)
-\end{minted}
-
-Obiekty te są inicjalizowane \textbf{leniwie} (lazy) – dopiero przy pierwszym odwołaniu się do nich.
-
-\subsection{Obiekty Anonimowe (Object Expression)}
-
-Czasami potrzebujemy obiektu danej klasy (lub implementującego interfejs) tylko w jednym miejscu ("ad-hoc"), bez konieczności nadawania mu nazwy. W Javie używalibyśmy anonimowych klas wewnętrznych. W Kotlinie używamy wyrażeń obiektowych (\texttt{object expression}).
-
-\begin{minted}[frame=single,framesep=10pt]{kotlin}
-interface MouseListener {
-    fun onClick()
-}
-
-// Tworzymy obiekt anonimowy implementujący interfejs
-val listener = object : MouseListener {
-    override fun onClick() {
-        println("Kliknięto myszką!")
-    }
-}
-\end{minted}
-
-Możemy też dziedziczyć po klasie i implementować wiele interfejsów jednocześnie:
-\begin{minted}[frame=single,framesep=10pt]{kotlin}
-open class A(x: Int)
-interface B
-
-val ab = object : A(1), B {
-    val y = 15
-}
-\end{minted}
-
-\subsection{Data Objects}
-Od nowszych wersji Kotlina, obiekty (\texttt{object}) mogą być oznaczane jako \texttt{data object}. Działa to analogicznie do \texttt{data class} – generuje czytelną metodę \texttt{toString()}.
-
-\begin{minted}[frame=single,framesep=10pt]{kotlin}
-data object EmptyState
-
-println(EmptyState) // Wypisze "EmptyState" zamiast "EmptyState@1b2c3d"
-\end{minted}
-
-Jest to szczególnie przydatne przy \textbf{Sealed Classes/Interfaces}, gdzie część wariantów to klasy z danymi, a część to proste bezstanowe obiekty.
-
-\section{Interfejsy}
-
-Interfejs definiuje kontrakt – zestaw metod i właściwości, które klasa implementująca musi dostarczyć. W Kotlinie interfejsy są bardzo elastyczne: mogą zawierać metody abstrakcyjne oraz metody z domyślną implementacją.
-
-\begin{minted}[frame=single,framesep=10pt]{kotlin}
-interface Drivable {
-    val maxSpeed: Int // Właściwość abstrakcyjna
+class MyService {
+    lateinit var database: Database // Nie musimy od razu przypisywać wartości
     
-    fun drive() // Metoda abstrakcyjna (brak ciała)
+    fun init() {
+        database = Database() // Inicjalizacja później
+    }
     
-    // Metoda z domyślną implementacją
-    fun stop() {
-        println("Zatrzymuję się.")
+    fun query() {
+        // Jeśli wywołamy to przed init(), dostaniemy wyjątek!
+        database.query() 
     }
 }
 \end{minted}
 
-Klasa implementująca interfejs używa tej samej składni co przy dziedziczeniu (\texttt{:}):
-
-\begin{minted}[frame=single,framesep=10pt]{kotlin}
-class Car : Drivable {
-    override val maxSpeed = 200 // Musimy nadpisać właściwość
-    
-    override fun drive() {
-        println("Jadę autem z prędkością $maxSpeed")
-    }
-    // Metody stop() nie musimy nadpisywać, użyje domyślnej
-}
-\end{minted}
-
-\subsection{Właściwości w Interfejsach}
-Interfejsy w Kotlinie nie mogą przechowywać \textbf{stanu} (nie mają pól instancji, "backing fields"). Mogą jednak deklarować właściwości:
+\textbf{Ograniczenia:}
 \begin{itemize}
-    \item Abstrakcyjne (klasa musi je nadpisać).
-    \item Zdefiniowane akcesorami (getter), o ile nie odwołują się do \texttt{field}.
+    \item Tylko dla zmiennych \texttt{var}.
+    \item Nie można używać z typami prostymi (prymitywnymi) jak \texttt{Int}, \texttt{Double}, \texttt{Boolean}.
+    \item Typ nie może być nullowalny.
 \end{itemize}
 
+Aby upewnić się, czy zmienna została zainicjalizowana, możemy użyć referencji \texttt{.isInitialized}:
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-interface Named {
-    val name: String // abstrakcyjne
-    
-    val nameLength: Int
-        get() = name.length // OK, oblicza na podstawie 'name'
+if (::database.isInitialized) {
+    println("Baza gotowa")
 }
 \end{minted}
 
-\subsection{Wielodziedziczenie Interfejsów}
-Klasa może implementować wiele interfejsów jednocześnie. Jeśli pojawi się konflikt nazw metod (dwa interfejsy mają metodę o tej samej sygnaturze i obie mają domyślną implementację), musimy jawnie wskazać, którą wersję wywołać, używając \texttt{super<Typ>}.
+\section{Delegaty (Delegated Properties)}
+
+Delegacja właściwości to mechanizm, w którym obsługa metod \texttt{get()} (i ew. \texttt{set()}) jest przekazywana do innego obiektu. Składnia wykorzystuje słowo kluczowe \texttt{by}.
+
+\subsection{Inicjalizacja Leniwa (\texttt{by lazy})}
+
+Najpopularniejszym delegatem jest \texttt{lazy}. Pozwala on na obliczenie wartości właściwości dopiero przy jej \textbf{pierwszym użyciu}. Wynik jest zapamiętywany i zwracany przy kolejnych odwołaniach. Jest to idealne dla kosztownych operacji (np. wczytywanie pliku, konfiguracja DB).
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-interface A {
-    fun foo() { print("A") }
-}
-interface B {
-    fun foo() { print("B") }
+val heavyObject: Heavy by lazy {
+    println("Obliczam...")
+    Heavy() // To wykona się tylko raz
 }
 
-class C : A, B {
-    override fun foo() {
-        super<A>.foo() // Wywołaj wersję z A
-        super<B>.foo() // Wywołaj wersję z B
-    }
+fun main() {
+    println("Start")
+    // Tu heavyObject jeszcze nie istnieje
+    println(heavyObject) // "Obliczam..." -> zwraca obiekt
+    println(heavyObject) // Zwraca zapamiętany obiekt (bez "Obliczam...")
 }
 \end{minted}
 
-\section{Interfejsy Funkcyjne (SAM)}
+Działa tylko dla zmiennych \texttt{val}. Domyślnie jest bezpieczny wątkowo (\texttt{synchronized}).
 
-Jeśli interfejs posiada \textbf{dokładnie jedną metodę abstrakcyjną}, nazywamy go interfejsem funkcyjnym lub \textbf{SAM} (Single Abstract Method).
+\subsection{Obserwowanie zmian (\texttt{Delegates.observable})}
 
-W Kotlinie oznaczamy takie interfejsy słowem \texttt{fun interface}.
-
-\begin{minted}[frame=single,framesep=10pt]{kotlin}
-fun interface Predicate {
-    fun accept(i: Int): Boolean
-}
-\end{minted}
-
-Dzięki temu możemy używać konwersji SAM – zamiast tworzyć obiekt anonimowy, możemy przekazać \textbf{wyrażenie lambda}:
+Możemy reagować na każdą zmianę wartości właściwości.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-// Tradycyjnie (obiekt anonimowy)
-val p1 = object : Predicate {
-    override fun accept(i: Int) = i > 0
+import kotlin.properties.Delegates
+
+var user: User by Delegates.observable(User("Pusty", 0)) { prop, old, new ->
+    println("Zmiana właściwości ${prop.name}: $old -> $new")
+}
+\end{minted}
+Każde przypisanie nowej wartości do \texttt{user} spowoduje wypisanie logu.
+
+\subsection{Wetowanie zmian (\texttt{Delegates.vetoable})}
+
+Pozwala zablokować zmianę wartości, jeśli nie spełnia ona określonego warunku.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+var age: Int by Delegates.vetoable(0) { prop, old, new ->
+    new >= 0 // Akceptujemy tylko wiek nieujemny
 }
 
-// Z użyciem konwersji SAM (lambda)
-val p2 = Predicate { it > 0 }
+age = 10
+println(age) // 10
+age = -5     // Zmiana odrzucona!
+println(age) // 10
 \end{minted}
 
-To znacznie skraca kod, zwłaszcza przy obsłudze zdarzeń w UI (np. \texttt{OnClickListener}).
+\subsection{Delegowanie do Mapy}
 
-\section{Klasa Abstrakcyjna vs Interfejs}
+Ciekawym zastosowaniem jest delegowanie właściwości do mapy. Jest to przydatne przy parsowaniu dynamicznych struktur danych (np. JSON).
 
-Skoro interfejsy mogą mieć metody z implementacją, czym różnią się od klas abstrakcyjnych?
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class User(val map: Map<String, Any?>) {
+    val name: String by map
+    val age: Int by map
+}
 
-\begin{enumerate}
-    \item \textbf{Stan}: Klasy abstrakcyjne mogą mieć stan (pola, zmienne instancji). Interfejsy nie mogą (tylko właściwości bez backing field).
-    \item \textbf{Konstruktory}: Klasy abstrakcyjne mają konstruktory, interfejsy nie.
-    \item \textbf{Wielodziedziczenie}: Klasa może dziedziczyć tylko po jednej klasie (abstrakcyjnej lub nie), ale może implementować \textbf{wiele} interfejsów.
-\end{enumerate}
-
-Zasada: Jeśli relacja jest typu "is-a" (jest rodzajem) i dzielimy kod oraz stan -> Klasa Abstrakcyjna. Jeśli relacja to "can-do" (potrafi robić) lub definiujemy zachowanie -> Interfejs.
+val data = mapOf("name" to "Jan", "age" to 25)
+val u = User(data)
+println(u.name) // "Jan"
+\end{minted}
+Klucze w mapie muszą odpowiadać nazwom właściwości.
 
 \section{Podsumowanie}
-Słowo kluczowe \texttt{object} w Kotlinie eliminuje potrzebę ręcznej implementacji wzorca Singleton i upraszcza tworzenie obiektów anonimowych. Interfejsy są potężnym narzędziem do definiowania kontraktów, a dzięki konwersji SAM (dla \texttt{fun interface}) praca z nimi jest niezwykle zwięzła i przypomina programowanie funkcyjne.
+
+\begin{itemize}
+    \item Używaj \texttt{lateinit} dla \texttt{var}, gdy nie możesz zainicjalizować pola w konstruktorze (np. wstrzykiwanie zależności), ale masz pewność, że zrobisz to przed użyciem.
+    \item Używaj \texttt{by lazy} dla \texttt{val}, gdy obliczenie wartości jest kosztowne i chcesz je opóźnić do momentu pierwszego użycia.
+    \item Delegaty \texttt{observable} i \texttt{vetoable} pozwalają na łatwą implementację logiki monitorowania i walidacji zmian danych.
+\end{itemize}
