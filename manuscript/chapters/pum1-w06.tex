@@ -1,207 +1,176 @@
-\chapter{Dziedziczenie i Zaawansowane Typy (Wykład 6)}
+\chapter{Obiekty i Interfejsy (Wykład 7)}
 
-W poprzednim rozdziale omówiliśmy podstawy tworzenia klas. Teraz zajmiemy się budowaniem relacji między nimi oraz bardziej zaawansowanymi mechanizmami, które pozwalają na tworzenie elastycznego i bezpiecznego kodu.
+W poprzednim rozdziale omówiliśmy klasy i dziedziczenie. Kotlin wprowadza jednak kilka unikalnych konstrukcji, które znacznie upraszczają typowe wzorce projektowe, takie jak Singleton czy anonimowe klasy wewnętrzne. Mowa o słowie kluczowym \texttt{object}. Ponadto, przyjrzymy się bliżej interfejsom, które w Kotlinie są bardzo potężne.
 
-\section{Dziedziczenie i Modyfikatory Dostępu}
+\section{Słowo kluczowe \texttt{object}}
 
-W Kotlinie podejście do dziedziczenia jest restrykcyjne ("zamknięte domyślnie"). W przeciwieństwie do Javy, gdzie wszystko można dziedziczyć (chyba że jest \texttt{final}), w Kotlinie \textbf{wszystkie klasy i metody są domyślnie finalne}.
+W Kotlinie \texttt{object} to specjalna konstrukcja, która \textbf{jednocześnie definiuje klasę i tworzy jej jedyną instancję}. Jest to realizacja wzorca \textbf{Singleton} (wbudowana w język).
 
-Aby umożliwić dziedziczenie lub nadpisywanie, musimy jawnie użyć słowa kluczowego \texttt{open}.
+\subsection{Deklaracja Obiektu (Singleton)}
 
-\subsection{Słowa kluczowe w dziedziczeniu}
-
-\begin{itemize}
-    \item \textbf{\texttt{final}} (domyślne): Blokuje możliwość dziedziczenia po klasie lub nadpisywania metody. Nie trzeba go pisać, jest domyślne.
-    \item \textbf{\texttt{open}}: \textit{Otwiera} klasę na dziedziczenie lub metodę na nadpisanie.
-    \item \textbf{\texttt{override}}: Wymagane, gdy nadpisujemy metodę z klasy bazowej. Co ważne: \textbf{funkcja oznaczona jako \texttt{override} jest domyślnie \texttt{open}}. Oznacza to, że kolejna klasa dziedzicząca może ją ponownie nadpisać.
-    \item \textbf{\texttt{final override}}: Jeśli w klasie pochodnej nadpisaliśmy metodę, ale chcemy zabronić dalszego jej nadpisywania w kolejnych podklasach, musimy użyć kombinacji \texttt{final override}.
-\end{itemize}
+Gdy chcemy mieć pewność, że w całej aplikacji istnieje tylko jeden egzemplarz danej klasy (np. konfiguracja, menedżer bazy danych), używamy deklaracji obiektu:
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-open class Base {
-    open fun v() {} // Metoda otwarta, można nadpisać
-    fun nv() {}     // Metoda finalna (domyślnie), nie można nadpisać
-}
+object DatabaseConfig {
+    const val DB_URL = "jdbc:mysql://localhost:3306/db"
+    var connectionCount = 0
 
-open class Derived() : Base() {
-    override fun v() {} // Nadpisanie metody v()
-                        // Ta metoda jest nadal OPEN dla kolejnych klas!
-}
-
-class Another : Derived() {
-    final override fun v() {} // Nadpisanie i ZABLOKOWANIE dalszych zmian
+    fun connect() {
+        connectionCount++
+        println("Connected to $DB_URL")
+    }
 }
 \end{minted}
 
-\section{Klasy Abstrakcyjne}
-
-Klasa abstrakcyjna może zawierać metody bez implementacji (abstrakcyjne), które \textbf{muszą} zostać zaimplementowane w klasach pochodnych. Nie można utworzyć instancji klasy abstrakcyjnej.
+Do składowych takiego obiektu odwołujemy się bezpośrednio przez nazwę (bez tworzenia instancji operatorem \texttt{()}):
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-abstract class Shape {
-    abstract fun area(): Double // Brak ciała metody
+DatabaseConfig.connect()
+println(DatabaseConfig.connectionCount)
+\end{minted}
+
+Obiekty te są inicjalizowane \textbf{leniwie} (lazy) – dopiero przy pierwszym odwołaniu się do nich.
+
+\subsection{Obiekty Anonimowe (Object Expression)}
+
+Czasami potrzebujemy obiektu danej klasy (lub implementującego interfejs) tylko w jednym miejscu ("ad-hoc"), bez konieczności nadawania mu nazwy. W Javie używalibyśmy anonimowych klas wewnętrznych. W Kotlinie używamy wyrażeń obiektowych (\texttt{object expression}).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+interface MouseListener {
+    fun onClick()
+}
+
+// Tworzymy obiekt anonimowy implementujący interfejs
+val listener = object : MouseListener {
+    override fun onClick() {
+        println("Kliknięto myszką!")
+    }
+}
+\end{minted}
+
+Możemy też dziedziczyć po klasie i implementować wiele interfejsów jednocześnie:
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+open class A(x: Int)
+interface B
+
+val ab = object : A(1), B {
+    val y = 15
+}
+\end{minted}
+
+\subsection{Data Objects}
+Od nowszych wersji Kotlina, obiekty (\texttt{object}) mogą być oznaczane jako \texttt{data object}. Działa to analogicznie do \texttt{data class} – generuje czytelną metodę \texttt{toString()}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+data object EmptyState
+
+println(EmptyState) // Wypisze "EmptyState" zamiast "EmptyState@1b2c3d"
+\end{minted}
+
+Jest to szczególnie przydatne przy \textbf{Sealed Classes/Interfaces}, gdzie część wariantów to klasy z danymi, a część to proste bezstanowe obiekty.
+
+\section{Interfejsy}
+
+Interfejs definiuje kontrakt – zestaw metod i właściwości, które klasa implementująca musi dostarczyć. W Kotlinie interfejsy są bardzo elastyczne: mogą zawierać metody abstrakcyjne oraz metody z domyślną implementacją.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+interface Drivable {
+    val maxSpeed: Int // Właściwość abstrakcyjna
     
-    // Metoda z implementacją (domyślnie final, chyba że damy open)
-    fun description() {
-        println("To jest jakiś kształt o polu ${area()}")
-    }
-}
-
-class Circle(val r: Double) : Shape() {
-    override fun area(): Double = Math.PI * r * r
-}
-\end{minted}
-
-\subsection{Abstract vs Open}
-
-W klasach abstrakcyjnych często mamy dylemat: użyć \texttt{abstract} czy \texttt{open}?
-
-\begin{itemize}
-    \item \textbf{\texttt{abstract fun}}: Nie ma ciała (implementacji). Klasa pochodna \textbf{musi} ją zaimplementować (chyba że sama jest abstrakcyjna). Używamy, gdy nie ma sensownej implementacji domyślnej (np. \texttt{calculateArea()} dla ogólnego kształtu).
-    \item \textbf{\texttt{open fun}}: Ma ciało (implementację domyślną). Klasa pochodna \textbf{może} ją nadpisać, ale nie musi. Używamy, gdy istnieje sensowne zachowanie domyślne (np. \texttt{logError()} wypisujące na konsolę), które w specyficznych przypadkach chcemy zmienić (np. zapis do pliku).
-\end{itemize}
-
-\section{Klasy Zapieczętowane (Sealed Classes)}
-
-\texttt{sealed class} to klasa, która ma \textbf{ograniczoną, z góry znaną liczbę potomków}. Wszystkie klasy dziedziczące muszą znajdować się w tym samym pakiecie.
-
-Jest to idealne narzędzie do modelowania \textbf{stanów}.
-
-\begin{minted}[frame=single,framesep=10pt]{kotlin}
-sealed class UiState {
-    object Loading : UiState()
-    data class Success(val data: String) : UiState()
-    data class Error(val message: String) : UiState()
-}
-\end{minted}
-
-Gdy używamy instrukcji \texttt{when}, kompilator wie, że pokryliśmy wszystkie możliwe przypadki. Nie potrzebujemy sekcji \texttt{else}.
-
-\begin{minted}[frame=single,framesep=10pt]{kotlin}
-fun handleState(state: UiState) {
-    when(state) {
-        is UiState.Loading -> showProgressBar()
-        is UiState.Success -> showData(state.data)
-        is UiState.Error -> showError(state.message)
-        // Brak else. Kompilator wie, że to wszystkie opcje.
-    }
-}
-\end{minted}
-
-\section{Klasy Zagnieżdżone i Wewnętrzne}
-
-Często chcemy zdefiniować klasę wewnątrz innej klasy, aby zgrupować logikę i ukryć szczegóły implementacyjne. Kotlin oferuje tu dwa podejścia, które kluczowo różnią się dostępem do pamięci i instancji.
-
-\subsection{Klasa Zagnieżdżona (Nested Class)}
-Jest to zachowanie \textbf{domyślne} (gdy nie użyjemy żadnego modyfikatora). Klasa zagnieżdżona jest bytem niezależnym. \textbf{Nie posiada referencji} do obiektu klasy zewnętrznej.
-
-\begin{itemize}
-    \item \textbf{Zastosowanie}: Gdy klasa pomocnicza jest logicznie powiązana z klasą zewnętrzną, ale nie potrzebuje dostępu do jej pól (danych). Działa jak \texttt{static class} w Javie.
-    \item \textbf{Zaleta}: Mniejsze zużycie pamięci (brak ukrytej referencji do rodzica).
-\end{itemize}
-
-\begin{minted}[frame=single,framesep=10pt]{kotlin}
-class Outer {
-    private val bar: Int = 1
+    fun drive() // Metoda abstrakcyjna (brak ciała)
     
-    class Nested {
-        fun foo() = 2
-        // fun getBar() = bar // BŁĄD! Nie widzi 'bar' klasy Outer
+    // Metoda z domyślną implementacją
+    fun stop() {
+        println("Zatrzymuję się.")
     }
 }
-val nested = Outer.Nested() // Tworzenie bez instancji Outer
 \end{minted}
 
-\subsection{Klasa Wewnętrzna (Inner Class)}
-Oznaczona słowem kluczowym \texttt{inner}. Taka klasa \textbf{posiada ukrytą referencję} do instancji klasy zewnętrznej, w której została utworzona.
+Klasa implementująca interfejs używa tej samej składni co przy dziedziczeniu (\texttt{:}):
 
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Car : Drivable {
+    override val maxSpeed = 200 // Musimy nadpisać właściwość
+    
+    override fun drive() {
+        println("Jadę autem z prędkością $maxSpeed")
+    }
+    // Metody stop() nie musimy nadpisywać, użyje domyślnej
+}
+\end{minted}
+
+\subsection{Właściwości w Interfejsach}
+Interfejsy w Kotlinie nie mogą przechowywać \textbf{stanu} (nie mają pól instancji, "backing fields"). Mogą jednak deklarować właściwości:
 \begin{itemize}
-    \item \textbf{Zastosowanie}: Gdy klasa pomocnicza musi operować na danych klasy głównej. Klasyczny przykład to \textbf{Adaptery w Androidzie} (ViewHolder często musi wywołać metodę z Adaptera) lub implementacje wzorca Listener, gdzie nasłuchiwacz musi zmodyfikować stan widoku.
-    \item \textbf{Dostęp do rodzica}: Aby odwołać się do instancji zewnętrznej, używamy składni \texttt{this@NazwaKlasyZewnetrznej}.
+    \item Abstrakcyjne (klasa musi je nadpisać).
+    \item Zdefiniowane akcesorami (getter), o ile nie odwołują się do \texttt{field}.
 \end{itemize}
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-class Outer {
-    private val bar: Int = 1
+interface Named {
+    val name: String // abstrakcyjne
     
-    inner class Inner {
-        fun foo() = bar // OK! Widzi 'bar'
-        
-        fun getOuterReference(): Outer {
-            return this@Outer // Dostęp do instancji Outer
-        }
-    }
+    val nameLength: Int
+        get() = name.length // OK, oblicza na podstawie 'name'
 }
-val outer = Outer()
-val inner = outer.Inner() // Musimy mieć instancję Outer, by stworzyć Inner
 \end{minted}
 
-\section{Obiekty Towarzyszące (Companion Object)}
-
-W Kotlinie nie ma słowa kluczowego \texttt{static}. Zamiast tego, jeśli chcemy mieć metodę lub pole powiązane z klasą, a nie z obiektem (np. fabrykę lub stałą), umieszczamy je w \texttt{companion object}.
+\subsection{Wielodziedziczenie Interfejsów}
+Klasa może implementować wiele interfejsów jednocześnie. Jeśli pojawi się konflikt nazw metod (dwa interfejsy mają metodę o tej samej sygnaturze i obie mają domyślną implementację), musimy jawnie wskazać, którą wersję wywołać, używając \texttt{super<Typ>}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-class User {
-    companion object {
-        const val MAX_AGE = 120
-        fun createDefault(): User = User()
-    }
+interface A {
+    fun foo() { print("A") }
+}
+interface B {
+    fun foo() { print("B") }
 }
 
-// Użycie (jak static w Javie)
-val max = User.MAX_AGE
-val user = User.createDefault()
+class C : A, B {
+    override fun foo() {
+        super<A>.foo() // Wywołaj wersję z A
+        super<B>.foo() // Wywołaj wersję z B
+    }
+}
 \end{minted}
 
-\section{Generics (Typy Generyczne)}
+\section{Interfejsy Funkcyjne (SAM)}
 
-O typach generycznych w funkcjach wspominaliśmy w Rozdziale 3. Teraz czas na klasy.
+Jeśli interfejs posiada \textbf{dokładnie jedną metodę abstrakcyjną}, nazywamy go interfejsem funkcyjnym lub \textbf{SAM} (Single Abstract Method).
+
+W Kotlinie oznaczamy takie interfejsy słowem \texttt{fun interface}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
-class Box<T>(val item: T)
-val intBox = Box(1)      // Box<Int>
-val strBox = Box("Hej")  // Box<String>
+fun interface Predicate {
+    fun accept(i: Int): Boolean
+}
 \end{minted}
 
-\subsection{Wariancja (Variance)}
-To trudny temat, ale kluczowy dla zrozumienia kolekcji w Kotlinie. Załóżmy, że \texttt{Dog} dziedziczy po \texttt{Animal}.
-Czy \texttt{Box<Dog>} jest podtypem \texttt{Box<Animal>}? Domyślnie \textbf{nie}.
+Dzięki temu możemy używać konwersji SAM – zamiast tworzyć obiekt anonimowy, możemy przekazać \textbf{wyrażenie lambda}:
 
-Gdyby było, moglibyśmy do pudełka z psami (\texttt{Box<Animal>}) włożyć kota, co zepsułoby pudełko z psami.
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Tradycyjnie (obiekt anonimowy)
+val p1 = object : Predicate {
+    override fun accept(i: Int) = i > 0
+}
 
-Kotlin pozwala jednak sterować tym zachowaniem za pomocą słów kluczowych \texttt{out} i \texttt{in} (Declaration-site variance).
+// Z użyciem konwersji SAM (lambda)
+val p2 = Predicate { it > 0 }
+\end{minted}
+
+To znacznie skraca kod, zwłaszcza przy obsłudze zdarzeń w UI (np. \texttt{OnClickListener}).
+
+\section{Klasa Abstrakcyjna vs Interfejs}
+
+Skoro interfejsy mogą mieć metody z implementacją, czym różnią się od klas abstrakcyjnych?
 
 \begin{enumerate}
-    \item \textbf{Kowariancja (\texttt{out})}: \textit{Producent}. Klasa tylko \textbf{zwraca} (produkuje) typ \texttt{T}.
-    \begin{minted}[frame=single,framesep=10pt]{kotlin}
-    // List<out T> w Kotlinie jest kowariantna
-    val dogs: List<Dog> = listOf(Dog(), Dog())
-    val animals: List<Animal> = dogs // OK! Bo List jest <out T>
-    \end{minted}
-    Możemy bezpiecznie czytać \texttt{Animal} z listy psów, bo każdy pies to zwierzę.
-    
-    \item \textbf{Kontrawariancja (\texttt{in})}: "Konsument". Klasa tylko \textbf{przyjmuje} typ \texttt{T}.
-    \begin{minted}[frame=single,framesep=10pt]{kotlin}
-    interface Consumer<in T> {
-        fun consume(item: T)
-    }
-    
-    val animalConsumer: Consumer<Animal> = ...
-    val dogConsumer: Consumer<Dog> = animalConsumer // OK!
-    \end{minted}
-    Jeśli coś potrafi obsłużyć każde zwierzę, to potrafi też obsłużyć psa. Kierunek dziedziczenia się "odwraca".
+    \item \textbf{Stan}: Klasy abstrakcyjne mogą mieć stan (pola, zmienne instancji). Interfejsy nie mogą (tylko właściwości bez backing field).
+    \item \textbf{Konstruktory}: Klasy abstrakcyjne mają konstruktory, interfejsy nie.
+    \item \textbf{Wielodziedziczenie}: Klasa może dziedziczyć tylko po jednej klasie (abstrakcyjnej lub nie), ale może implementować \textbf{wiele} interfejsów.
 \end{enumerate}
 
-\begin{figure}[h]
-    \centering
-    \includegraphics[width=0.3\textwidth]{fig/pum1-w06-variance.png}
-    \caption{Wariancja w Kotlinie}
-    \label{fig:variance}
-\end{figure}
+Zasada: Jeśli relacja jest typu "is-a" (jest rodzajem) i dzielimy kod oraz stan -> Klasa Abstrakcyjna. Jeśli relacja to "can-do" (potrafi robić) lub definiujemy zachowanie -> Interfejs.
 
-Możemy zapamiętać to sobie w następujący sposób:
-\begin{itemize}
-    \item \textbf{\texttt{out}} (Producent): Skupiamy się na tym, co \textbf{wychodzi} z obiektu. Jeśli ze źródła wychodzą psy, to bezpiecznie możemy uznać, że wychodzą z niego zwierzęta.
-    \item \textbf{\texttt{in}} (Konsument): Skupiamy się na tym, co \textbf{wchodzi} do obiektu. Jeśli ktoś potrafi zaopiekować się dowolnym zwierzęciem (np. weterynarz), to poradzi sobie również, gdy \textit{wejdzie} do niego konkretnie pies.
-\end{itemize}
-
+\section{Podsumowanie}
+Słowo kluczowe \texttt{object} w Kotlinie eliminuje potrzebę ręcznej implementacji wzorca Singleton i upraszcza tworzenie obiektów anonimowych. Interfejsy są potężnym narzędziem do definiowania kontraktów, a dzięki konwersji SAM (dla \texttt{fun interface}) praca z nimi jest niezwykle zwięzła i przypomina programowanie funkcyjne.
