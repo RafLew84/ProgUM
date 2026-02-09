@@ -1,0 +1,208 @@
+\chapter{Klasy i Obiekty (Wykład 5)}
+
+Programowanie obiektowe (OOP) opiera się na koncepcji klas i obiektów. Klasa to \textbf{szablon} (blueprint), który definiuje strukturę i zachowanie. Obiekt to konkretna \textbf{instancja} stworzona na podstawie tego szablonu.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{fig/pum1-w05-class_object.png}
+    \caption{Klasa i obiekt}
+    \label{fig:class_object}
+\end{figure}
+
+Możemy to sobie wyobrazić na przykładzie domu.
+\begin{itemize}
+    \item \textbf{Klasa} to projekt architektoniczny (rysunków technicznych) domu.
+    \item \textbf{Obiekt} to konkretny dom wybudowany na podstawie tego projektu. Możesz wybudować wiele domów (obiektów) z jednego projektu (klasy).
+\end{itemize}
+
+\section{Definicja Klasy}
+
+W Kotlinie definicja klasy jest bardzo zwięzła. Jeśli klasa nie ma ciała, możemy pominąć nawiasy klamrowe.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Empty
+\end{minted}
+
+Zazwyczaj jednak klasa posiada właściwości (stan) oraz funkcje (zachowanie).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Lamp {
+    // Właściwość (stan)
+    var isOn: Boolean = false
+
+    // Metoda (zachowanie)
+    fun turnOn() {
+        isOn = true
+    }
+}
+\end{minted}
+
+Tworzenie instancji w Kotlinie nie wymaga słowa kluczowego \texttt{new} (znanego z Javy czy C++). Po prostu wywołujemy konstruktor jak funkcję:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val myLamp = Lamp()
+myLamp.turnOn()
+\end{minted}
+
+\section{Konstruktory}
+
+Kotlin rozróżnia dwa rodzaje konstruktorów: główny (primary) i drugorzędne (secondary).
+
+Konstruktor główny jest częścią definicji klasy. To najbardziej idiomatyczny sposób definiowania klas.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Zapis skrócony - deklaracja właściwości wprost w konstruktorze
+class Person(val name: String, var age: Int)
+
+// To, co powyżej, jest równoważne:
+/*
+class Person(_name: String, _age: Int) {
+    val name: String = _name
+    var age: Int = _age
+}
+*/
+\end{minted}
+
+Jeśli potrzebujemy wykonać kod podczas inicjalizacji (np. walidację), używamy bloku \texttt{init}. Konstruktor główny nie może zawierać kodu.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class User(val login: String) {
+    init {
+        println("Tworzenie użytkownika: $login")
+        if (login.isEmpty()) {
+            throw IllegalArgumentException("Login nie może być pusty")
+        }
+    }
+}
+\end{minted}
+
+Czasami potrzebujemy alternatywnych sposobów tworzenia obiektu. Używamy wtedy słowa kluczowego \texttt{constructor} wewnątrz ciała klasy. Każdy konstruktor drugorzędny musi ostatecznie wywołać konstruktor główny (używając \texttt{this(...)}). W odróżnieniu od kontruktora głównego, konstruktor drugorzędny może zawierać kod. Jest to przydatne, gdy chcemy stworzyć obiekt na podstawie innych danych niż te, które są przekazywane do konstruktora głównego. Nie ma możliwści automatycznego deklarowania właściwości w konstruktorze drugorzędnym, dlatego musimy to zrobić ręcznie. Warto również zauważyć, że konstruktor drugorzędny nie może być wywoływany bezpośrednio z zewnątrz klasy, a jedynie z poziomu konstruktora głównego lub innego konstruktora drugorzędnego. W praktyce w Kotlinie rzadko używa się konstruktorów drugorzędnych, ponieważ mechanizm \textbf{wartości domyślnych} w konstruktorze głównym pokrywa większość przypadków użycia (np. przeciążanie konstruktorów w Javie).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Rect(val width: Int, val height: Int) {
+    // Konstruktor pomocniczy dla kwadratu
+    constructor(side: Int) : this(side, side) {
+        println("Utworzono kwadrat o boku $side")
+    }
+}
+\end{minted}
+
+\section{Modyfikatory Dostępu}
+
+Określają, kto \textit{widzi} nasze klasy, metody i właściwości.
+\begin{itemize}
+    \item \texttt{public} (domyślny): Widoczne wszędzie.
+    \item \texttt{private}: Widoczne tylko wewnątrz pliku (dla funkcji/klas najwyższego poziomu) lub wewnątrz klasy.
+    \item \texttt{protected}: Widoczne w klasie i jej podklasach (nie ma dostępu \textit{pakietowego} jak w Javie!).
+    \item \texttt{internal}: Widoczne w całym \textbf{module} (np. module Mavena, Gradle'a, czy module IntelliJ). To specyfika Kotlina – bardzo przydatne do ukrywania szczegółów implementacyjnych biblioteki.
+\end{itemize}
+
+\section{Klasy Danych (Data Classes)}
+
+Często tworzymy klasy, których jedynym celem jest przechowywanie danych (DTO - Data Transfer Object). W Kotlinie mamy specjalny rodzaj klas do tego celu, które oznaczamy słowem kluczowym \texttt{data class}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+data class User(val name: String, val age: Int)
+\end{minted}
+
+Dzięki temu jednemu słowu, kompilator automatycznie generuje dla nas:
+\begin{enumerate}
+    \item \texttt{toString()}: Zwraca czytelny ciąg np. \texttt{"User(name=Jan, age=30)"}.
+    \item \texttt{equals()}: Porównuje zawartość pól (a nie referencje).
+    \item \texttt{hashCode()}: Generuje poprawny hash na podstawie pól.
+    \item \texttt{copy()}: Pozwala skopiować obiekt zmieniając tylko wybrane pola (niezastąpione przy niemutowalności!).
+    \item \texttt{componentN()}: Metody umożliwiające destrukturyzację (\texttt{val (n, a) = user}).
+\end{enumerate}
+
+Zastosowanie tych metod eliminuje konieczność ręcznego pisania powtarzalnego kodu (\textit{boilerplate}), co znacząco poprawia czytelność i bezpieczeństwo aplikacji. Metody te są szczególnie przydatne w architekturach opartych na niemutowalności danych, gdzie zamiast modyfikować istniejący obiekt, tworzymy jego kopię ze zmienionymi parametrami.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val u1 = User("Jan", 25)
+val u2 = u1.copy(age = 26) // User(name="Jan", age=26)
+println(u1 == u2) // false
+\end{minted}
+
+Konstruktor główny musi mieć co najmniej jeden parametr i wszystkie muszą być oznaczone jako \texttt{val} lub \texttt{var}. Klasy danych nie mogą być dziedziczone (są final).
+
+\section{Porównywanie Obiektów}
+
+W Kotlinie mamy dwa rodzaje równości:
+
+\begin{itemize}
+    \item \textbf{Równość Strukturalna (\texttt{==})}: Sprawdza, czy obiekty są \textit{takie same} (mają taką samą zawartość). Pod spodem wywołuje \texttt{equals()}. To bezpieczne dla null (np. \texttt{null == null} zwróci true).
+    \item \textbf{Równość Referencyjna (\texttt{===})}: Sprawdza, czy dwie zmienne wskazują na \textbf{ten sam obiekt} w pamięci (ten sam adres).
+\end{itemize}
+
+Zachowanie operatora \texttt{==} zależy od tego, czy pracujemy ze zwykłą klasą, czy z \texttt{data class}. W zwykłej klasie \texttt{==} sprawdza referencję (chyba że ręcznie nadpiszemy \texttt{equals()}), natomiast w \texttt{data class} porównuje zawartość pól.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Person(val name: String, val age: Int)
+data class User(val name: String, val age: Int)
+
+val p1 = Person("Ewa", 30)
+val p2 = Person("Ewa", 30)
+println(p1 == p2)  // false (zwykła klasa porównuje adresy)
+
+val u1 = User("Ewa", 30)
+val u2 = User("Ewa", 30)
+val u3 = u1
+
+println(u1 == u2)  // true (data class porównuje zawartość)
+println(u1 === u2) // false (dwa różne obiekty w pamięci)
+println(u1 === u3) // true (u3 wskazuje na to samo co u1)
+\end{minted}
+
+Możemy to sobie wyobrazić na przykładzie samochodów:
+\begin{itemize}
+    \item \texttt{==} (Równość strukturalna): Twoje auto i auto sąsiada. Są takie same (marka, model, kolor), ale to dwa różne fizyczne samochody.
+    \item \texttt{===} (Równość referencyjna): Twoje auto rano i Twoje auto wieczorem. To ten sam, fizyczny pojazd.
+\end{itemize}
+
+Dodajmy, że w przypadku klas danych w przypadku porównania strukturalnego, porównywane są tylko pola z konstruktora głównego. Pola dodane w klasie, ale niebędące parametrami konstruktora głównego, nie są brane pod uwagę przy porównywaniu.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+data class User(val name: String, val age: Int) {
+    var email: String = ""
+}
+
+val u1 = User("Ewa", 30)
+val u2 = User("Ewa", 30)
+
+u1.email = "ewa@gmail.com"
+u2.email = "e.w.q@gmail.com"
+
+println(u1 == u2)  // true (data class porównuje zawartość pól z konstruktora głównego)
+\end{minted}
+
+Warto zauważyć, że dla typów, które w czasie wykonania są reprezentowane jako typy proste (np. \texttt{Int}, \texttt{Double}, \texttt{Boolean}), operator \texttt{===} jest równoważny operatorowi \texttt{==}. Wynika to z faktu, że wartości te nie posiadają odrębnej tożsamości obiektowej.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val a = 100
+val b = 100
+println(a === b) // true
+\end{minted}
+
+\section{Klasy Wyliczeniowe (Enum Classes)}
+
+Służą do definiowania stałego zbioru wartości (np. pory roku, stany zamówienia, kierunki świata).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+enum class Direction {
+    NORTH, SOUTH, EAST, WEST
+}
+\end{minted}
+
+Enumu mogą mieć też właściwości i metody:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+enum class Color(val hex: String) {
+    RED("#FF0000"),
+    GREEN("#00FF00"),
+    BLUE("#0000FF"); // średnik wymagany przy metodach
+
+    fun rgb() = "Color: $hex"
+}
+
+val color = Color.RED
+println(color.hex)
+\end{minted}
