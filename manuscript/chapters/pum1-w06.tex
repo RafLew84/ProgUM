@@ -1,12 +1,10 @@
-\chapter{Obiekty i Interfejsy (Wykład 7)}
+\chapter{Obiekty i Interfejsy (Wykład 6)}
 
-W poprzednim rozdziale omówiliśmy klasy i dziedziczenie. Kotlin wprowadza jednak kilka unikalnych konstrukcji, które znacznie upraszczają typowe wzorce projektowe, takie jak Singleton czy anonimowe klasy wewnętrzne. Mowa o słowie kluczowym \texttt{object}. Ponadto, przyjrzymy się bliżej interfejsom, które w Kotlinie są bardzo potężne.
+W poprzednim rozdziale omówiliśmy klasy i dziedziczenie. Kotlin wprowadza jednak kilka unikalnych konstrukcji, które znacznie upraszczają typowe wzorce projektowe, takie jak Singleton czy anonimowe klasy wewnętrzne. Mowa o słowie kluczowym \texttt{object}.
 
 \section{Słowo kluczowe \texttt{object}}
 
 W Kotlinie \texttt{object} to specjalna konstrukcja, która \textbf{jednocześnie definiuje klasę i tworzy jej jedyną instancję}. Jest to realizacja wzorca \textbf{Singleton} (wbudowana w język).
-
-\subsection{Deklaracja Obiektu (Singleton)}
 
 Gdy chcemy mieć pewność, że w całej aplikacji istnieje tylko jeden egzemplarz danej klasy (np. konfiguracja, menedżer bazy danych), używamy deklaracji obiektu:
 
@@ -31,9 +29,7 @@ println(DatabaseConfig.connectionCount)
 
 Obiekty te są inicjalizowane \textbf{leniwie} (lazy) – dopiero przy pierwszym odwołaniu się do nich.
 
-\subsection{Obiekty Anonimowe (Object Expression)}
-
-Czasami potrzebujemy obiektu danej klasy (lub implementującego interfejs) tylko w jednym miejscu ("ad-hoc"), bez konieczności nadawania mu nazwy. W Javie używalibyśmy anonimowych klas wewnętrznych. W Kotlinie używamy wyrażeń obiektowych (\texttt{object expression}).
+Czasami potrzebujemy obiektu danej klasy (lub implementującego interfejs) tylko w jednym miejscu (\textit{ad-hoc}), bez konieczności nadawania mu nazwy. W Javie używalibyśmy anonimowych klas wewnętrznych. W Kotlinie używamy wyrażeń obiektowych (\texttt{object expression}).
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 interface MouseListener {
@@ -58,7 +54,6 @@ val ab = object : A(1), B {
 }
 \end{minted}
 
-\subsection{Data Objects}
 Od nowszych wersji Kotlina, obiekty (\texttt{object}) mogą być oznaczane jako \texttt{data object}. Działa to analogicznie do \texttt{data class} – generuje czytelną metodę \texttt{toString()}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -99,8 +94,9 @@ class Car : Drivable {
 }
 \end{minted}
 
-\subsection{Właściwości w Interfejsach}
-Interfejsy w Kotlinie nie mogą przechowywać \textbf{stanu} (nie mają pól instancji, "backing fields"). Mogą jednak deklarować właściwości:
+
+
+Interfejsy w Kotlinie nie mogą przechowywać \textbf{stanu} (nie mają pól instancji). Mogą jednak deklarować właściwości:
 \begin{itemize}
     \item Abstrakcyjne (klasa musi je nadpisać).
     \item Zdefiniowane akcesorami (getter), o ile nie odwołują się do \texttt{field}.
@@ -115,7 +111,6 @@ interface Named {
 }
 \end{minted}
 
-\subsection{Wielodziedziczenie Interfejsów}
 Klasa może implementować wiele interfejsów jednocześnie. Jeśli pojawi się konflikt nazw metod (dwa interfejsy mają metodę o tej samej sygnaturze i obie mają domyślną implementację), musimy jawnie wskazać, którą wersję wywołać, używając \texttt{super<Typ>}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -133,6 +128,34 @@ class C : A, B {
     }
 }
 \end{minted}
+
+\section{Zastosowania Interfejsów}
+
+Interfejsy w programowaniu obiektowym pełnią kluczową rolę, wykraczającą poza proste definiowanie metod.
+
+Interfejs tworzy nowy \textbf{typ danych}, którym możemy posługiwać się w kodzie. Zmienna, parametr funkcji czy pole w klasie może być typu interfejsu. Dzięki temu kod staje się niezależny od konkretnej implementacji.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun playMusic(player: Playable) { // Parametr jest typu interfejsu
+    player.play()
+}
+\end{minted}
+
+Interfejs narzuca klasom implementującym obowiązek dostarczenia kodu dla zdefiniowanych metod. Gwarantuje to, że każdy obiekt \textit{spełniający kontrakt} (implementujący interfejs) posiada określone zachowania.
+
+Dzięki traktowaniu interfejsu jako typu, możemy uzyskać \textbf{polimorfizm}. Obiekty różnych klas (np. \texttt{Car}, \texttt{Bike}, \texttt{Plane}) mogą być traktowane w jednolity sposób (jako \texttt{Drivable}), o ile implementują ten sam interfejs. Pozwala to na pisanie uniwersalnego kodu, operującego na abstrakcjach, a nie konkretach.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val vehicles: List<Drivable> = listOf(Car(), Bike())
+for (v in vehicles) {
+    v.drive() // Zadziała dla każdego obiektu, niezależnie od konkretnej klasy
+}
+\end{minted}
+
+Czasami interfejs nie posiada żadnych metod ani właściwości, jest to tak zwany \textbf{interfejs marker} (interfejs znacznikowy). Służy wtedy jedynie do \textbf{oznaczenia} klasy, by nadać jej pewną cechę lub poinformować framework o jej specjalnym traktowaniu.
+Przykładem w Javie/Kotlinie jest \texttt{Serializable} (oznacza, że obiekt można serializować) lub \texttt{Cloneable}. Taki interfejs jest często używany w frameworkach, które muszą wiedzieć, że dana klasa może być używana w określonym kontekście.
+
+Interfejsy pozwalają nadać wspólną cechę klasom, które nie są ze sobą powiązane w hierarchii dziedziczenia. Np. interfejs \texttt{Comparable} sprawia, że obiekty można porównywać (i sortować), a \texttt{Iterable} pozwala iterować po obiekcie w pętli \texttt{for}.
 
 \section{Interfejsy Funkcyjne (SAM)}
 
@@ -169,8 +192,3 @@ Skoro interfejsy mogą mieć metody z implementacją, czym różnią się od kla
     \item \textbf{Konstruktory}: Klasy abstrakcyjne mają konstruktory, interfejsy nie.
     \item \textbf{Wielodziedziczenie}: Klasa może dziedziczyć tylko po jednej klasie (abstrakcyjnej lub nie), ale może implementować \textbf{wiele} interfejsów.
 \end{enumerate}
-
-Zasada: Jeśli relacja jest typu "is-a" (jest rodzajem) i dzielimy kod oraz stan -> Klasa Abstrakcyjna. Jeśli relacja to "can-do" (potrafi robić) lub definiujemy zachowanie -> Interfejs.
-
-\section{Podsumowanie}
-Słowo kluczowe \texttt{object} w Kotlinie eliminuje potrzebę ręcznej implementacji wzorca Singleton i upraszcza tworzenie obiektów anonimowych. Interfejsy są potężnym narzędziem do definiowania kontraktów, a dzięki konwersji SAM (dla \texttt{fun interface}) praca z nimi jest niezwykle zwięzła i przypomina programowanie funkcyjne.
