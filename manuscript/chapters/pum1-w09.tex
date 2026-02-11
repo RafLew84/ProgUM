@@ -1,0 +1,155 @@
+\chapter{Jetpack Compose: Podstawy UI i Stanu (Wykład 9)}
+
+Jetpack Compose to nowoczesny, deklaratywny toolkit do budowania natywnego interfejsu użytkownika na Androida. Zmienia on paradygmat tworzenia aplikacji z imperatywnego (modyfikowanie drzewa widoków XML) na deklaratywny (opisywanie stanu UI).
+
+\section{Podstawowe Komponenty Layoutu}
+
+W Jetpack Compose interfejs budujemy, składając ze sobą funkcje oznaczone adnotacją \texttt{@Composable}. Zamiast znanych z XML \texttt{LinearLayout} czy \texttt{FrameLayout}, używamy ich odpowiedników:
+
+\begin{itemize}
+    \item \textbf{Column}: Układa elementy w pionie (jeden pod drugim).
+    \item \textbf{Row}: Układa elementy w poziomie (jeden obok drugiego).
+    \item \textbf{Box}: Układa elementy jeden na drugim (warstwowo).
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable
+fun UserProfile(name: String) {
+    Row {
+        // Obrazek po lewej
+        Image(...) 
+        
+        // Tekst po prawej, ułożony pionowo
+        Column {
+            Text("Witaj,")
+            Text(name)
+        }
+    }
+}
+\end{minted}
+
+\subsection{Komponent Text i Jednostki}
+Do wyświetlania tekstu służy komponent \texttt{Text}. Przy określaniu rozmiarów w Androidzie używamy dwóch jednostek:
+
+\begin{itemize}
+    \item \textbf{dp (density-independent pixels)}: Używane do wymiarów (marginesy, szerokość, wysokość). Zapewniają ten sam fizyczny rozmiar elementu na ekranach o różnej gęstości pikseli.
+    \item \textbf{sp (scale-independent pixels)}: Używane \textbf{tylko do rozmiaru czcionki}. Działają jak \texttt{dp}, ale dodatkowo uwzględniają ustawienia systemowe użytkownika (np. powiększony tekst dla osób słabowidzących).
+\end{itemize}
+
+\section{Modyfikatory (Modifiers)}
+
+\texttt{Modifier} to potężne narzędzie w Compose, które pozwala modyfikować wygląd i zachowanie komponentu (np. dodać tło, margines, obsługę kliknięcia).
+
+Kluczową zasadą jest to, że modyfikatory działają \textbf{sekwencyjnie} (jak łańcuch). Kolejność wywołań ma znaczenie!
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Przykład: Kolejność paddingu i tła
+Box(
+    modifier = Modifier
+        .background(Color.Red)   // 1. Najpierw czerwone tło
+        .padding(16.dp)          // 2. Potem wcięcie (padding) wewnątrz czerwonego tła
+        .background(Color.Blue)  // 3. Niebieskie tło wewnątrz paddingu
+) {
+    Text("Hej!")
+}
+\end{minted}
+
+Gdybyśmy zamienili kolejność \texttt{padding} i \texttt{background}, efekt wizualny byłby zupełnie inny.
+
+Najczęstsze modyfikatory:
+\begin{itemize}
+    \item \texttt{.fillMaxSize()}: Zajmij całą dostępną przestrzeń.
+    \item \texttt{.padding()}: Odstęp wewnętrzny.
+    \item \texttt{.clickable \{ \}}: Reakcja na dotyk.
+\end{itemize}
+
+\section{Układ i Wyrównanie (Alignment vs Arrangement)}
+
+Częstym błędem jest mylenie \texttt{Alignment} z \texttt{Arrangement}.
+
+\begin{itemize}
+    \item \textbf{Arrangement (Rozmieszczenie)}: Działa wzdłuż \textbf{głównej osi} kontenera.
+    \begin{itemize}
+        \item Dla \texttt{Row}: Oś pozioma (lewo-prawo).
+        \item Dla \texttt{Column}: Oś pionowa (góra-dół).
+        \item Opcje: \texttt{Arrangement.Center}, \texttt{Arrangement.SpaceBetween}, \texttt{Arrangement.End}.
+    \end{itemize}
+    
+    \item \textbf{Alignment (Wyrównanie)}: Działa na \textbf{osi poprzecznej}.
+    \begin{itemize}
+        \item Dla \texttt{Row}: Oś pionowa (wyrównaj do góry/dołu/środka).
+        \item Dla \texttt{Column}: Oś pozioma (wyrównaj do lewej/prawej/środka).
+        \item Opcje: \texttt{Alignment.CenterVertically}, \texttt{Alignment.End}.
+    \end{itemize}
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+Column(
+    modifier = Modifier.fillMaxSize(),
+    verticalArrangement = Arrangement.Center, // Środek pionowo (Główna oś Column)
+    horizontalAlignment = Alignment.CenterHorizontally // Środek poziomo (Oś poprzeczna)
+) {
+    Text("Na samym środku ekranu")
+}
+\end{minted}
+
+\section{Zarządzanie Stanem (State)}
+
+W Compose UI jest funkcją stanu: $f(state) = UI$. Oznacza to, że jedynym sposobem na zmianę wyglądu aplikacji jest zmiana stanu (danych), a framework automatycznie odrysuje odpowiednie elementy. Proces ten nazywamy \textbf{Rekompozycją} (Recomposition).
+
+\subsection{remember i mutableStateOf}
+
+Zwykła zmienna wewnątrz funkcji \texttt{@Composable} zostanie zresetowana przy każdej rekompozycji (ponownym wywołaniu funkcji). Aby zachować wartość między klatkami, musimy użyć delegata \texttt{remember}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable
+fun Counter() {
+    // remember: "Pamiętaj tę wartość przy kolejnym rysowaniu"
+    // mutableStateOf: "Powiadom Compose, gdy wartość się zmieni"
+    var count by remember { mutableStateOf(0) }
+
+    Button(onClick = { count++ }) {
+        Text("Kliknięto $count razy")
+    }
+}
+\end{minted}
+
+Każda zmiana \texttt{count} powoduje, że Compose zauważa zmianę obserwowalnego stanu (\texttt{MutableState}) i wywołuje funkcję \texttt{Counter()} ponownie, ale z nową zapamiętaną wartością.
+
+\subsection{Wzorzec State Hoisting}
+
+Aby komponenty były wielokrotnego użytku i łatwe w testowaniu, stosujemy wzorzec \textbf{State Hoisting} (wynoszenie stanu w górę). Polega on na tym, że komponent nie zarządza swoim stanem wewnętrznie, ale otrzymuje go od rodzica.
+
+Cechy komponentu \textbf{Stateless} (bezstanowego):
+\begin{enumerate}
+    \item Otrzymuje stan przez parametr (np. \texttt{value: String}).
+    \item Zgłasza zdarzenia przez lambdę (np. \texttt{onValueChange: (String) -> Unit}).
+\end{enumerate}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Komponent Stateful (zarządza stanem - trudniejszy do testowania i reużycia)
+@Composable
+fun HelloScreen() {
+    var name by remember { mutableStateOf("") }
+    HelloContent(name = name, onNameChange = { name = it })
+}
+
+// Komponent Stateless (czysta funkcja UI)
+@Composable
+fun HelloContent(name: String, onNameChange: (String) -> Unit) {
+    Column {
+        Text("Cześć $name")
+        TextField(
+            value = name,
+            onValueChange = onNameChange
+        )
+    }
+}
+\end{minted}
+
+Dzięki temu \texttt{HelloContent} jest niezależny od tego, skąd pochodzi stan (może to być \texttt{remember}, \texttt{ViewModel}, czy stała z testu).
+Wzorzec ten promuje \textbf{Unidirectional Data Flow} (Jednokierunkowy Przepływ Danych):
+\begin{itemize}
+    \item Dane płyną \textbf{w dół} (od rodzica do dziecka).
+    \item Zdarzenia płyną \textbf{w górę} (od dziecka do rodzica).
+\end{itemize}
