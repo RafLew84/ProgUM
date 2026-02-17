@@ -301,7 +301,7 @@ Tutaj wchodzą dwaj gracze:
 
 Bez \texttt{remember}, przy każdym kliknięciu funkcja \texttt{Counter} startowałaby od nowa z wartością 0. Bez \texttt{mutableStateOf}, zmiana zmiennej nie dałaby sygnału do odświeżenia ekranu (interfejs byłby martwy).
 
-Mimo że \texttt{remember} działa świetnie podczas rekompozycji, ma jedną wadę: \textbf{zapomina wszystko przy zmianie konfiguracji} (np. obrót ekranu, zmiana języka, tryb ciemny). Wtedy cała aktywność jest niszczona i tworzona od nowa, a pamięć podręczna \texttt{remember} jest czyszczona.
+Mimo że \texttt{remember} działa podczas rekompozycji, ma jedną wadę: \textbf{zapomina wszystko przy zmianie konfiguracji} (np. obrót ekranu, zmiana języka, tryb ciemny). Wtedy cała aktywność jest niszczona i tworzona od nowa, a pamięć podręczna \texttt{remember} jest czyszczona.
 
 Aby zachować stan nawet po \textit{śmierci} i odrodzeniu się aktywności (lub procesu), używamy \texttt{rememberSaveable}. Pod maską wykorzystuje on mechanizm \texttt{Bundle} (ten sam co w \texttt{onSaveInstanceState} z klasycznego Androida).
 
@@ -318,6 +318,28 @@ fun ResilientCounter() {
 \end{minted}
 
 Dla prostych typów (Int, String, Boolean) działa to automatycznie. Dla własnych obiektów musimy dostarczyć tzw. \texttt{Saver} (np. implementując \texttt{Parcelable} i używając \texttt{@Parcelize}).
+
+\subsection{Składnia: = vs by}
+Często spotkamy się z dwoma zapisami stanu:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// 1. Przypisanie (=)
+val nameState = remember { mutableStateOf("Jan") }
+Text(text = nameState.value) // Musimy pisać .value
+
+// 2. Delegacja (by)
+var name by remember { mutableStateOf("Jan") }
+Text(text = name) // Używamy jak zwykłej zmiennej
+\end{minted}
+
+Słowo kluczowe \texttt{by} (delegacja właściwości) \textit{odpakowuje} dla nas stan.
+\begin{itemize}
+    \item Przy \texttt{by}, zmienna \texttt{name} jest typu \texttt{String} (kompilator ukrywa \texttt{State} pod spodem). Aby zmienić wartość, piszemy \texttt{name = "Ewa"}.
+    \item Przy \texttt{=}, zmienna \texttt{nameState} jest typu \texttt{MutableState<String>}. Aby zmienić wartość, musimy pisać \texttt{nameState.value = "Ewa"}.
+\end{itemize}
+Używanie \texttt{by} wymaga importów (które czasami nie są dodawane automatycznie przez IDE):
+\texttt{import androidx.compose.runtime.getValue}
+\texttt{import androidx.compose.runtime.setValue}
 
 \section{Wzorzec State Hoisting}
 
