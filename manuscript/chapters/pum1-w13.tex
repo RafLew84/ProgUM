@@ -1,0 +1,189 @@
+\chapter{Behawioralne Wzorce Projektowe (Wykład 13)}
+
+W poprzednim rozdziale poznaliśmy wzorce kreacyjne (Singleton, Builder, Factory), które pomagają w tworzeniu obiektów. Teraz skupimy się na \textbf{wzorcach behawioralnych}. Dotyczą one komunikacji między obiektami, podziału odpowiedzialności oraz sposobów, w jaki obiekty ze sobą współpracują.
+
+W świecie Androida i Jetpack Compose, gdzie reaktywność i przepływ danych są kluczowe, wzorce behawioralne odgrywają ogromną rolę.
+
+\section{Observer (Obserwator)}
+
+Observer to jeden z najważniejszych wzorców w programowaniu mobilnym. Definiuje on mechanizm subskrypcji, który pozwala wielu obiektom (\textit{Observers}) obserwować inny obiekt (\textit{Subject}) i reagować na jego zmiany.
+
+Wyobraź sobie, że masz ekran wyświetlający kursy walut. Dane te zmieniają się w czasie. Bez Obserwatora, ekran musiałby ciągle \textit{pytać} serwer lub bazę danych: \textit{"Czy coś się zmieniło?"} (tzw. polling). Co gorsza, po pobraniu nowych danych, musielibyśmy ręcznie wywołać metodę aktualizującą UI (np. \texttt{updateUI()}).
+
+Zamiast pytać, ekran \textit{zapisuje się} (subskrybuje) na powiadomienia. Gdy kurs waluty się zmieni, źródło danych (Subject) \textbf{samo powiadomi} wszystkich zainteresowanych (Observers).
+
+W historii Androida mieliśmy wiele implementacji tego wzorca:
+\begin{enumerate}
+    \item \textbf{Callbacki / Listenery}: (np. \texttt{OnClickListener}, \texttt{TextWatcher}) – klasyczna forma, gdzie przekazujemy interfejs, którego metoda zostanie wywołana po zdarzeniu.
+    \item \textbf{LiveData}: Obiekt przechowujący dane, świadomy cyklu życia (Activity/Fragment), który powiadamia obserwatorów tylko gdy widok jest aktywny.
+    \item \textbf{StateFlow / SharedFlow} (Kotlin Coroutines): Obecny standard. Strumienie danych, na które \textit{nasłuchujemy} (\texttt{collect}).
+\end{enumerate}
+
+
+W Jetpack Compose cały system opiera się na obserwacji stanu (\texttt{State<T>}). Gdy wartość stanu się zmienia, Compose automatycznie \textit{powiadamia} funkcje \texttt{@Composable} i przerysowuje (rekomponuje) interfejs.
+
+\subsection{Przykład: Klasyczny Observer vs StateFlow}
+
+Spójrzmy, jak ewoluował ten wzorzec w Kotlinie i Androidzie.
+
+\textbf{1. Starsze podejście w Kotlinie (Listener/Callback)}
+Wymaga ręcznego definiowania interfejsu i zarządzania listą słuchaczy.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Definicja interfejsu (Observer)
+interface UserListener {
+    fun onUserUpdated(newName: String)
+}
+
+// Źródło danych (Subject)
+class UserRepository {
+    private val listeners = mutableListOf<UserListener>()
+
+    fun addListener(listener: UserListener) = listeners.add(listener)
+    
+    fun updateUser(name: String) {
+        // Powiadom wszystkich
+        listeners.forEach { it.onUserUpdated(name) }
+    }
+}
+\end{minted}
+
+\textbf{2. Nowsze podejście w Kotlinie (StateFlow)}
+Zamiast listy listenerów, używamy strumienia danych, który zawsze posiada aktualną wartość.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class UserViewModel {
+    // Subject (można zmieniać)
+    private val _userName = MutableStateFlow("Jan")
+    
+    // Observer interface (tylko do odczytu)
+    val userName: StateFlow<String> = _userName.asStateFlow()
+
+    fun updateName(name: String) {
+        _userName.value = name // Automatyczne powiadomienie subskrybentów
+    }
+}
+\end{minted}
+
+\section{State (Stan)}
+
+Wzorzec State pozwala obiektowi zmieniać swoje zachowanie w zależności od wewnętrznego stanu. Unikamy dzięki temu gigantycznych instrukcji \texttt{if-else} lub \texttt{switch/when} rozrzuconych po całym kodzie.
+
+W aplikacjach (MVVM/MVI) stan ekranu modelujemy często jako osobne klasy (zazwyczaj \texttt{sealed class} lub \texttt{sealed interface}).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Definicja możliwych stanów ekranu
+sealed interface ScreenState {
+    object Loading : ScreenState
+    data class Success(val data: List<String>) : ScreenState
+    data class Error(val message: String) : ScreenState
+}
+
+// Obsługa w UI (Jetpack Compose)
+@Composable
+fun MyScreen(state: ScreenState) {
+    when (state) {
+        is ScreenState.Loading -> CircularProgressIndicator()
+        is ScreenState.Success -> Text("Data: ${state.data}")
+        is ScreenState.Error -> Text("Error: ${state.message}", color = Color.Red)
+    }
+}
+\end{minted}
+
+Dzięki temu, widok jest \textit{głupi} – tylko wyświetla to, co nakazuje mu stan. Logika przejść między stanami (np. po pobraniu danych przejdź z \texttt{Loading} do \texttt{Success}) znajduje się w ViewModelu.
+
+\subsection{Wzorzec State vs State w Compose}
+Warto rozróżnić:
+\begin{itemize}
+    \item \textbf{Wzorzec State}: Architektoniczne podejście do modelowania zachowania (np. \texttt{sealed class}).
+    \item \textbf{Compose State}: Mechanizm biblioteczny (\texttt{mutableStateOf}), który służy do przechowywania danych, których zmiana wymusza odświeżenie widoku.
+\end{itemize}
+
+Często używamy ich razem: \texttt{ViewModel} trzyma \texttt{StateFlow<ScreenState>}, a Compose obserwuje go i zamienia na \texttt{State<ScreenState>}, by sterować widokiem.
+
+\section{Strategy (Strategia)}
+
+Strategia pozwala zdefiniować rodzinę algorytmów, opakować je w osobne klasy (lub funkcje) i wymieniać w czasie działania programu. Klient używający strategii nie musi wiedzieć, jak algorytm działa w środku.
+
+Możemy mieć interfejs \texttt{SortStrategy}, a konkretne implementacje to \texttt{BubbleSortStrategy}, \texttt{QuickSortStrategy} itp. Użytkownik wybiera metodę sortowania z listy, a kod wywołujący po prostu woła \texttt{strategy.sort(list)}.
+
+\subsection{W Kotlinie: Funkcje jako Strategie}
+W Kotlinie funkcje są \textit{obywatelami pierwszej kategorii}, więc strategią może być po prostu lambda:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun processNumbers(numbers: List<Int>, filterStrategy: (Int) -> Boolean): List<Int> {
+    return numbers.filter(filterStrategy)
+}
+
+// Użycie różnych strategii "w locie"
+val nums = listOf(1, 2, 3, 4, 5)
+val evens = processNumbers(nums) { it % 2 == 0 } // Strategia: parzyste
+val bigs = processNumbers(nums) { it > 3 }       // Strategia: większe od 3
+\end{minted}
+
+To znacznie upraszcza kod.
+
+\section{Mediator}
+
+Mediator to wzorzec, który służy do zmniejszenia powiązań (coupling) między wieloma klasami. Zamiast obiekty komunikować się \textit{każdy z każdym} (tworząc sieć zależności jak \textit{spaghetti}), komunikują się tylko z Mediatorem. Mediator decyduje, co z tym zrobić.
+
+Analogicznie, samoloty (komponenty) nie rozmawiają bezpośrednio ze sobą (\textit{Cześć Boeing, ląduję}). Rozmawiają z wieżą (Mediator). Wieża wie o wszystkich samolotach i steruje ruchem, zapobiegając kolizjom.
+
+Jeśli masz skomplikowany formularz, gdzie zmiana CheckBoxa A wpływa na widoczność Pola B, a wpisanie tekstu w C, blokuje Przycisk D – zamiast pisać logikę wewnątrz każdego elementu UI (\texttt{onCheckedChange} w CheckBoxie zmieniające visibility pola B), lepiej użyć Mediatora (np. ViewModelu).
+
+Wszystkie zdarzenia (Events) lecą do ViewModelu (Mediatora), on aktualizuje Stan, a Stan wraca do Widoku. Komponenty UI nie wiedzą o swoim istnieniu – wiedzą tylko o Mediatorze.
+
+\subsection{Przykład: Formularz Rejestracji}
+
+W tym przykładzie \texttt{RegistrationViewModel} pełni rolę Mediatora. Pola tekstowe i przycisk nie wiedzą o sobie nawzajem. Przycisk \textit{Zarejestruj} staje się aktywny tylko wtedy, gdy Username jest poprawny, ale to Mediator o tym decyduje.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Stan formularza
+data class RegistrationState(
+    val username: String = "",
+    val isButtonEnabled: Boolean = false
+)
+
+// Mediator (ViewModel)
+class RegistrationViewModel : ViewModel() {
+    // Używamy mutableStateOf zamiast Flow (prościej dla początkujących)
+    var state by mutableStateOf(RegistrationState())
+        private set // Setter prywatny, tylko ViewModel może zmieniać
+
+    fun onUsernameChange(newName: String) {
+        // Logika mediacji: Zmiana nazwy wpływa na przycisk
+        val isValid = newName.length >= 3
+        state = state.copy(
+            username = newName,
+            isButtonEnabled = isValid
+        )
+    }
+
+    fun onRegisterClick() {
+        println("Rejestracja użytkownika: ${state.username}")
+    }
+}
+
+// Widok (Colleagues)
+@Composable
+fun RegistrationScreen(viewModel: RegistrationViewModel) {
+    val state = viewModel.state
+
+    Column {
+        // Komponent A: Pole tekstowe
+        TextField(
+            value = state.username,
+            onValueChange = { viewModel.onUsernameChange(it) },
+            label = { Text("Nazwa użytkownika") }
+        )
+
+        // Komponent B: Przycisk (zależy od A, ale pośrednio)
+        Button(
+            onClick = { viewModel.onRegisterClick() },
+            enabled = state.isButtonEnabled // Decyzja Mediatora
+        ) {
+            Text("Zarejestruj")
+        }
+    }
+}
+\end{minted}
