@@ -1,0 +1,319 @@
+\chapter{Wzorce Projektowe i Adnotacje (Wykład 12)}
+
+W inżynierii oprogramowania często napotykamy powtarzające się problemy. Zamiast wymyślać koło na nowo, korzystamy ze sprawdzonych rozwiązań zwanych \textbf{wzorcami projektowymi} (ang. \textit{design patterns}). Są to uniwersalne, abstrakcyjne recepty na rozwiązanie konkretnych problemów architektonicznych. Wzorce dzielimy zazwyczaj na trzy grupy:
+\begin{enumerate}
+    \item \textbf{Kreacyjne}: Dotyczą mechanizmów tworzenia obiektów (np. Singleton, Builder, Factory).
+    \item \textbf{Strukturalne}: Dotyczą składania obiektów i klas w większe struktury (np. Adapter, Decorator).
+    \item \textbf{Behawioralne}: Dotyczą komunikacji i podziału odpowiedzialności między obiektami (np. Observer, Strategy).
+\end{enumerate}
+
+W tym rozdziale omówimy wybrane wzorce, które są szczególnie istotne w ekosystemie Kotlin i Android.
+
+\section{Singleton}
+
+Singleton to wzorzec kreacyjny, który gwarantuje, że dana klasa będzie miała \textbf{tylko jedną instancję} w całym systemie i zapewnia do niej globalny punkt dostępu.
+
+W Kotlinie tworzenie Singletona jest niezwykle proste dzięki słowu kluczowemu \textbf{\texttt{object}}. Kompilator automatycznie generuje kod, który zapewnia, że powstanie tylko jedna instancja tej klasy, w sposób bezpieczny dla wątków (thread-safe).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Najprostszy Singleton w Kotlinie
+object DatabaseConnection {
+    val url = "jdbc:mysql://localhost:8801/db"
+    
+    fun connect() {
+        println("Connecting to $url")
+    }
+}
+
+// Użycie
+DatabaseConnection.connect()
+\end{minted}
+
+Cechy \texttt{object}:
+\begin{itemize}
+    \item \textbf{Leniwa inicjalizacja (Lazy Initialization)}: Obiekt jest tworzony dopiero przy pierwszym odwołaniu się do niego (np. \texttt{DatabaseConnection.connect()}).
+    \item \textbf{Bezpieczeństwo wątkowe}: Kotlin (działając na JVM) gwarantuje, że inicjalizacja statyczna jest bezpieczna. Nie musimy martwić się wyścigami wątków.
+    \item \textbf{Brak publicznego konstruktora}: Nie ma możliwości utworzenia drugiej instancji ręcznie.
+\end{itemize}
+
+Czasami potrzebujemy większej kontroli nad tworzeniem instancji, np. gdy inicjalizacja wymaga parametrów dostarczanych w trakcie działania aplikacji lub gdy chcemy opóźnić tworzenie ciężkiego obiektu.
+
+Jeśli inicjalizacja Singletona wymaga argumentów (np. \texttt{Context} w Androidzie), słowo \texttt{object} nie wystarczy, bo nie przyjmuje ono parametrów konstrukcyjnych. W takim przypadku używamy \textbf{\texttt{companion object}} wewnątrz zwykłej klasy oraz delegacji \textbf{\texttt{by lazy}}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class NetworkClient private constructor(val baseUrl: String) {
+    
+    companion object {
+        // Leniwa inicjalizacja - kod w bloku wykona się tylko raz,
+        // przy pierwszym użyciu pola 'instance'.
+        // Domyślnie jest to bezpieczne wątkowo (thread-safe).
+        val instance: NetworkClient by lazy {
+            NetworkClient("https://api.example.com")
+        }
+    }
+}
+\end{minted}
+
+W przypadkach, gdy \texttt{by lazy} nie wystarcza (np. chcemy resetować Singletona lub mamy bardzo nietypową logikę inicjalizacji), stosujemy wzorzec \textbf{Double-Checked Locking}.
+ Sprawdza on istnienie instancji dwa razy: raz bez blokady (dla szybkości), a drugi raz wewnątrz bloku synchronizowanego (dla bezpieczeństwa).
+
+Oto przykład implementacji dla klienta biblioteki \textbf{Retrofit} (służącej do komunikacji z API):
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class RetrofitClient private constructor() {
+
+    companion object {
+        // @Volatile zapewnia, że zmiana wartości jest natychmiast widoczna 
+        // dla wszystkich wątków (omija cache procesora)
+        @Volatile
+        private var instance: Retrofit? = null
+
+        fun getInstance(): Retrofit {
+            // Pierwsze sprawdzenie (bez blokady - szybkie)
+            val currentInstance = instance
+            if (currentInstance != null) {
+                return currentInstance
+            }
+
+            // Blokada (synchronized) - wpuszcza tylko jeden wątek na raz
+            synchronized(this) {
+                // Drugie sprawdzenie (wewnątrz blokady)
+                val i2 = instance
+                if (i2 != null) {
+                    return i2
+                } else {
+                    // Tworzenie instancji
+                    val created = Retrofit.Builder()
+                        .baseUrl("https://api.example.com")
+                        .build()
+                    
+                    instance = created
+                    return created
+                }
+            }
+        }
+    }
+}
+\end{minted}
+
+Choć w Kotlinie zazwyczaj wystarcza nam \texttt{object} lub delegacja \texttt{by lazy} (która pod spodem również używa mechanizmów synchronizacji), zrozumienie Double-Checked Locking jest ważne dla świadomości, jak działają te mechanizmy \textit{pod maską}.
+
+\section{Builder (Budowniczy)}
+
+Wzorzec Builder służy do konstruowania złożonych obiektów krok po kroku. Oddziela proces budowania od reprezentacji obiektu. Jest to szczególnie przydatne, gdy obiekt ma wiele opcjonalnych parametrów konfiguracyjnych.
+
+Dzięki \textbf{argumentom nazwanym} i \textbf{wartościom domyślnym} implementacja wzorca Builder w Kotlinie jest bardzo prosta.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Zamiast Buildera: parametry domyślne
+data class Pizza(
+    val size: String = "Medium",
+    val cheese: Boolean = true,
+    val pepperoni: Boolean = false,
+    val mushrooms: Boolean = false
+)
+
+// Użycie
+val myPizza = Pizza(
+    size = "Large",
+    pepperoni = true
+)
+\end{minted}
+
+Jeśli jednak konfiguracja jest bardziej złożona i wymaga walidacji lub operacji pobocznych, możemy użyć funkcji \texttt{apply} do symulacji Buildera:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class NotificationBuilder {
+    var title: String = ""
+    var body: String = ""
+    
+    fun build(): Notification {
+        require(title.isNotEmpty()) { "Title cannot be empty" }
+        return Notification(title, body)
+    }
+}
+
+// Użycie
+val notification = NotificationBuilder().apply {
+    title = "Hello"
+    body = "World"
+}.build()
+\end{minted}
+
+\subsection{Klasyczna implementacja (Java Style)}
+
+Mimo że w Kotlinie mamy lepsze narzędzia, jako programiści Androida często korzystamy z bibliotek napisanych w Javie (lub w stylu Javy), które stosują klasyczny wzorzec Builder. Warto go znać, aby efektywnie z nich korzystać.
+
+Cechy klasycznego Buildera:
+\begin{itemize}
+    \item Posiada prywatny konstruktor głównej klasy (np. \texttt{Notification}).
+    \item Posiada statyczną klasę wewnętrzną \texttt{Builder}.
+    \item Metody ustawiające pola zwracają \texttt{this} (obiekt Buildera), co pozwala na łańcuchowanie wywołań.
+    \item Posiada metodę \texttt{build()}, która tworzy finalny obiekt.
+\end{itemize}
+
+Przykład (styl Java w składni Kotlina):
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Pizza private constructor(val size: String, val cheese: Boolean) {
+    
+    class Builder {
+        private var size: String = "Medium" // wartość domyślna
+        private var cheese: Boolean = false
+
+        // Metoda zwraca 'Builder' umożliwiając łańcuchowanie
+        fun setSize(size: String): Builder {
+            this.size = size
+            return this
+        }
+
+        fun setCheese(cheese: Boolean): Builder {
+            this.cheese = cheese
+            return this
+        }
+
+        fun build(): Pizza {
+            return Pizza(size, cheese)
+        }
+    }
+}
+
+// Użycie (wygląda znajomo dla programistów Java/Android SDK)
+val pizza = Pizza.Builder()
+    .setSize("Large")
+    .setCheese(true)
+    .build()
+\end{minted}
+
+\section{Factory (Fabryka)}
+
+Wzorzec Factory (lub Factory Method) to jeden z najczęściej wykorzystywanych wzorców kreacyjnych. Służy do tworzenia obiektów bez ujawniania klientowi logiki ich tworzenia oraz bez wiązania kodu klienta z konkretną klasą implementującą.
+
+Zamiast wywoływać konstruktor bezpośrednio (np. \texttt{new ConsoleLogger()}), klient prosi fabrykę o dostarczenie obiektu spełniającego określony interfejs. Pozwala to na:
+\begin{enumerate}
+    \item \textbf{Ukrycie skomplikowanej logiki tworzenia}: Jeśli obiekt wymaga wielu zależności (np. konfiguracji, dostępu do plików), fabryka "chowa" ten kod w jednym miejscu. Dzięki temu klient nie musi wiedzieć \textit{jak} stworzyć obiekt, a jedynie \textit{co} chce otrzymać. Ułatwia to też późniejsze zmiany (Zasada Otwarte-Zamknięte) – zmiana sposobu konstrukcji obiektu nie wymaga zmian w kodzie, który go używa.
+    \item \textbf{Zwracanie różnych implementacji}: Metoda fabrykująca może zwrócić dowolną podklasę w zależności od parametrów (np. \texttt{FileLogger} w produkcji, \texttt{ConsoleLogger} w debugu).
+\end{enumerate}
+
+W Kotlinie idiomatycznym sposobem implementacji prostych fabryk jest wykorzystanie \texttt{companion object}:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+interface Logger {
+    fun log(message: String)
+}
+
+class ConsoleLogger : Logger {
+    override fun log(message: String) = println(message)
+}
+
+class FileLogger : Logger {
+    override fun log(message: String) { /* pisz do pliku */ }
+}
+
+class LoggerFactory {
+    companion object {
+        fun create(type: String): Logger = when(type) {
+            "file" -> FileLogger()
+            else -> ConsoleLogger()
+        }
+    }
+}
+
+// Użycie
+val logger = LoggerFactory.create("console")
+\end{minted}
+
+Możemy też użyć operatora \texttt{invoke}, aby fabryka wyglądała jak konstruktor:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+companion object {
+    operator fun invoke(type: String): Logger { ... }
+}
+// Użycie: val logger = LoggerFactory("console")
+\end{minted}
+
+\section{Repository (Repozytorium)}
+
+Repozytorium to jeden z ważniejszych wzorców architektonicznych w tworzeniu nowoczesnych aplikacji mobilnych. Służy on do \textbf{abstrakcji źródeł danych} i działa jako \textit{mediator} między domeną aplikacji a warstwą danych.
+
+Warstwa widoku (View/ViewModel) nie powinna wiedzieć, skąd pochodzą dane – czy z lokalnej bazy danych (Room), z API REST-owego (Retrofit), czy może z plików systemowych. Powinna jedynie \textit{poprosić} o dane i je otrzymać (zazwyczaj jako \texttt{Flow} lub \texttt{suspend} function). To Repozytorium podejmuje decyzję, czy zwrócić dane z pamięci podręcznej (dla szybkości), czy pobrać świeże dane z sieci (dla aktualności). Działa ono jak \textit{fasada}, ukrywając przed resztą aplikacji złożoność operacji I/O.
+
+\subsection{Zalety Repozytorium}
+\begin{enumerate}
+    \item \textbf{Single Source of Truth (SSOT)}: Repozytorium zarządza danymi i dba o ich spójność (np. pobiera z API i zapisuje do bazy lokalnej).
+    \item \textbf{Testowalność}: Łatwo podmienić prawdziwe repozytorium na \textit{fake} w testach jednostkowych.
+    \item \textbf{Decoupling}: Zmiana biblioteki do API (np. z Retrofit na Ktor) nie wymaga zmian w kodzie UI.
+\end{enumerate}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Interfejs (kontrakt)
+interface UserRepository {
+    suspend fun getUser(id: String): User
+}
+
+// Konkretna implementacja
+class UserRepositoryImpl(
+    private val api: ApiService,
+    private val database: UserDao
+) : UserRepository {
+
+    override suspend fun getUser(id: String): User {
+        // 1. Sprawdź czy user jest w bazie lokalnej (cache)
+        val cachedUser = database.getUser(id)
+        if (cachedUser != null) {
+            return cachedUser
+        }
+
+        // 2. Jeśli nie ma, pobierz z API
+        val networkUser = api.fetchUser(id)
+        
+        // 3. Zapisz do bazy na przyszłość
+        database.saveUser(networkUser)
+        
+        return networkUser
+    }
+}
+\end{minted}
+
+Dzięki takiemu podejściu, ViewModel po prostu wywołuje \texttt{repository.getUser("123")} i nie martwi się logiką cache'owania ani obsługą sieci.
+
+\section{Adnotacje i Przetwarzanie (Annotation Processing)}
+
+Adnotacje (np. \texttt{@Override}, \texttt{@Composable}, \texttt{@GET}) to metadane dołączane do kodu. Same w sobie nie zmieniają działania programu, ale mogą być odczytywane przez kompilator lub inne narzędzia.
+
+Dlaczego w ogóle ich używamy?
+\begin{enumerate}
+    \item \textbf{Generowanie kodu (Code Generation)}: To najważniejsze zastosowanie w Androidzie. Biblioteki takie jak Room (baza danych) czy Hilt (wstrzykiwanie zależności) czytają adnotacje i na ich podstawie generują skomplikowany kod "boilerplate", którego nie musimy pisać ręcznie.
+    \item \textbf{Konfiguracja}: Zamiast plików XML czy JSON, konfigurujemy zachowanie klas bezpośrednio w kodzie (np. \texttt{@GET("/users")} w Retrofit mówi, pod jaki adres uderzyć).
+    \item \textbf{Walidacja}: Kompilator może sprawdzić poprawność kodu (np. \texttt{@Override} upewnia się, że faktycznie nadpisujemy metodę).
+\end{enumerate}
+
+W ekosystemie Kotlina mamy dwie główne technologie przetwarzania adnotacji:
+
+\begin{enumerate}
+    \item \textbf{KAPT (Kotlin Annotation Processing Tool)}:
+    \begin{itemize}
+        \item Starsze rozwiązanie.
+        \item Działa na bazie Java Annotation Processing (APT).
+        \item Wymaga wygenerowania "stubów" (zaślepek) w Javie dla kodu Kotlina.
+        
+        \textit{Stuby to wygenerowane pliki Java, które zawierają same deklaracje klas i metod z kodu Kotlina (bez ciał funkcji). Są one potrzebne, aby procesory adnotacji napisane dla Javy mogły "zrozumieć" kod Kotlina. Generowanie stubów jest kosztowne i spowalnia kompilację.}
+        
+        \textit{Analogia: Wyobraź sobie, że piszesz książkę po polsku (Kotlin), ale Twój redaktor (procesor adnotacji) mówi tylko po angielsku (Java). Stuby to takie "streszczenie" lub "spis treści" przetłumaczone na angielski – redaktor nie widzi całej treści, ale wie, jakie są rozdziały (klasy) i podrozdziały (metody).}
+
+    \end{itemize}
+
+    \item \textbf{KSP (Kotlin Symbol Processing)}:
+    \begin{itemize}
+        \item Nowoczesne, natywne rozwiązanie dla Kotlina.
+        \item Nie generuje stubów Java $\rightarrow$ działa szybciej niż KAPT.
+        \item Rozumie specyficzne dla Kotlina konstrukcje (np. \texttt{internal}, \texttt{sealed class}).
+        \item Zalecane dla bibliotek takich jak Room, Moshi czy Hilt.
+    \end{itemize}
+\end{enumerate}
+
+Przykład użycia KSP (w build.gradle):
+\begin{minted}[frame=single,framesep=10pt]{groovy}
+plugins {
+    id("com.google.devtools.ksp") version "1.9.0-1.0.13"
+}
+\end{minted}
