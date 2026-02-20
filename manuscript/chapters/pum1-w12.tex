@@ -98,6 +98,13 @@ class RetrofitClient private constructor() {
 
 Choć w Kotlinie zazwyczaj wystarcza nam \texttt{object} lub delegacja \texttt{by lazy} (która pod spodem również używa mechanizmów synchronizacji), zrozumienie Double-Checked Locking jest ważne dla świadomości, jak działają te mechanizmy \textit{pod maską}.
 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w12-singleton.png}
+    \caption{Inżynieria Singletona - od leniwej inicjalizacji do Double-Checked Locking}
+    \label{fig:pum1-w12-singleton}
+\end{figure}
+
 \section{Builder (Budowniczy)}
 
 Wzorzec Builder służy do konstruowania złożonych obiektów krok po kroku. Oddziela proces budowania od reprezentacji obiektu. Jest to szczególnie przydatne, gdy obiekt ma wiele opcjonalnych parametrów konfiguracyjnych.
@@ -184,6 +191,13 @@ val pizza = Pizza.Builder()
     .build()
 \end{minted}
 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w12-builder.png}
+    \caption{Inżynieria wzorca Budowniczy - Konfiguracja bezpośrednia vs. z użyciem klasy \texttt{Builder}}
+    \label{fig:pum1-w12-builder}
+\end{figure}
+
 \section{Factory (Fabryka)}
 
 Wzorzec Factory (lub Factory Method) to jeden z najczęściej wykorzystywanych wzorców kreacyjnych. Służy do tworzenia obiektów bez ujawniania klientowi logiki ich tworzenia oraz bez wiązania kodu klienta z konkretną klasą implementującą.
@@ -231,9 +245,16 @@ companion object {
 // Użycie: val logger = LoggerFactory("console")
 \end{minted}
 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w12-factory.png}
+    \caption{Inżynieria wzorca Fabryka - Odsprzęganie kodu klienta od logiki tworzenia obiektów}
+    \label{fig:pum1-w12-factory}
+\end{figure}
+
 \section{Repository (Repozytorium)}
 
-Repozytorium to jeden z ważniejszych wzorców architektonicznych w tworzeniu nowoczesnych aplikacji mobilnych. Służy on do \textbf{abstrakcji źródeł danych} i działa jako \textit{mediator} między domeną aplikacji a warstwą danych.
+Repozytorium to jeden z ważniejszych wzorców architektonicznych w tworzeniu aplikacji mobilnych. Służy on do \textbf{abstrakcji źródeł danych} i działa jako \textit{mediator} między domeną aplikacji a warstwą danych.
 
 Warstwa widoku (View/ViewModel) nie powinna wiedzieć, skąd pochodzą dane – czy z lokalnej bazy danych (Room), z API REST-owego (Retrofit), czy może z plików systemowych. Powinna jedynie \textit{poprosić} o dane i je otrzymać (zazwyczaj jako \texttt{Flow} lub \texttt{suspend} function). To Repozytorium podejmuje decyzję, czy zwrócić dane z pamięci podręcznej (dla szybkości), czy pobrać świeże dane z sieci (dla aktualności). Działa ono jak \textit{fasada}, ukrywając przed resztą aplikacji złożoność operacji I/O.
 
@@ -276,6 +297,13 @@ class UserRepositoryImpl(
 
 Dzięki takiemu podejściu, ViewModel po prostu wywołuje \texttt{repository.getUser("123")} i nie martwi się logiką cache'owania ani obsługą sieci.
 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w12-repository.png}
+    \caption{Inżynieria wzorca Repozytorium - Abstrakcja źródeł danych}
+    \label{fig:pum1-w12-repository}
+\end{figure}
+
 \section{Adnotacje i Przetwarzanie (Annotation Processing)}
 
 Adnotacje (np. \texttt{@Override}, \texttt{@Composable}, \texttt{@GET}) to metadane dołączane do kodu. Same w sobie nie zmieniają działania programu, ale mogą być odczytywane przez kompilator lub inne narzędzia.
@@ -304,7 +332,7 @@ W ekosystemie Kotlina mamy dwie główne technologie przetwarzania adnotacji:
 
     \item \textbf{KSP (Kotlin Symbol Processing)}:
     \begin{itemize}
-        \item Nowoczesne, natywne rozwiązanie dla Kotlina.
+        \item Natywne rozwiązanie dla Kotlina.
         \item Nie generuje stubów Java $\rightarrow$ działa szybciej niż KAPT.
         \item Rozumie specyficzne dla Kotlina konstrukcje (np. \texttt{internal}, \texttt{sealed class}).
         \item Zalecane dla bibliotek takich jak Room, Moshi czy Hilt.

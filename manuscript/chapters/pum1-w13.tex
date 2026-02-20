@@ -65,6 +65,13 @@ class UserViewModel {
 }
 \end{minted}
 
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w13-observer.png}
+    \caption{Inżynieria wzorca Obserwator - od Listenerów do StateFlow}
+    \label{fig:pum1-w13-observer}
+\end{figure}
+
 \section{State (Stan)}
 
 Wzorzec State pozwala obiektowi zmieniać swoje zachowanie w zależności od wewnętrznego stanu. Unikamy dzięki temu gigantycznych instrukcji \texttt{if-else} lub \texttt{switch/when} rozrzuconych po całym kodzie.
@@ -122,6 +129,13 @@ val bigs = processNumbers(nums) { it > 3 }       // Strategia: większe od 3
 \end{minted}
 
 To znacznie upraszcza kod.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w13-strategy.png}
+    \caption{Inżynieria wzorca Strategia - Wymienne algorytmy i podejście funkcyjne w Kotlinie}
+    \label{fig:pum1-w13-strategy}
+\end{figure}
 
 \section{Mediator}
 
@@ -187,3 +201,10 @@ fun RegistrationScreen(viewModel: RegistrationViewModel) {
     }
 }
 \end{minted}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w13-mediator.png}
+    \caption{Wzorzec Mediator - Centralizacja komunikacji i logiki}
+    \label{fig:pum1-w13-mediator}
+\end{figure}
