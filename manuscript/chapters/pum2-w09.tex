@@ -83,7 +83,9 @@ data class TaskEntity(
 )
 \end{minted}
 
-\subsection{DAO (Operacje na danych)}Data Access Object (DAO) stanowi warstwę abstrakcji oddzielającą logikę biznesową aplikacji od niskopoziomowych operacji na bazie danych SQLite. W bibliotece Room, DAO musi być interfejsem (lub klasą abstrakcyjną), ponieważ właściwa implementacja metod (zawierająca kod SQL i zarządzanie kursorami) jest generowana automatycznie podczas kompilacji.
+\subsection{DAO (Operacje na danych)}
+
+Data Access Object (DAO) stanowi warstwę abstrakcji oddzielającą logikę biznesową aplikacji od niskopoziomowych operacji na bazie danych SQLite. W bibliotece Room, DAO musi być interfejsem (lub klasą abstrakcyjną), ponieważ właściwa implementacja metod (zawierająca kod SQL i zarządzanie kursorami) jest generowana automatycznie podczas kompilacji.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
 @Dao
@@ -94,8 +96,8 @@ interface TaskDao {
     // dużo czasu.
     // Room automatycznie wykona je na Dispatchers.IO (Main-Safe).
     
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTask(task: TaskEntity)
+    @Upsert
+    suspend fun upsertTask(task: TaskEntity)
 
     @Delete
     suspend fun deleteTask(task: TaskEntity)
@@ -117,19 +119,19 @@ interface TaskDao {
 }
 \end{minted}
 
-Metody oznaczone adnotacjami \texttt{@Insert}, \texttt{@Delete} oraz \texttt{@Update} odpowiadają za modyfikację stanu bazy danych.
+Metody oznaczone adnotacjami \texttt{@Upsert}, \texttt{@Delete} oraz \texttt{@Update} odpowiadają za modyfikację stanu bazy danych.
 
 \begin{itemize}
     \item \textbf{Modyfikator \texttt{suspend}:} Operacje zapisu na dysku (I/O) są z natury blokujące i mogą trwać od kilku do kilkudziesięciu milisekund. Oznaczenie ich jako \texttt{suspend} wymusza na programiście wywołanie ich wewnątrz korutyny.
     \item \textbf{Main-Safety:} Room gwarantuje bezpieczeństwo wątku głównego. Wygenerowana implementacja tych metod automatycznie przenosi wykonanie zapytania SQL na dedykowany dla bazy danych dyspozytor (zazwyczaj oparty na \texttt{Dispatchers.IO}), niezależnie od tego, na jakim wątku została uruchomiona korutyna nadrzędna.
-    \item \textbf{Strategia Konfliktów:} Parametr \texttt{onConflict = OnConflictStrategy.REPLACE} instruuje silnik bazy danych, jak zachować się w przypadku naruszenia unikalności klucza głównego (Primary Key). W tym przypadku, próba wstawienia zadania o istniejącym już ID spowoduje nadpisanie starego rekordu nowym (tzw. operacja \textit{UPSERT}).
+    \item \textbf{Strategia Konfliktów:} W starszym kodzie często spotkamy \texttt{@Insert(onConflict = OnConflictStrategy.REPLACE)}, które mapuje się na SQLite \texttt{INSERT OR REPLACE}. Taka operacja ma semantykę \textit{delete + insert}, a nie klasycznej aktualizacji \textit{in place}. Dlatego, gdy chcemy jawnej semantyki \textit{insert albo update}, w Room warto preferować adnotację \texttt{@Upsert}.
 \end{itemize}
 
 Metoda \texttt{getAllTasks()} zwraca typ \texttt{Flow<List<TaskEntity>>}.
 
 \begin{itemize}
     \item \textbf{Brak \texttt{suspend}:} Zauważmy, że ta metoda \textbf{nie jest} funkcją zawieszającą. Wynika to z faktu, że samo wywołanie metody nie wykonuje zapytania SQL. Tworzy ono jedynie i zwraca instancję strumienia (\texttt{Flow}). Dopiero zasubskrybowanie się do strumienia (operacja \texttt{collect}) uruchamia zapytanie.
-    \item \textbf{Invalidation Tracker:} Room automatycznie monitoruje tabele w bazie danych. Gdy nastąpi jakakolwiek zmiana w tabeli \texttt{tasks\_table} (np. przez \texttt{insertTask}), Room wykrywa to zdarzenie, automatycznie wykonuje zapytanie \texttt{SELECT} ponownie i emituje zaktualizowaną listę do strumienia. Zapewnia to spójność widoku z danymi bez konieczności ręcznego odświeżania UI.
+    \item \textbf{Invalidation Tracker:} Room automatycznie monitoruje tabele w bazie danych. Gdy nastąpi jakakolwiek zmiana w tabeli \texttt{tasks\_table} (np. przez \texttt{upsertTask}), Room wykrywa to zdarzenie, automatycznie wykonuje zapytanie \texttt{SELECT} ponownie i emituje zaktualizowaną listę do strumienia. Zapewnia to spójność widoku z danymi bez konieczności ręcznego odświeżania UI.
 \end{itemize}
 
 Metoda \texttt{getTaskById} jest przykładem klasycznego zapytania zwracającego pojedynczy wynik (Snapshot).
@@ -219,7 +221,7 @@ class TaskRepository(private val taskDao: TaskDao) {
     // z którego wołamy tę funkcję (zazwyczaj ViewModel).
     suspend fun addTask(title: String) {
         val newTask = TaskEntity(title = title, isCompleted = false)
-        taskDao.insertTask(newTask)
+        taskDao.upsertTask(newTask)
     }
 
     suspend fun toggleTaskCompletion(task: TaskEntity) {

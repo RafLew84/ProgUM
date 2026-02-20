@@ -126,13 +126,13 @@ Różnica wynika z architektury Androida i faktu, że aplikacje mobilne działaj
     \item \textbf{Zarządzanie cyklem życia}: W przeciwieństwie do aplikacji desktopowej, która zazwyczaj działa dopóki użytkownik jej nie zamknie, komponenty Androida są stale tworzone i niszczone przez system. Istnienie wielu rodzajów kontekstu pozwala systemowi precyzyjnie określić, jak długo dany zasób powinien być zarezerwowany.
 \end{itemize}
 
-Dlaczego tworząc klasy odpowiedzialne za bazę danych (np. Room) lub komunikację sieciową (np. Retrofit) musimy przekazać \texttt{Context}.
+Dlaczego tworząc klasy odpowiedzialne za bazę danych (np. Room) lub warstwę sieciową (np. Retrofit + OkHttp) czasem musimy przekazać \texttt{Context}?
 \begin{itemize}
     \item \textbf{Baza danych}: Musi wiedzieć, gdzie fizycznie utworzyć plik \texttt{.db}. Ścieżka do chronionego folderu danych aplikacji (\texttt{/data/data/nazwa.pakietu/databases}) jest dostępna wyłącznie poprzez metodę \texttt{getDatabasePath()}, która należy do kontekstu.
-    \item \textbf{Retrofit/OkHttp}: Często wymaga dostępu do folderu \texttt{cache} (pamięci podręcznej) dla odpowiedzi HTTP lub musi odpytać system o stan sieci (\texttt{ConnectivityManager}), co również wymaga uprawnień zaszytych w kontekście.
+    \item \textbf{Retrofit/OkHttp}: Sam \texttt{Retrofit} nie wymaga \texttt{Context}. \texttt{Context} bywa potrzebny na etapie konfiguracji klienta \texttt{OkHttp} (np. \texttt{cacheDir} dla HTTP cache) albo przy dostępie do usług systemowych (np. \texttt{ConnectivityManager}).
 \end{itemize}
 
-W przypadku takich bibliotek kluczowe jest przekazanie \textbf{Application Context}. Ponieważ baza danych czy klient sieciowy to zazwyczaj obiekty typu Singleton (żyjące przez cały czas działania programu), trzymanie w nich referencji do \texttt{Activity Context} uniemożliwiłoby systemowi usunięcie zamkniętego ekranu z pamięci, prowadząc do jej wycieku.
+W takich przypadkach kluczowe jest przekazanie \textbf{Application Context}. Ponieważ baza danych czy klient sieciowy to zazwyczaj obiekty typu Singleton (żyjące przez cały czas działania programu), trzymanie w nich referencji do \texttt{Activity Context} uniemożliwiłoby systemowi usunięcie zamkniętego ekranu z pamięci, prowadząc do jej wycieku.
 
 Z punktu widzenia programisty, \texttt{Activity} jest pełnoprawnym obiektem typu \texttt{Context} dzięki wielopoziomowemu dziedziczeniu. Hierarchia klas w systemie Android prezentuje się następująco:
 

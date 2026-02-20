@@ -107,7 +107,7 @@ Kluczowe elementy:
 \begin{enumerate}
     \item \textbf{\texttt{arguments}}: Lista oczekiwanych parametrów. Navigation Compose musi wiedzieć, że \texttt{\{userId\}} to coś więcej niż fragment tekstu – że jest to zmienna.
     \item \textbf{\texttt{navArgument}}: Konfiguracja pojedynczego parametru. Określamy tu typ (np. \texttt{\-NavType.\-StringType}, \texttt{IntType}) oraz ewentualnie wartość domyślną (\texttt{defaultValue}) lub czy może być nullem (\texttt{nullable}).
-    \item \textbf{\texttt{backStackEntry}}: To obiekt reprezentujący \textit{wpis} na stosie nawigacji. Przechowuje stan ekranu, w tym \textbf{Sparchowane argumenty}. To z niego wyciągamy przekazaną wartość (podobnie jak \texttt{Intent.extras} w starym systemie).
+    \item \textbf{\texttt{backStackEntry}}: To obiekt reprezentujący \textit{wpis} na stosie nawigacji. Przechowuje stan ekranu, w tym \textbf{Sparsowane argumenty}. To z niego wyciągamy przekazaną wartość (podobnie jak \texttt{Intent.extras} w starym systemie).
     \item \textbf{\texttt{UserProfile}}: To zwykła funkcja \texttt{@Composable}, która przyjmuje \texttt{id} jako parametr. Zauważ, że \textbf{nie wie ona nic o nawigacji}. Nie wie, skąd przyszło \texttt{id} – czy z URL-a, czy ze stałej. To dobra praktyka: uniezależnia widok od mechanizmu nawigacji (Decoupling).
 \end{enumerate}
 

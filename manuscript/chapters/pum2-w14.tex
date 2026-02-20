@@ -405,7 +405,7 @@ Czasami musimy wykonać kilka operacji atomowo (wszystko albo nic).
 
 \section{Zaawansowane zapytania i indeksy}
 
-Firestore jest bazą zoptymalizowaną pod kątem szybkości odczytu. Gwarantuje ona, że czas pobierania danych zależy od liczby wyników, a nie od wielkości całej kolekcji. Pobranie 50 filmów z bazy zawierającej 100 dokumentów trwa tyle samo, co z bazy zawierającej 100 milionów dokumentów.
+Firestore jest bazą zoptymalizowaną pod kątem szybkości odczytu. Gwarantuje ona, że czas pobierania danych zależy od liczby wyników, a nie od wielkości całej kolekcji. Pobranie 50 filmów z bazy zawierającej 100 dokumentów czas zalezy glownie od liczby zwracanych wynikow, przy poprawnym indeksowaniu.
 
 Aby to osiągnąć, Firestore nakłada na programistów pewne ograniczenia dotyczące konstrukcji zapytań i wymaga indeksowania każdego pola, po którym chcemy wyszukiwać. Zapytania tworzymy poprzez łańcuchowe wywoływanie metod na obiekcie \texttt{CollectionReference}. Każde wywołanie zwraca obiekt \texttt{Query}.
 
