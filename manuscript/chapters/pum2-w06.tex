@@ -1,0 +1,749 @@
+\chapter{Zaawansowane Zarządzanie Wątkami i Stanem (Wykład 6)}
+
+\section{Powrót do podstaw}
+
+W poprzednich rozdziałach nauczyliśmy się tworzyć korutyny, używać \texttt{launch}, \texttt{async} oraz synchronizować zadania za pomocą \texttt{join}. Zanim jednak przejdziemy do zaawansowanych wzorców architektonicznych, musimy wyjaśnić jedno z najczęstszych nieporozumień dotyczących współbieżności w Kotlinie.
+
+Wróćmy do przykładów, które omawialiśmy w Rozdziale 3. Przeanalizujmy dokładnie, na jakim wątku wykonywana jest każda linijka kodu.
+
+Spójrzmy na generator haseł. Użyliśmy tu \texttt{async}, co mocno sugeruje asynchroniczność. Ale gdzie tak naprawdę dzieje się \textit{praca}?
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable fun PasswordGeneratorScreen() { 
+    var password by remember { mutableStateOf("...") } 
+    // Domyślny scope w Compose używa Dispatchers.Main.immediate
+    val scope = rememberCoroutineScope()
+
+    // Funkcja symulująca ciężkie obliczenia
+    suspend fun generatePassword(): String {
+        // Tu nadal jesteśmy na WĄTKU GŁÓWNYM!
+        // delay tylko zawiesza korutynę, nie zmienia wątku.
+        delay(3000) 
+        return "Kotlin-Is-Super-Secure-123"
+    }
+
+    Column(...) {
+        Button(onClick = {
+            password = "Generowanie..."
+            
+            // 1. START: Jesteśmy na Main Thread (obsługa kliknięcia)
+            // launch bez argumentów dziedziczy kontekst (tu: Main)
+            scope.launch { 
+                // 2. WNĘTRZE KORUTYNY: Nadal Main Thread.
+                
+                // 3. ASYNC: Uruchamia nową korutynę, ale
+                // dziedziczy dispatcher od rodzica (czyli Main Thread).
+                val deferredPassword: Deferred<String> = async { 
+                    generatePassword() // Wykonanie funkcji na Main Thread
+                }
+                
+                // 4. AWAIT: Zawiesza korutynę rodzica (na Main Thread).
+                // UI nie jest zablokowane tylko dlatego, że użyliśmy 'delay',
+                // który jest funkcją nieblokującą.
+                // Gdyby generatePassword() liczyło hashe przez 3 sekundy (CPU), 
+                // aplikacja by "zamarzła" (ANR).
+                val result = deferredPassword.await()
+                
+                // 5. WZNOWIENIE: Nadal Main Thread. Aktualizacja UI.
+                password = result
+            }
+        }) { Text("Wygeneruj hasło") }
+    }
+} 
+\end{minted}
+
+\textbf{Wniosek:} Cała operacja, od kliknięcia, przez \texttt{async}, aż po wynik, odbyła się na \textbf{jednym i tym samym wątku (Main)}. Zadziałało to płynnie tylko dlatego, że \texttt{delay} jest funkcją zawieszającą. Gdybyśmy tam wstawili prawdziwą pracę procesora, UI uległoby zamrożeniu.
+
+Drugi przykład z kucharzami pokazywał współbieżność (robienie dwóch rzeczy naraz). Czy oznacza to jednak równoległość (użycie wielu rdzeni)?
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// 1. Szef Kuchni (Rodzic)
+// scope.launch domyślnie używa Dispatchers.Main
+scope.launch {
+    // WĄTEK: Main Thread
+    logs.add("Szef kuchni (rodzic): Zaczynamy")
+
+    // 2. Zlecenie zadania Pomocnikowi 1
+    // launch dziedziczy kontekst -> Dispatchers.Main
+    val jobMieso = launch {
+        // WĄTEK: Main Thread
+        // Korutyna zawiesza się na wątku głównym, ustępując miejsca innym
+        delay(2000) 
+        logs.add("Kucharz 1: Mięso usmażone (2s).")
+    }
+
+    // 3. Zlecenie zadania Pomocnikowi 2
+    // launch dziedziczy kontekst -> Dispatchers.Main
+    val jobWarzywa = launch {
+        // WĄTEK: Main Thread
+        delay(3000) 
+        logs.add("Kucharz 2: Warzywa gotowe (3s).")
+    }
+
+    // WĄTEK: Main Thread
+    logs.add("Szef kuchni: Zadania zlecone...")
+
+    // 4. Synchronizacja
+    // join() to punkt zawieszenia na Main Thread.
+    // Korutyna rodzica "czeka" (nie blokując wątku), aż dzieci skończą.
+    jobWarzywa.join()
+    jobMieso.join()
+
+    // 5. Finał
+    // WĄTEK: Main Thread
+    logs.add("Szef kuchni: Wszyscy skończyli!")
+}
+\end{minted}
+
+\textbf{Wniosek:} Mimo że mamy trzy korutyny (Rodzic, Kucharz 1, Kucharz 2), wszystkie \textit{skaczą} po tym samym wątku głównym.
+
+Oczywiście, zarówno \texttt{launch}, jak i \texttt{async} przyjmują opcjonalny argument typu \path{CoroutineContext}, który pozwala jawnie wskazać dyspozytora.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Możemy wymusić inny wątek w momencie startu
+scope.launch(Dispatchers.IO) {
+    // Teraz jesteśmy na wątku tła.
+    // Dobre dla zapisu do pliku.
+    saveToFile()
+    
+    // PROBLEM: Nie możemy stąd bezpiecznie dotknąć UI
+    // textLabel.text = "Zapisano" // BŁĄD!
+}
+\end{minted}
+
+Choć jest to możliwe, w architekturze MVVM rzadko używamy tego podejścia bezpośrednio w warstwie UI. Powoduje to problemy z aktualizacją interfejsu (musimy ręcznie wracać na Main Thread) i utrudnia testowanie. Dlatego stosujemy podejście, w którym korutyna startuje na UI (żeby mieć do niego dostęp), a \textit{skacze} na inne wątki tylko wtedy, gdy to konieczne.
+
+Wyróżniamy dwa główne wzorce przełączania wątków, którymi zajmiemy się w tym rozdziale:
+
+\begin{enumerate}
+    \item \textbf{Podejście Imperatywne (\texttt{withContext}):} Stosowane wewnątrz funkcji. Mówimy: \textit{Wykonaj ten fragment kodu na innym wątku i wróć do mnie z wynikiem}.
+    \item \textbf{Podejście Reaktywne (\texttt{flowOn}):} Stosowane w strumieniach. Mówimy: \textit{Wszystkie dane powyżej tego punktu mają być produkowane na innym wątku}.
+\end{enumerate}
+
+\section{Podejście Imperatywne: Bezpieczeństwo funkcji z withContext}
+
+Wróćmy do problemu blokowania UI. Wiemy już, że wywołanie trudnej obliczeniowo funkcji wewnątrz \texttt{viewModelScope.launch} zablokuje ekran.
+
+Rozwiązaniem tego problemu w podejściu imperatywnym jest funkcja \texttt{withContext}:
+\begin{enumerate}
+    \item Przyjmuje jako argument \texttt{Dispatcher} (np. \texttt{Dispatchers.Default} lub \texttt{IO}).
+    \item \textbf{Zawiesza} bieżącą korutynę (nie blokując wątku, z którego została wywołana).
+    \item Wykonuje blok kodu na wskazanym dyspozytorze.
+    \item Po zakończeniu pracy \textbf{wznawia} korutynę na pierwotnym dyspozytorze.
+    \item Zwraca wynik ostatniej linii bloku kodu (działa jak wyrażenie).
+\end{enumerate}
+
+To sprawia, że kod wygląda na sekwencyjny, mimo że pod spodem następuje skomplikowane przełączanie wątków.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Definicja funkcji Main-Safe (Bezpiecznej dla UI)
+suspend fun performHeavyCalculation(): Int {
+    // 1. Zmiana kontekstu na wątek obliczeniowy
+    return withContext(Dispatchers.Default) {
+        // 2. Symulacja ciężkiej pracy (np. przetwarzanie obrazu)
+        // To nie zablokuje UI, mimo że funkcja 'sleep' normalnie blokuje wątek.
+        // Blokujemy tu wątek roboczy, a nie główny.
+        Thread.sleep(2000) 
+        
+        // 3. Obliczenie wyniku
+        val result = 42 * 100 
+        
+        // 4. Zwrócenie wyniku (ostatnia linia)
+        result 
+    }
+    // 5. Automatyczny powrót na wątek, z którego wywołano funkcję
+}
+
+// Użycie w ViewModelu
+fun onCalculateClicked() {
+    viewModelScope.launch { // Start na Main Thread
+        _uiState.value = UiState.Loading // Aktualizacja UI
+        
+        // Wywołanie - tu korutyna się "zawiesza" na Main Thread
+        // UI pozostaje responsywne (np. kręci się loader)
+        val result = performHeavyCalculation()
+        
+        // Powrót na Main Thread z gotowym wynikiem
+        _uiState.value = UiState.Success(result)
+    }
+}
+\end{minted}
+
+\section{Podejście Reaktywne: Bezpieczeństwo strumieni z flowOn}
+
+O ile \texttt{withContext} świetnie sprawdza się w funkcjach, które \textit{wchodzą i wychodzą}, o tyle w przypadku strumieni (\texttt{Flow}) sytuacja jest bardziej złożona. Strumień to \textit{rurociąg}, przez który dane \textit{płyną} w czasie.
+
+We \texttt{Flow} obowiązuje zasada: \textbf{kod wewnątrz bloku \texttt{flow { ... }} wykonuje się w tym samym kontekście, w którym wywołano \texttt{collect()}}.
+
+Ponieważ w Androidzie zazwyczaj zbieramy dane (\texttt{collect}) w warstwie widoku (Activity/Composable), która działa na wątku głównym, oznacza to, że domyślnie \textbf{producent danych też działałby na wątku głównym}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// BŁĘDNE PODEJŚCIE
+// Repository
+val usersFlow = flow {
+    // To wykona się na Main Thread, jeśli collect będzie na Main!
+    // Spowoduje to zamrożenie UI przy każdym odczycie z bazy.
+    val data = database.readUsers() // Operacja blokująca IO
+    emit(data)
+}
+
+// ViewModel / UI
+viewModelScope.launch { 
+    // Zbieramy na Main Thread (domyślnie w viewModelScope)
+    usersFlow.collect { show(it) } 
+}
+\end{minted}
+
+Aby zmienić wątek, na którym produkowane są dane, używamy operatora \texttt{flowOn}. Jego działanie jest specyficzne: zmienia on kontekst wykonania tylko dla operatorów znajdujących się \textbf{powyżej} niego (tzw. \textit{upstream}).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// PRAWIDŁOWE PODEJŚCIE
+val usersFlow = flow {
+    // 1. To wykona się na Dispatchers.IO
+    val data = database.readUsers()
+    emit(data)
+}.map { users -> 
+    // 2. To też wykona się na Dispatchers.IO (bo jest powyżej flowOn)
+    users.filter { it.isActive }
+}.flowOn(Dispatchers.IO) // <--- GRANICA ZMIANY KONTEKSTU
+.map { users ->
+    // 3. To wykona się w kontekście odbiorcy (zazwyczaj Main)
+    // Bo jest PONIŻEJ flowOn
+    users.map { it.name }
+}
+\end{minted}
+
+Dzięki \texttt{flowOn} możemy bezpiecznie wykonywać operacje bazodanowe lub sieciowe w repozytorium, a wynik dostarczać gotowy do wyświetlenia na wątku UI.
+
+\section{Porównanie withContext i flowOn}
+
+Podsumujmy różnice między tymi dwoma mechanizmami:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|p{5cm}|p{5cm}|}
+\hline
+\textbf{Cecha} & \textbf{withContext} & \textbf{flowOn} \\ \hline
+\textbf{Typ danych} & Pojedynczy wynik (T) & Strumień danych (Flow<T>) \\ \hline
+\textbf{Kierunek zmian} & Zmienia kontekst dla bloku kodu \textit{tu i teraz}. & Zmienia kontekst dla źródła danych (\textit{w górę rzeki}). \\ \hline
+\textbf{Bezpieczeństwo} & Musi być wywołany wewnątrz funkcji \texttt{suspend}. & Jest operatorem nakładanym na obiekt \texttt{Flow}. \\ \hline
+\textbf{Zastosowanie} & Krótkie operacje (np. sortowanie listy, zapis do pliku). & Długotrwałe obserwowanie danych (np. z bazy Room). \\ \hline
+\end{tabular}
+\caption{Porównanie mechanizmów zmiany wątku}
+\end{table}
+
+\section{Transformacja Strumieni}
+
+Zanim poznamy operator \texttt{stateIn}, musimy zrozumieć problem architektoniczny, który on rozwiązuje. Wymaga to przypomnienia fundamentalnej różnicy między strumieniami zimnymi a gorącymi oraz przeanalizowania cyklu życia aplikacji w Androidzie.
+
+W Rozdziale 5 zdefiniowaliśmy dwa rodzaje strumieni. Spójrzmy na nie teraz z perspektywy wydajności:
+
+\begin{itemize}
+    \item \textbf{Zimny Strumień (Flow):} To jest \textbf{przepis} na dane.
+    \begin{itemize}
+        \item Nie przechowuje danych.
+        \item Kod wewnątrz bloku \texttt{flow \{ ... \}} nie wykonuje się, dopóki ktoś nie zacznie nasłuchiwać (\texttt{collect}).
+        \item Każdy nowy subskrybent powoduje ponowne wykonanie kodu producenta od początku.
+    \end{itemize}
+    
+    \item \textbf{Gorący Strumień (StateFlow/SharedFlow):} To jest \textbf{gotowe danie} na stole.
+    \begin{itemize}
+        \item Przechowuje dane (stan) w pamięci.
+        \item Produkuje dane niezależnie od tego, czy ktoś ich słucha.
+        \item Nowy subskrybent otrzymuje natychmiast aktualny stan (talerz z jedzeniem), bez konieczności gotowania wszystkiego od nowa.
+    \end{itemize}
+\end{itemize}
+
+W Androidzie zmiana konfiguracji (np. obrót ekranu, zmiana trybu jasny/ciemny) powoduje całkowite zniszczenie i odtworzenie Aktywności. Jeśli w warstwie UI nasłuchujemy na \textbf{zimny} strumień (zwykły \texttt{Flow}) pochodzący bezpośrednio z repozytorium, dochodzi do marnotrawstwa zasobów.
+
+Prześledźmy ten scenariusz krok po kroku:
+
+\begin{enumerate}
+    \item Użytkownik uruchamia ekran. Activity woła \texttt{collect()}.
+    \item \textbf{Zimny Flow startuje:} Repozytorium łączy się z bazą danych, wykonuje zapytanie SQL, przetwarza wyniki. Dane trafiają na ekran.
+    \item Użytkownik \textbf{obraca ekran}.
+    \item Stare Activity jest niszczone $\rightarrow$ \texttt{collect()} zostaje anulowany.
+    \item Nowe Activity jest tworzone $\rightarrow$ woła nowe \texttt{collect()}.
+    \item \textbf{Zimny Flow startuje OD NOWA:} Repozytorium \textbf{znowu} łączy się z bazą, \textbf{znowu} wykonuje to samo zapytanie SQL.
+\end{enumerate}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// --- REPOZYTORIUM ---
+// Zimny strumień - kod w środku wykona się przy KAŻDEJ subskrypcji
+fun getTasks(): Flow<List<Task>> = flow {
+    println("Pobieram dane z bazy...") // To loguje się przy każdym obrocie!
+    val tasks = database.queryAll()
+    emit(tasks)
+}
+
+// --- VIEWMODEL (BŁĘDNE PODEJŚCIE) ---
+// ViewModel tylko przekazuje zimny strumień dalej
+val tasksFlow = repository.getTasks() // To nadal jest zimny Flow
+\end{minted}
+
+Architektura MVVM daje nam idealne miejsce na rozwiązanie tego problemu. \texttt{ViewModel} \textbf{przeżywa} zmianę konfiguracji urządzenia.
+
+Musimy więc:
+\begin{enumerate}
+    \item Pobrać dane raz (uruchomić zimny strumień).
+    \item Przechować wynik w pamięci ViewModelu (zamienić w gorący stan).
+    \item Nowe Activity po obrocie powinno otrzymać dane z pamięci ViewModelu, zamiast uderzać do repozytorium.
+\end{enumerate}
+
+Do tej transformacji służy operator \texttt{stateIn}, który omówimy w kolejnej sekcji.
+
+\section{Operatory stateIn i shareIn}
+
+Skoro wiemy już, że musimy zamienić zimny strumień (przepis) w gorący (danie), Kotlin dostarcza nam do tego dwa dedykowane operatory: \texttt{stateIn} oraz \texttt{shareIn}.
+
+Operator \texttt{stateIn} zamienia dowolny \texttt{Flow<T>} w \texttt{StateFlow<T>}.
+Przypomnijmy, że \texttt{StateFlow} jest obserwowalnym pojemnikiem na dane, który \textbf{zawsze} posiada wartość. Dlatego operator ten wymaga podania wartości początkowej.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// ViewModel
+val uiState: StateFlow<UiState> = repository.getDataStream()
+    .map { data -> UiState.Success(data) } // Transformacja danych
+    .stateIn(
+        scope = viewModelScope, // 1. Gdzie strumień ma żyć?
+        started = SharingStarted.WhileSubscribed(5000), // 2. Kiedy ma działać?
+        initialValue = UiState.Loading // 3. Co pokazać na początku?
+    )
+\end{minted}
+
+Parametr \texttt{started} jest kluczowy dla oszczędzania zasobów. Najczęściej używaną strategią w Androidzie jest \texttt{SharingStarted.WhileSubscribed(5000)}.
+
+\begin{itemize}
+    \item \textbf{Działanie:} Utrzymuj połączenie ze źródłem (upstream) tak długo, jak ktoś nasłuchuje w UI.
+    \item \textbf{Timeout (5000 ms):} Jeśli liczba subskrybentów spadnie do zera (np. użytkownik obrócił ekran i stare Activity zniknęło), \textbf{nie zrywaj połączenia od razu}. Poczekaj 5 sekund.
+\end{itemize}
+
+Zmiana konfiguracji często jest niemal natychmiastowa. Stare Activity znika (subskrybenci = 0), a chwilę później nowe Activity się pojawia (subskrybenci = 1).
+\begin{itemize}
+    \item Dzięki opóźnieniu 5s, strumień \textit{nie zauważa} tej krótkiej przerwy. Połączenie z bazą danych nie jest zrywane, a nowe Activity natychmiast dostaje dane z pamięci.
+    \item Jeśli jednak użytkownik naciśnie przycisk \textit{Home} i wyjdzie z aplikacji na dłużej niż 5 sekund - strumień zostanie zatrzymany, zwalniając zasoby (np. zamykając połączenie sieciowe).
+\end{itemize}
+
+Operator \texttt{shareIn} zamienia \texttt{Flow<T>} w \texttt{SharedFlow<T>}.
+Używamy go dla danych, które mają charakter \textit{zdarzeniowy} (Events), a nie \textit{stanowy} (State). Przykłady to: powiadomienia, toasty, sygnały nawigacyjne.
+
+Różnice względem \texttt{stateIn}:
+\begin{enumerate}
+    \item Nie wymaga wartości początkowej (zdarzenia nie muszą istnieć na starcie).
+    \item Pozwala konfigurować parametr \texttt{replay} (ile starych zdarzeń pamiętać dla nowych subskrybentów).
+\end{enumerate}
+
+Wyobraźmy sobie strumień alertów z serwera. Chcemy, aby te alerty trafiały do wszystkich ekranów w aplikacji, ale nie chcemy, aby nowy ekran po otwarciu wyświetlał stare, nieaktualne komunikaty.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val notificationEvents: SharedFlow<String> = repository.getAlerts()
+    .shareIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        replay = 0
+    )
+\end{minted}
+
+Gdybyśmy ustawili \texttt{replay = 1}, to każdy nowy ekran po otwarciu od razu dostałby ostatni komunikat.
+
+Podsumujmy:
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Cecha} & \textbf{stateIn (StateFlow)} & \textbf{shareIn (SharedFlow)} \\ \hline
+\textbf{Wartość początkowa} & Wymagana (\texttt{initialValue}) & Brak \\ \hline
+\textbf{Pamięć (Replay)} & Zawsze 1 (Ostatnia wartość) & Konfigurowalna (Domyślnie 0) \\ \hline
+\textbf{Zachowanie} & Jak zmienna (zawsze ma stan) & Jak radio (strumień ulotny) \\ \hline
+\textbf{Zastosowanie} & Stan ekranu (UI State) & Zdarzenia jednorazowe (Events) \\ \hline
+\end{tabular}
+\caption{Porównanie stateIn i shareIn}
+\end{table}
+
+\section{Łączenie danych: Operator combine}
+
+W aplikacjach stan ekranu (UI State) rzadko pochodzi z jednego źródła. Często musimy połączyć dane z dwóch lub więcej niezależnych strumieni.
+
+Typowe scenariusze:
+\begin{itemize}
+    \item \textbf{E-commerce:} Cena produktów (z Bazy) + Kod rabatowy (z Pola tekstowego).
+    \item \textbf{Profil:} Dane użytkownika (z Sieci) + Ustawienia prywatności (z DataStore).
+    \item \textbf{Listy:} Lista zadań (z Bazy) + Wybrany filtr kategorii (z ViewModela).
+\end{itemize}
+
+Do realizacji tego celu służy operator \texttt{combine}, który nasłuchuje na kilka strumieni jednocześnie. Jego działanie można porównać do formuły w arkuszu kalkulacyjnym (np. \texttt{=A1+B1}).
+\begin{enumerate}
+    \item Czeka, aż \textbf{wszystkie} strumienie wyemitują pierwszą wartość (synchronizacja startowa).
+    \item Gdy \textbf{którykolwiek} ze strumieni wyemituje nową wartość, operator bierze tę nową wartość oraz \textbf{ostatnie znane wartości} z pozostałych strumieni.
+    \item Uruchamia blok lambda, w którym łączymy te dane w jeden obiekt wynikowy.
+\end{enumerate}
+
+Załóżmy, że mamy repozytorium dostarczające aktualną sumę koszyka oraz pole tekstowe w ViewModelu, gdzie użytkownik wpisuje kod rabatowy.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class CartViewModel(repository: CartRepository) : ViewModel() {
+
+    // 1. Strumień z repozytorium (np. z bazy danych)
+    // Zmienia się rzadko (tylko gdy dodamy produkt)
+    val cartTotalFlow: Flow<Double> = repository.getCartTotal()
+
+    // 2. Strumień z pola tekstowego
+    // Zmienia się często (przy każdym naciśnięciu klawisza)
+    val promoCodeFlow = MutableStateFlow("")
+
+    // 3. Łączenie w jeden stan UI
+    val uiState: StateFlow<CartUiState> = combine(
+        cartTotalFlow,
+        promoCodeFlow
+    ) { total, code ->
+        // Ta lambda wykonuje się, gdy zmieni się cena LUB kod
+        
+        val discount = if (code == "PROMO20") 0.20 else 0.0
+        val finalPrice = total * (1.0 - discount)
+
+        // Zwracamy obiekt stanu
+        CartUiState(
+            totalPrice = total,
+            discountApplied = discount > 0,
+            finalPriceToPay = finalPrice
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = CartUiState() // Stan początkowy (pusty)
+    )
+    
+    fun onCodeChanged(code: String) {
+        promoCodeFlow.value = code
+    }
+}
+\end{minted}
+
+Dzięki \texttt{combine}, nasz UI jest w pełni reaktywny. Jeśli użytkownik wpisze poprawny kod, cena przeliczy się natychmiast. Jeśli w międzyczasie w tle przyjdzie aktualizacja ceny z bazy danych - cena również przeliczy się automatycznie, uwzględniając wpisany kod.
+
+\section{Pełne Przykłady Implementacji}
+
+Poniżej znajdują się kompletne kody źródłowe omawianych zagadnień, gotowe do przekopiowania do projektu.
+
+\subsection{Przykład 1: Bezpieczne obliczenia z withContext}
+
+Ten przykład pokazuje podejście imperatywne. Wykonujemy ciężką operację (symulacja renderowania wideo) na kliknięcie przycisku, nie blokując paska postępu na ekranie.
+
+\begin{minted}[frame=single,framesep=10pt,fontsize=\footnotesize]{kotlin}
+// 1. Definicja stanów UI (Sealed Interface)
+sealed interface UiState {
+    data object Idle : UiState                    
+    data object Loading : UiState                 
+    data class Success(val result: Int) : UiState 
+}
+
+// 2. ViewModel (Logika biznesowa)
+class CalculationViewModel : ViewModel() {
+
+    private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    fun onCalculateClicked() {
+        viewModelScope.launch {
+            _uiState.value = UiState.Loading
+
+            val result = performHeavyCalculation()
+
+            _uiState.value = UiState.Success(result)
+        }
+    }
+
+    private suspend fun performHeavyCalculation(): Int {
+        return withContext(Dispatchers.Default) {
+            Thread.sleep(2000) 
+            42 * 100
+        }
+    }
+}
+
+// 3. Widok (Composable)
+@Composable
+fun CalculationScreen(viewModel: CalculationViewModel = viewmodel()) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Reakcja na konkretny stan
+            when (val currentState = state) {
+                is UiState.Idle -> {
+                    Text(text = "Gotowy do obliczeń")
+                }
+                is UiState.Loading -> {
+                    CircularProgressIndicator()
+                    Text(text = "Przetwarzanie...")
+                }
+                is UiState.Success -> {
+                    Text(
+                        text = "Wynik: ${currentState.result}"
+                    )
+                }
+            }
+            Button(
+                onClick = { viewModel.onCalculateClicked() },
+                enabled = state !is UiState.Loading
+            ) {
+                Text("Rozpocznij ciężką pracę")
+            }
+        }
+    }
+}
+\end{minted}
+
+\subsection{Przykład 2: Optymalizacja strumienia z flowOn}
+
+Ten przykład pokazuje podejście reaktywne. Przenosimy przetwarzanie danych strumieniowych (filtrowanie i sortowanie) na wątek tła, podczas gdy repozytorium i widok pozostają czyste.
+
+\begin{minted}[frame=single,framesep=10pt,fontsize=\footnotesize]{kotlin}
+// 1. Model danych
+data class User(val name: String, val isActive: Boolean)
+
+// 2. Repository (Symulacja warstwy danych)
+class UserRepository {
+    // Funkcja zwraca "zimny" strumień (Cold Flow)
+    fun fetchUsersFromDb(): Flow<List<User>> = flow {
+        // SYMULACJA BLOKUJĄCEGO IO
+        // Normalnie zablokowałoby to UI, gdyby nie flowOn
+        Thread.sleep(2000) 
+        
+        val users = listOf(
+            User("Anna Kowalska", true),
+            User("Jan Nowak", false),
+            User("Marek Zegarek", true),
+            User("Zofia Samosia", true)
+        )
+        emit(users)
+    }
+}
+
+class UserViewModel : ViewModel() {
+    private val repository = UserRepository()
+
+    val uiState: StateFlow<UiState> = repository.fetchUsersFromDb()
+        .map { users -> users.filter { it.isActive }}
+        .flowOn(Dispatchers.IO) // <--- GRANICA ZMIANY KONTEKSTU (Upstream na IO)
+        .map { users ->
+            // Ten map jest ZA flowOn, więc wykona się na kontekście kolektora (Main)
+            UiState.Success(users.map { it.name.uppercase() }) as UiState
+        }
+        .onStart {
+            // Emitujemy stan ładowania na początku subskrypcji
+            emit(UiState.Loading)
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = UiState.Loading
+        )
+}
+
+// Definicja stanów widoku
+sealed interface UiState {
+    data object Loading : UiState
+    data class Success(val userNames: List<String>) : UiState
+}
+
+// 4. Widok (Composable)
+@Composable
+fun UserListScreen(viewModel: UserViewModel = viewModel()) {
+    val state by viewModel.uiState.collectAsState()
+
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        when (val currentState = state) {
+            is UiState.Loading -> {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Pobieranie bazy danych...")
+                    Text("(Sprawdź Logcat)")
+                }
+            }
+            is UiState.Success -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp)
+                ) {
+                    item {
+                        Text(
+                            "Aktywni Użytkownicy:",
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
+                    items(currentState.userNames) { name ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Text(
+                                text = name,
+                                modifier = Modifier.padding(16.dp)                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+\end{minted}
+
+\subsection{Przykład 3: Łączenie strumieni danych z combine}
+
+\begin{minted}[frame=single,framesep=10pt,fontsize=\footnotesize]{kotlin}
+// 1. Model Stanu UI
+data class CartUiState(
+    val baseTotal: Double = 0.0,
+    val finalPrice: Double = 0.0,
+    val discountApplied: Boolean = false,
+    val currentCode: String = ""
+)
+
+// 2. Repository (Symulacja danych zewnętrznych)
+class CartRepository {
+    // Symuluje koszyk, który zmienia się w czasie
+    fun getCartTotal(): Flow<Double> = flow {
+        // Startowa cena koszyka
+        emit(100.0) 
+        
+        // Po 5 sekundach symulujemy, że np. dodano produkt na innym urządzeniu
+        delay(5000) 
+        emit(200.0) // Cena rośnie. Combine automatycznie przeliczy wynik.
+    }
+}
+
+// 3. ViewModel (Logika łączenia strumieni)
+class CartViewModel : ViewModel() {
+    private val repository = CartRepository()
+
+    // Strumień 1: Cena z bazy danych (Read-only Flow)
+    private val cartTotalFlow = repository.getCartTotal()
+
+    // Strumień 2: Kod wpisywany przez usera (MutableStateFlow)
+    private val promoCodeFlow = MutableStateFlow("")
+
+    // Operator combine
+    val uiState: StateFlow<CartUiState> = combine(
+        cartTotalFlow,
+        promoCodeFlow
+    ) { total, code ->
+        // Ta lambda uruchamia się, gdy zmieni się ALBO cena, ALBO kod
+        
+        // Logika biznesowa rabatu
+        val isPromoValid = code.trim() == "PROMO20"
+        val discount = if (isPromoValid) 0.20 else 0.0
+        val finalPrice = total * (1.0 - discount)
+
+        // Zwracamy nowy, połączony stan
+        CartUiState(
+            baseTotal = total,
+            finalPrice = finalPrice,
+            discountApplied = isPromoValid,
+            currentCode = code
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = CartUiState()
+    )
+
+    // Funkcja wywoływana z UI przy wpisywaniu tekstu
+    fun onCodeChanged(newCode: String) {
+        promoCodeFlow.value = newCode
+    }
+}
+
+// 4. Widok (Composable)
+@Composable
+fun ShoppingCartScreen(viewModel: CartViewModel = viewModel()) {
+    // UI reaguje na każdą zmianę w uiState (pochodzącą z dowolnego strumienia)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Twój Koszyk")
+        
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Karta z podsumowaniem
+        Card(
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Cena produktów:")
+                    Text(
+                      "${state.baseTotal} PLN", 
+                      fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Wiersz: Rabat
+                if (state.discountApplied) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Rabat (PROMO20):")
+                        Text(
+                          "-20%", 
+                          fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                // Wiersz: Suma końcowa
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Do zapłaty:")
+                    Text(
+                        "${state.finalPrice} PLN", 
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Pole tekstowe do wprowadzania kodu
+        OutlinedTextField(
+            value = state.currentCode,
+            onValueChange = { viewModel.onCodeChanged(it) },
+            label = { Text("Kod rabatowy") },
+            placeholder = { Text("Wpisz: PROMO20") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            isError = state.currentCode.isNotEmpty() && !state.discountApplied,
+            supportingText = {
+                if (state.currentCode.isNotEmpty() && !state.discountApplied) {
+                    Text("Nieprawidłowy kod")
+                } else if (state.discountApplied) {
+                    Text("Kod przyjęty!", color = Color(0xFF2E7D32))
+                }
+            }
+        )
+    }
+}
+\end{minted}

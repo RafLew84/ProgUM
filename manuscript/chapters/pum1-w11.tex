@@ -1,0 +1,238 @@
+\chapter{Nawigacja w Jetpack Compose (Wykład 11)}
+
+W Jetpack Compose nawigacja jest w pełni deklaratywna i opiera się na bibliotece \textbf{Navigation Compose}. Cała nawigacja odbywa się w ramach jednej Aktywności, gdzie po prostu wymieniamy wyświetlane komponenty \texttt{@Composable} w zależności od aktualnego stanu aplikacji.
+
+\section{Podstawowe Elementy Nawigacji}
+
+System nawigacji składa się z trzech głównych komponentów:
+
+\begin{enumerate}
+    \item \textbf{NavController}: "System GPS". Centralny obiekt, który zarządza stosem nawigacji (Back Stack). To on wie, gdzie jesteś i jak dotrzeć do celu. Jego używasz, aby wywołać \texttt{navigate()} lub \texttt{popBackStack()}.
+    \item \textbf{NavHost}: "Ekran nawigacji". Kontener UI, który wyświetla aktualną pozycję (mapę/widok drogi) na podstawie stanu \texttt{NavController}.
+    \item \textbf{NavGraph}: "Mapa całej okolicy". Definiuje wszystkie dostępne ekrany (destynacje) i możliwe połączenia między nimi.
+\end{enumerate}
+
+
+Aby korzystać z Navigation Compose, musimy dodać odpowiednią zależność do pliku \texttt{build.gradle}. Biblioteka ta nie jest częścią standardowego zestawu startowego Compose.
+
+\begin{minted}[frame=single,framesep=10pt]{groovy}
+dependencies {
+    implementation("androidx.navigation:navigation-compose:<numer_wersji>")
+}
+\end{minted}
+
+Po zsynchronizowaniu projektu, możemy stworzyć \texttt{NavController}. Robimy to zazwyczaj w głównym komponencie naszej aplikacji (np. wewnątrz \texttt{Scaffold}), używając \texttt{rememberNavController()}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable
+fun AppNavigation() {
+    val navController = rememberNavController()
+
+    NavHost(navController = navController, startDestination = "home") {
+        
+        // Definicja ekranu "home"
+        composable("home") {
+            HomeScreen(
+                onProfileClick = { navController.navigate("profile") }
+            )
+        }
+
+        // Definicja ekranu "profile"
+        composable("profile") {
+            ProfileScreen()
+        }
+    }
+}
+\end{minted}
+
+Analiza powyższego kodu:
+
+\begin{itemize}
+    \item \textbf{\texttt{rememberNavController()}}: Tworzy i zapamiętuje instancję \texttt{NavHostController}. Obiekt ten przetrwa rekompozycję (dzięki \texttt{remember}) i jest odpowiedzialny za sterowanie nawigacją. Należy przekazać go do \texttt{NavHost}.
+    
+    \item \textbf{\texttt{NavHost}}: To jest kontener, w którym podmieniane są ekrany. Działa jak ramka na zdjęcia.
+    \begin{itemize}
+        \item \texttt{navController}: Łączy ten host z kontrolerem.
+        \item \texttt{startDestination}: Określa, który ekran ma zostać wyświetlony jako pierwszy po uruchomieniu aplikacji (ekran startowy).
+    \end{itemize}
+
+    \item \textbf{\texttt{composable("route")}}: Funkcja ta definiuje pojedynczy węzeł w grafie nawigacji.
+    \begin{itemize}
+        \item Łączy unikalny identyfikator trasy (np. "home") z konkretnym widokiem Composable (\texttt{HomeScreen}).
+        \item To tutaj decydujemy, co wyświetlić, gdy użytkownik nawiguje pod dany adres.
+    \end{itemize}
+\end{itemize}
+
+W powyższym przykładzie używamy prostych stringów ("home", "profile") jako identyfikatorów tras (Routes). Działa to podobnie do adresów URL w przeglądarce.
+
+Dobrą praktyką jest zdefiniowanie tras jako obiektów, np. za pomocą \texttt{sealed class}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Definicja tras
+sealed class Screen(val route: String) {
+    data object Home : Screen("home")
+    data object Profile : Screen("profile")
+    data object Settings : Screen("settings")
+}
+
+// Użycie w NavHost
+NavHost(navController, startDestination = Screen.Home.route) {
+    composable(Screen.Home.route) { /* ... */ }
+    composable(Screen.Profile.route) { /* ... */ }
+}
+\end{minted}
+
+\section{Przekazywanie Danych (Argumenty)}
+
+Ponieważ trasy w Compose Navigation wzorowane są na adresach URL, argumenty przekazujemy w ścieżce.
+
+Jeśli argument jest niezbędny (np. ID użytkownika w profilu), dodajemy go do ścieżki: \texttt{"profile/\{userId\}"}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// 1. Definicja trasy z parametrem
+composable(
+    route = "profile/{userId}",
+    arguments = listOf(navArgument("userId") { type = NavType.StringType })
+) { backStackEntry ->
+    // 2. Odczytanie argumentu
+    val userId = backStackEntry.arguments?.getString("userId")
+    UserProfile(id = userId)
+}
+
+// 3. Wywołanie nawigacji
+navController.navigate("profile/123")
+\end{minted}
+
+Kluczowe elementy:
+\begin{enumerate}
+    \item \textbf{\texttt{arguments}}: Lista oczekiwanych parametrów. Navigation Compose musi wiedzieć, że \texttt{\{userId\}} to coś więcej niż fragment tekstu – że jest to zmienna.
+    \item \textbf{\texttt{navArgument}}: Konfiguracja pojedynczego parametru. Określamy tu typ (np. \texttt{\-NavType.\-StringType}, \texttt{IntType}) oraz ewentualnie wartość domyślną (\texttt{defaultValue}) lub czy może być nullem (\texttt{nullable}).
+    \item \textbf{\texttt{backStackEntry}}: To obiekt reprezentujący \textit{wpis} na stosie nawigacji. Przechowuje stan ekranu, w tym \textbf{Sparsowane argumenty}. To z niego wyciągamy przekazaną wartość (podobnie jak \texttt{Intent.extras} w starym systemie).
+    \item \textbf{\texttt{UserProfile}}: To zwykła funkcja \texttt{@Composable}, która przyjmuje \texttt{id} jako parametr. Zauważ, że \textbf{nie wie ona nic o nawigacji}. Nie wie, skąd przyszło \texttt{id} – czy z URL-a, czy ze stałej. To dobra praktyka: uniezależnia widok od mechanizmu nawigacji (Decoupling).
+\end{enumerate}
+
+Jeśli argument jest opcjonalny, używamy składni znanej z zapytań HTTP: \texttt{"search?\-query\-=\{text\}"}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+composable(
+    route = "search?query={text}",
+    arguments = listOf(
+        navArgument("text") { 
+            defaultValue = "" 
+            nullable = true
+        }
+    )
+) { /* ... */ }
+\end{minted}
+
+
+\subsection{Pełny Przykład}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable
+fun ArgumentNavigationDemo() {
+    val navController = rememberNavController()
+
+    NavHost(navController = navController, startDestination = "list") {
+        
+        // Ekran 1: Lista Elementów
+        composable("list") {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Wybierz element:", 
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Button(onClick = { navController.navigate("details/1") }) {
+                    Text("Pokaż szczegóły elementu #1")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(onClick = { navController.navigate("details/42") }) {
+                    Text("Pokaż szczegóły elementu #42")
+                }
+            }
+        }
+
+        // Ekran 2: Szczegóły (odbiera ID)
+        composable(
+            route = "details/{itemId}",
+            arguments = listOf(navArgument("itemId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val id = backStackEntry.arguments?.getInt("itemId")
+            
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Otrzymane ID: $id", 
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = { navController.popBackStack() }) {
+                    Text("Wróć na listę")
+                }
+            }
+        }
+    }
+}
+\end{minted}
+
+
+\section{Nawigacja z Dolnym Paskiem (Scaffold + BottomBar)}
+
+Integracja nawigacji z \texttt{BottomBar} wymaga połączenia stanu \texttt{NavController} z widokiem paska. Musimy wiedzieć, na którym ekranie jesteśmy, aby podświetlić odpowiednią ikonę.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val navController = rememberNavController()
+// Obserwujemy aktualną trasę (state)
+val navBackStackEntry by navController.currentBackStackEntryAsState()
+val currentRoute = navBackStackEntry?.destination?.route
+
+Scaffold(
+    bottomBar = {
+        NavigationBar {
+            NavigationBarItem(
+                selected = currentRoute == Screen.Home.route,
+                onClick = {
+                    navController.navigate(Screen.Home.route) {
+                        // Ważne flagi dla dolnej nawigacji:
+                        // 1. Unikaj tworzenia wielu kopii tego samego ekranu na stosie
+                        popUpTo(navController.graph.startDestinationId) {
+                            saveState = true
+                        }
+                        // 2. Przywróć stan ekranu (np. scroll) przy powrocie
+                        restoreState = true
+                        // 3. Nie twórz nowej instancji, jeśli już tam jesteśmy
+                        launchSingleTop = true
+                    }
+                },
+                icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                label = { Text("Start") }
+            )
+        }
+    }
+) { innerPadding ->
+    NavHost(
+        navController = navController,
+        startDestination = Screen.Home.route,
+        modifier = Modifier.padding(innerPadding)
+    ) {
+        composable(Screen.Home.route) { HomeScreen() }
+        // ... inne ekrany
+    }
+}
+\end{minted}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.25\textwidth]{fig/pum1-w11-bottom-nav.png}
+    \caption{Nawigacja z dolnym paskiem}
+    \label{fig:pum1-w11-bottom-nav}
+\end{figure}
+
+Flagi \texttt{popUpTo}, \texttt{saveState}, \texttt{restoreState} i \texttt{launchSingleTop} są istotne dla poprawnego działania dolnej nawigacji ("Bottom Navigation Patterns"), zapewniając intuicyjne zachowanie przycisku \textit{Wstecz} i zachowanie stanu formularzy/list przy przełączaniu zakładek.

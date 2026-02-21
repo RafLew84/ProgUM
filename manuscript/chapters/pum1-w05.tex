@@ -1,0 +1,411 @@
+\chapter{Klasy i Obiekty (Wykład 5)}
+
+Programowanie obiektowe (OOP) opiera się na koncepcji klas i obiektów. Klasa to \textbf{szablon} (blueprint), który definiuje strukturę i zachowanie. Obiekt to konkretna \textbf{instancja} stworzona na podstawie tego szablonu.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\textwidth]{fig/pum1-w05-class_object.png}
+    \caption{Klasa i obiekt}
+    \label{fig:class_object}
+\end{figure}
+
+Możemy to sobie wyobrazić na przykładzie domu.
+\begin{itemize}
+    \item \textbf{Klasa} to projekt architektoniczny (rysunków technicznych) domu.
+    \item \textbf{Obiekt} to konkretny dom wybudowany na podstawie tego projektu. Możesz wybudować wiele domów (obiektów) z jednego projektu (klasy).
+\end{itemize}
+
+\section{Definicja Klasy}
+
+W Kotlinie definicja klasy jest bardzo zwięzła. Jeśli klasa nie ma ciała, możemy pominąć nawiasy klamrowe.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Empty
+\end{minted}
+
+Zazwyczaj jednak klasa posiada właściwości (stan) oraz funkcje (zachowanie).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Lamp {
+    // Właściwość (stan)
+    var isOn: Boolean = false
+
+    // Metoda (zachowanie)
+    fun turnOn() {
+        isOn = true
+    }
+}
+\end{minted}
+
+Tworzenie instancji w Kotlinie nie wymaga słowa kluczowego \texttt{new} (znanego z Javy czy C++). Po prostu wywołujemy konstruktor jak funkcję:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val myLamp = Lamp()
+myLamp.turnOn()
+\end{minted}
+
+\section{Konstruktory}
+
+Kotlin rozróżnia dwa rodzaje konstruktorów: główny (primary) i drugorzędne (secondary).
+
+Konstruktor główny jest częścią definicji klasy. To najbardziej idiomatyczny sposób definiowania klas.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Zapis skrócony - deklaracja właściwości wprost w konstruktorze
+class Person(val name: String, var age: Int)
+
+// To, co powyżej, jest równoważne:
+/*
+class Person(_name: String, _age: Int) {
+    val name: String = _name
+    var age: Int = _age
+}
+*/
+\end{minted}
+
+Jeśli potrzebujemy wykonać kod podczas inicjalizacji (np. walidację), używamy bloku \texttt{init}. Konstruktor główny nie może zawierać kodu.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class User(val login: String) {
+    init {
+        println("Tworzenie użytkownika: $login")
+        if (login.isEmpty()) {
+            throw IllegalArgumentException("Login nie może być pusty")
+        }
+    }
+}
+\end{minted}
+
+Czasami potrzebujemy alternatywnych sposobów tworzenia obiektu. Używamy wtedy słowa kluczowego \texttt{constructor} wewnątrz ciała klasy. Każdy konstruktor drugorzędny musi ostatecznie wywołać konstruktor główny (używając \texttt{this(...)}). W odróżnieniu od kontruktora głównego, konstruktor drugorzędny może zawierać kod. Jest to przydatne, gdy chcemy stworzyć obiekt na podstawie innych danych niż te, które są przekazywane do konstruktora głównego. Nie ma możliwści automatycznego deklarowania właściwości w konstruktorze drugorzędnym, dlatego musimy to zrobić ręcznie. Warto również zauważyć, że konstruktor drugorzędny nie może być wywoływany bezpośrednio z zewnątrz klasy, a jedynie z poziomu konstruktora głównego lub innego konstruktora drugorzędnego. W praktyce w Kotlinie rzadko używa się konstruktorów drugorzędnych, ponieważ mechanizm \textbf{wartości domyślnych} w konstruktorze głównym pokrywa większość przypadków użycia (np. przeciążanie konstruktorów w Javie).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Rect(val width: Int, val height: Int) {
+    // Konstruktor pomocniczy dla kwadratu
+    constructor(side: Int) : this(side, side) {
+        println("Utworzono kwadrat o boku $side")
+    }
+}
+\end{minted}
+
+\section{Modyfikatory Dostępu}
+
+Określają, kto \textit{widzi} nasze klasy, metody i właściwości.
+\begin{itemize}
+    \item \texttt{public} (domyślny): Widoczne wszędzie.
+    \item \texttt{private}: Widoczne tylko wewnątrz pliku (dla funkcji/klas najwyższego poziomu) lub wewnątrz klasy.
+    \item \texttt{protected}: Widoczne w klasie i jej podklasach (nie ma dostępu \textit{pakietowego} jak w Javie!).
+    \item \texttt{internal}: Widoczne w całym \textbf{module} (np. module Mavena, Gradle'a, czy module IntelliJ). To specyfika Kotlina – bardzo przydatne do ukrywania szczegółów implementacyjnych biblioteki.
+\end{itemize}
+
+\section{Klasy Danych (Data Classes)}
+
+Często tworzymy klasy, których jedynym celem jest przechowywanie danych (DTO - Data Transfer Object). W Kotlinie mamy specjalny rodzaj klas do tego celu, które oznaczamy słowem kluczowym \texttt{data class}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+data class User(val name: String, val age: Int)
+\end{minted}
+
+Dzięki temu jednemu słowu, kompilator automatycznie generuje dla nas:
+\begin{enumerate}
+    \item \texttt{toString()}: Zwraca czytelny ciąg np. \texttt{"User(name=Jan, age=30)"}.
+    \item \texttt{equals()}: Porównuje zawartość pól (a nie referencje).
+    \item \texttt{hashCode()}: Generuje poprawny hash na podstawie pól.
+    \item \texttt{copy()}: Pozwala skopiować obiekt zmieniając tylko wybrane pola (niezastąpione przy niemutowalności!).
+    \item \texttt{componentN()}: Metody umożliwiające destrukturyzację (\texttt{val (n, a) = user}).
+\end{enumerate}
+
+Zastosowanie tych metod eliminuje konieczność ręcznego pisania powtarzalnego kodu (\textit{boilerplate}), co znacząco poprawia czytelność i bezpieczeństwo aplikacji. Metody te są szczególnie przydatne w architekturach opartych na niemutowalności danych, gdzie zamiast modyfikować istniejący obiekt, tworzymy jego kopię ze zmienionymi parametrami.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val u1 = User("Jan", 25)
+val u2 = u1.copy(age = 26) // User(name="Jan", age=26)
+println(u1 == u2) // false
+\end{minted}
+
+Konstruktor główny musi mieć co najmniej jeden parametr i wszystkie muszą być oznaczone jako \texttt{val} lub \texttt{var}. Klasy danych nie mogą być dziedziczone (są final).
+
+\section{Porównywanie Obiektów}
+
+W Kotlinie mamy dwa rodzaje równości:
+
+\begin{itemize}
+    \item \textbf{Równość Strukturalna (\texttt{==})}: Sprawdza, czy obiekty są \textit{takie same} (mają taką samą zawartość). Pod spodem wywołuje \texttt{equals()}. To bezpieczne dla null (np. \texttt{null == null} zwróci true).
+    \item \textbf{Równość Referencyjna (\texttt{===})}: Sprawdza, czy dwie zmienne wskazują na \textbf{ten sam obiekt} w pamięci (ten sam adres).
+\end{itemize}
+
+Zachowanie operatora \texttt{==} zależy od tego, czy pracujemy ze zwykłą klasą, czy z \texttt{data class}. W zwykłej klasie \texttt{==} sprawdza referencję (chyba że ręcznie nadpiszemy \texttt{equals()}), natomiast w \texttt{data class} porównuje zawartość pól.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Person(val name: String, val age: Int)
+data class User(val name: String, val age: Int)
+
+val p1 = Person("Ewa", 30)
+val p2 = Person("Ewa", 30)
+println(p1 == p2)  // false (zwykła klasa porównuje adresy)
+
+val u1 = User("Ewa", 30)
+val u2 = User("Ewa", 30)
+val u3 = u1
+
+println(u1 == u2)  // true (data class porównuje zawartość)
+println(u1 === u2) // false (dwa różne obiekty w pamięci)
+println(u1 === u3) // true (u3 wskazuje na to samo co u1)
+\end{minted}
+
+Możemy to sobie wyobrazić na przykładzie samochodów:
+\begin{itemize}
+    \item \texttt{==} (Równość strukturalna): Twoje auto i auto sąsiada. Są takie same (marka, model, kolor), ale to dwa różne fizyczne samochody.
+    \item \texttt{===} (Równość referencyjna): Twoje auto rano i Twoje auto wieczorem. To ten sam, fizyczny pojazd.
+\end{itemize}
+
+Dodajmy, że w przypadku klas danych w przypadku porównania strukturalnego, porównywane są tylko pola z konstruktora głównego. Pola dodane w klasie, ale niebędące parametrami konstruktora głównego, nie są brane pod uwagę przy porównywaniu.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+data class User(val name: String, val age: Int) {
+    var email: String = ""
+}
+
+val u1 = User("Ewa", 30)
+val u2 = User("Ewa", 30)
+
+u1.email = "ewa@gmail.com"
+u2.email = "e.w.q@gmail.com"
+
+println(u1 == u2)  // true (data class porównuje zawartość pól z konstruktora głównego)
+\end{minted}
+
+Warto zauważyć, że dla typów, które w czasie wykonania są reprezentowane jako typy proste (np. \texttt{Int}, \texttt{Double}, \texttt{Boolean}), operator \texttt{===} jest równoważny operatorowi \texttt{==}. Wynika to z faktu, że wartości te nie posiadają odrębnej tożsamości obiektowej.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val a = 100
+val b = 100
+println(a === b) // true
+\end{minted}
+
+\section{Klasy Wyliczeniowe (Enum Classes)}
+
+Służą do definiowania stałego zbioru wartości (np. pory roku, stany zamówienia, kierunki świata).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+enum class Direction {
+    NORTH, SOUTH, EAST, WEST
+}
+\end{minted}
+
+Enumu mogą mieć też właściwości i metody:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+enum class Color(val hex: String) {
+    RED("#FF0000"),
+    GREEN("#00FF00"),
+    BLUE("#0000FF"); // średnik wymagany przy metodach
+
+    fun rgb() = "Color: $hex"
+}
+
+val color = Color.RED
+println(color.hex)
+\end{minted}
+
+\section{Dziedziczenie i Modyfikatory Dostępu}
+
+W Kotlinie podejście do dziedziczenia jest restrykcyjne ("zamknięte domyślnie"). W przeciwieństwie do Javy, gdzie wszystko można dziedziczyć (chyba że jest \texttt{final}), w Kotlinie \textbf{wszystkie klasy i metody są domyślnie finalne}.
+
+Aby umożliwić dziedziczenie lub nadpisywanie, musimy jawnie użyć słowa kluczowego \texttt{open}.
+
+\subsection{Słowa kluczowe w dziedziczeniu}
+
+\begin{itemize}
+    \item \textbf{\texttt{final}} (domyślne): Blokuje możliwość dziedziczenia po klasie lub nadpisywania metody. Nie trzeba go pisać, jest domyślne.
+    \item \textbf{\texttt{open}}: \textit{Otwiera} klasę na dziedziczenie lub metodę na nadpisanie.
+    \item \textbf{\texttt{override}}: Wymagane, gdy nadpisujemy metodę z klasy bazowej. Co ważne: \textbf{funkcja oznaczona jako \texttt{override} jest domyślnie \texttt{open}}. Oznacza to, że kolejna klasa dziedzicząca może ją ponownie nadpisać.
+    \item \textbf{\texttt{final override}}: Jeśli w klasie pochodnej nadpisaliśmy metodę, ale chcemy zabronić dalszego jej nadpisywania w kolejnych podklasach, musimy użyć kombinacji \texttt{final override}.
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+open class Base {
+    open fun v() {} // Metoda otwarta, można nadpisać
+    fun nv() {}     // Metoda finalna (domyślnie), nie można nadpisać
+}
+
+open class Derived() : Base() {
+    override fun v() {} // Nadpisanie metody v()
+                        // Ta metoda jest nadal OPEN dla kolejnych klas!
+}
+
+class Another : Derived() {
+    final override fun v() {} // Nadpisanie i ZABLOKOWANIE dalszych zmian
+}
+\end{minted}
+
+\section{Klasy Abstrakcyjne}
+
+Klasa abstrakcyjna może zawierać metody bez implementacji (abstrakcyjne), które \textbf{muszą} zostać zaimplementowane w klasach pochodnych. Nie można utworzyć instancji klasy abstrakcyjnej.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+abstract class Shape {
+    abstract fun area(): Double // Brak ciała metody
+    
+    // Metoda z implementacją (domyślnie final, chyba że damy open)
+    fun description() {
+        println("To jest jakiś kształt o polu ${area()}")
+    }
+}
+
+class Circle(val r: Double) : Shape() {
+    override fun area(): Double = Math.PI * r * r
+}
+\end{minted}
+
+\subsection{Abstract vs Open}
+
+W klasach abstrakcyjnych często mamy dylemat: użyć \texttt{abstract} czy \texttt{open}?
+
+\begin{itemize}
+    \item \textbf{\texttt{abstract fun}}: Nie ma ciała (implementacji). Klasa pochodna \textbf{musi} ją zaimplementować (chyba że sama jest abstrakcyjna). Używamy, gdy nie ma sensownej implementacji domyślnej (np. \texttt{calculateArea()} dla ogólnego kształtu).
+    \item \textbf{\texttt{open fun}}: Ma ciało (implementację domyślną). Klasa pochodna \textbf{może} ją nadpisać, ale nie musi. Używamy, gdy istnieje sensowne zachowanie domyślne (np. \texttt{logError()} wypisujące na konsolę), które w specyficznych przypadkach chcemy zmienić (np. zapis do pliku).
+\end{itemize}
+
+\section{Klasy Zapieczętowane (Sealed Classes)}
+
+\texttt{sealed class} to klasa, która ma \textbf{ograniczoną, z góry znaną liczbę potomków}. Wszystkie klasy dziedziczące muszą znajdować się w tym samym pakiecie.
+
+Jest to idealne narzędzie do modelowania \textbf{stanów}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+sealed class UiState {
+    object Loading : UiState()
+    data class Success(val data: String) : UiState()
+    data class Error(val message: String) : UiState()
+}
+\end{minted}
+
+Gdy używamy instrukcji \texttt{when}, kompilator wie, że pokryliśmy wszystkie możliwe przypadki. Nie potrzebujemy sekcji \texttt{else}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+fun handleState(state: UiState) {
+    when(state) {
+        is UiState.Loading -> showProgressBar()
+        is UiState.Success -> showData(state.data)
+        is UiState.Error -> showError(state.message)
+        // Brak else. Kompilator wie, że to wszystkie opcje.
+    }
+}
+\end{minted}
+
+\section{Klasy Zagnieżdżone i Wewnętrzne}
+
+Często chcemy zdefiniować klasę wewnątrz innej klasy, aby zgrupować logikę i ukryć szczegóły implementacyjne. Kotlin oferuje tu dwa podejścia, które kluczowo różnią się dostępem do pamięci i instancji.
+
+\subsection{Klasa Zagnieżdżona (Nested Class)}
+Jest to zachowanie \textbf{domyślne} (gdy nie użyjemy żadnego modyfikatora). Klasa zagnieżdżona jest bytem niezależnym. \textbf{Nie posiada referencji} do obiektu klasy zewnętrznej.
+
+\begin{itemize}
+    \item \textbf{Zastosowanie}: Gdy klasa pomocnicza jest logicznie powiązana z klasą zewnętrzną, ale nie potrzebuje dostępu do jej pól (danych). Działa jak \texttt{static class} w Javie.
+    \item \textbf{Zaleta}: Mniejsze zużycie pamięci (brak ukrytej referencji do rodzica).
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Outer {
+    private val bar: Int = 1
+    
+    class Nested {
+        fun foo() = 2
+        // fun getBar() = bar // BŁĄD! Nie widzi 'bar' klasy Outer
+    }
+}
+val nested = Outer.Nested() // Tworzenie bez instancji Outer
+\end{minted}
+
+\subsection{Klasa Wewnętrzna (Inner Class)}
+Oznaczona słowem kluczowym \texttt{inner}. Taka klasa \textbf{posiada ukrytą referencję} do instancji klasy zewnętrznej, w której została utworzona.
+
+\begin{itemize}
+    \item \textbf{Zastosowanie}: Gdy klasa pomocnicza musi operować na danych klasy głównej. Klasyczny przykład to \textbf{Adaptery w Androidzie} (ViewHolder często musi wywołać metodę z Adaptera) lub implementacje wzorca Listener, gdzie nasłuchiwacz musi zmodyfikować stan widoku.
+    \item \textbf{Dostęp do rodzica}: Aby odwołać się do instancji zewnętrznej, używamy składni \texttt{this@NazwaKlasyZewnetrznej}.
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Outer {
+    private val bar: Int = 1
+    
+    inner class Inner {
+        fun foo() = bar // OK! Widzi 'bar'
+        
+        fun getOuterReference(): Outer {
+            return this@Outer // Dostęp do instancji Outer
+        }
+    }
+}
+val outer = Outer()
+val inner = outer.Inner() // Musimy mieć instancję Outer, by stworzyć Inner
+\end{minted}
+
+\section{Obiekty Towarzyszące (Companion Object)}
+
+W Kotlinie nie ma słowa kluczowego \texttt{static}. Zamiast tego, jeśli chcemy mieć metodę lub pole powiązane z klasą, a nie z obiektem (np. fabrykę lub stałą), umieszczamy je w \texttt{companion object}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class User {
+    companion object {
+        const val MAX_AGE = 120
+        fun createDefault(): User = User()
+    }
+}
+
+// Użycie (jak static w Javie)
+val max = User.MAX_AGE
+val user = User.createDefault()
+\end{minted}
+
+\section{Generics (Typy Generyczne)}
+
+O typach generycznych w funkcjach wspominaliśmy w Rozdziale 3. Teraz czas na klasy.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Box<T>(val item: T)
+val intBox = Box(1)      // Box<Int>
+val strBox = Box("Hej")  // Box<String>
+\end{minted}
+
+\subsection{Wariancja (Variance)}
+To trudny temat, ale kluczowy dla zrozumienia kolekcji w Kotlinie. Załóżmy, że \texttt{Dog} dziedziczy po \texttt{Animal}.
+Czy \texttt{Box<Dog>} jest podtypem \texttt{Box<Animal>}? Domyślnie \textbf{nie}.
+
+Gdyby było, moglibyśmy do pudełka z psami (\texttt{Box<Animal>}) włożyć kota, co zepsułoby pudełko z psami.
+
+Kotlin pozwala jednak sterować tym zachowaniem za pomocą słów kluczowych \texttt{out} i \texttt{in} (Declaration-site variance).
+
+\begin{enumerate}
+    \item \textbf{Kowariancja (\texttt{out})}: \textit{Producent}. Klasa tylko \textbf{zwraca} (produkuje) typ \texttt{T}.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    // List<out T> w Kotlinie jest kowariantna
+    val dogs: List<Dog> = listOf(Dog(), Dog())
+    val animals: List<Animal> = dogs // OK! Bo List jest <out T>
+    \end{minted}
+    Możemy bezpiecznie czytać \texttt{Animal} z listy psów, bo każdy pies to zwierzę.
+    
+    \item \textbf{Kontrawariancja (\texttt{in})}: "Konsument". Klasa tylko \textbf{przyjmuje} typ \texttt{T}.
+    \begin{minted}[frame=single,framesep=10pt]{kotlin}
+    interface Consumer<in T> {
+        fun consume(item: T)
+    }
+    
+    val animalConsumer: Consumer<Animal> = ...
+    val dogConsumer: Consumer<Dog> = animalConsumer // OK!
+    \end{minted}
+    Jeśli coś potrafi obsłużyć każde zwierzę, to potrafi też obsłużyć psa. Kierunek dziedziczenia się "odwraca".
+\end{enumerate}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.3\textwidth]{fig/pum1-w06-variance.png}
+    \caption{Wariancja w Kotlinie}
+    \label{fig:variance}
+\end{figure}
+
+Możemy zapamiętać to sobie w następujący sposób:
+\begin{itemize}
+    \item \textbf{\texttt{out}} (Producent): Skupiamy się na tym, co \textbf{wychodzi} z obiektu. Jeśli ze źródła wychodzą psy, to bezpiecznie możemy uznać, że wychodzą z niego zwierzęta.
+    \item \textbf{\texttt{in}} (Konsument): Skupiamy się na tym, co \textbf{wchodzi} do obiektu. Jeśli ktoś potrafi zaopiekować się dowolnym zwierzęciem (np. weterynarz), to poradzi sobie również, gdy \textit{wejdzie} do niego konkretnie pies.
+\end{itemize}

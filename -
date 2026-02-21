@@ -1,0 +1,72 @@
+﻿\chapter{Wyklad 0: Organizacja kursu i nawigacja Compose}
+
+\begin{learningobjectives}
+  \item Zrozumiesz zasady zaliczenia PUM2 oraz wymagane narzedzia.
+  \item Przygotujesz srodowisko Android Studio na potrzeby zaawansowanych zajec (Compose + Hilt + Firebase).
+  \item Zaplanujesz aplikacje przykladowa wykorzystywana w dalszych rozdzialach, ze szczegolnym naciskiem na Compose Navigation.
+\end{learningobjectives}
+
+\section{Mapa rozdzialu}
+\begin{itemize}
+  \item Organizacja PUM2: cele, harmonogram, forma zaliczenia, roznice wzgledem PUM1.
+  \item Przeglad narzedzi: Android Studio (aktualna wersja), emulator, Firebase CLI, Postman/Insomnia.
+  \item Konfiguracja projektu startowego: Compose Material 3, Hilt, modul app.
+  \item Compose Navigation: podstawowe pojecia (NavHost, NavController, graf, destynacje, argumenty), integracja z scaffold.
+  \item Przeglad notebookow `Listy` dedykowanych nawigacji (\texttt{W1-Drawer.ipynb}, \texttt{W1-Nested\_graph.ipynb}).
+  \item Plan rozwoju aplikacji "Catalog App" w trakcie PUM2.
+\end{itemize}
+
+\section{Material zrodlowy}
+\begin{itemize}
+  \item Slajdy: `PUM2/Wyk/Wyklad1.pdf` (organizacja + Compose Navigation) oraz `PUM1/Wyk/Wyklad11.pdf` jako powtorka.
+  \item Notebooki: \texttt{PUM2/Listy/W1-Drawer.ipynb}, \texttt{PUM2/Listy/W1-Nested\_graph.ipynb}.
+  \item Dokumentacja: Compose Navigation (developer.android.com/jetpack/compose/navigation).
+\end{itemize}
+
+\section{Struktura docelowa}
+\subsection{Organizacja kursu}
+\begin{itemize}
+  \item Cele PUM2: przejscie od podstaw Compose do pelnej aplikacji produkcyjnej.
+  \item Zasady zaliczenia, wymagania projektowe i laboratoryjne.
+  \item Repozytoria oraz sposoby dzielenia sie kodem (Git, GitHub Classroom, itp.).
+\end{itemize}
+
+\subsection{Srodowisko pracy}
+\begin{itemize}
+  \item Wersje narzedzi (Android Studio, gradle, Kotlin, Java, Firebase CLI).
+  \item Konfiguracja emulatora i urzadzen fizycznych.
+  \item Kontrola konfiguracji (gradle.properties, signing configs, sekretne klucze API).
+\end{itemize}
+
+\subsection{Projekt startowy}
+\begin{itemize}
+  \item Struktura modulow i pakietow.
+  \item Setup Compose Material 3 + theming.
+  \item Dodanie dependency Hilt, Navigation, Retrofit.
+  \item Szkic ekranu startowego i bottom navigation (jesli wykorzystywana).
+\end{itemize}
+
+\subsection{Compose Navigation}
+\begin{itemize}
+  \item NavHost i konfiguracja grafu nawigacji.
+  \item Destynacje, parametry, deep linki.
+  \item Nested graphs, bottom navigation, drawer navigation.
+  \item Integracja z ViewModel (state hoisting, savedStateHandle).
+\end{itemize}
+
+\subsection{Plan aplikacji przykladowej}
+\begin{itemize}
+  \item Zakres funkcjonalny (lista -> szczegoly -> ulubione -> ustawienia).
+  \item Mapowanie przyszlych rozdzialow PUM2 na rozwijane funkcje.
+  \item Przygotowanie backlogu i milestone'ow (np. offline caching, DI, Firestore).
+\end{itemize}
+
+\section{Elementy do rozbudowy}
+\begin{itemize}
+  \item \textbf{Przyklad A}: konfiguracja Compose Navigation w projekcie startowym (TODO: wkleic kod `NavHost`).
+  \item \textbf{Przyklad B}: nested navigation (drawer + bottom nav) w oparciu o notebooki W1 (TODO: zrzuty i komentarz).
+  \item Lista kontrolna setupu (TODO: tabela z krokami instalacji narzedzi).
+  \item Pytania kontrolne: roznica NavGraph vs NavHost, jak przekazywac argumenty, jak testowac nawigacje.
+\end{itemize}
+
+% TODO: uzupelnic tresc narracyjna i przyklady kodu w kolejnych etapach.

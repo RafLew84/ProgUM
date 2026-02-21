@@ -1,0 +1,429 @@
+\chapter{Trwałość Danych (Wykład 8)}
+
+W poprzednich rozdziałach, omawiając architekturę MVVM i zarządzanie stanem, operowaliśmy na danych przechowywanych w pamięci operacyjnej (RAM). Zmienne wewnątrz \texttt{ViewModel}, strumienie \texttt{StateFlow} czy kolekcje danych istnieją tak długo, jak długo żyje proces aplikacji.
+
+W ekosystemie Androida wyróżniamy trzy główne kategorie przechowywania danych, dobierane w zależności od struktury i wolumenu informacji:
+
+\begin{enumerate}
+    \item \textbf{Pliki (File API):} Przeznaczone dla danych niestrukturalnych lub strumieni bajtów, takich jak multimedia (zdjęcia, wideo), dokumenty PDF czy pliki cache.
+    \item \textbf{Relacyjne Bazy Danych (SQLite / Room):} Przeznaczone dla dużych zbiorów danych strukturalnych, wymagających złożonych zapytań, relacji i transakcyjności (np. lista zadań, historia zamówień). Temat ten zostanie omówiony szczegółowo w \textbf{Rozdziale 9}.
+    \item \textbf{Magazyny Klucz-Wartość (Preferences):} Przeznaczone dla lekkich danych konfiguracyjnych, flag i prostych ustawień (np. \texttt{isDarkModeEnabled}, \texttt{sessionToken}). To na tej kategorii skupiamy się w bieżącym rozdziale.
+\end{enumerate}
+
+\section{Mechanizm SharedPreferences}
+
+Przez wiele lat standardem przechowywania prostych danych w Androidzie była biblioteka \texttt{SharedPreferences}. Choć obecnie jest wypierana przez nowsze rozwiązania, wciąż można ją spotkać w wielu istniejących projektach.
+
+\texttt{SharedPreferences} to API, które zarządza plikiem XML przechowywanym w prywatnym katalogu aplikacji. Dane są zapisywane w formacie pary: \textbf{Klucz} (String) $\rightarrow$ \textbf{Wartość} (Int, Boolean, String, Float, Long).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class SettingsManager(context: Context) {
+    // Utworzenie/Otwarcie pliku "app_settings.xml"
+    private val prefs = context.getSharedPreferences(
+      "app_settings", 
+      Context.MODE_PRIVATE
+    )
+
+    fun saveTheme(isDark: Boolean) {
+        prefs.edit()
+             .putBoolean("is_dark_mode", isDark)
+             .apply() 
+    }
+
+    fun isDarkMode(): Boolean {
+        return prefs.getBoolean("is_dark_mode", false)
+    }
+}
+\end{minted}
+
+Analizując powyższy kod, warto pochylić się nad dwoma kluczowymi elementami: rolą obiektu \texttt{Context} oraz trybem otwarcia pliku.
+
+Metoda \texttt{getSharedPreferences()} nie jest metodą statyczną - musi zostać wywołana na instancji \texttt{Context}. Wynika to z architektury bezpieczeństwa systemu Android.
+
+Każda aplikacja w systemie Android działa jako oddzielny użytkownik i posiada swój prywatny, chroniony katalog na dysku.
+Obiekt \texttt{Context} jest \textit{oknem} na zasoby systemowe i środowisko aplikacji. To on \textit{wie}, gdzie fizycznie znajduje się katalog prywatny bieżącej aplikacji. Bez niego biblioteka nie wiedziałaby, w której ścieżce utworzyć lub odczytać plik XML.
+
+Drugim parametrem metody jest flaga \texttt{mode}. Określa ona uprawnienia systemu plików nadawane tworzonemu plikowi XML.
+
+\begin{itemize}
+    \item \textbf{\texttt{Context.MODE\_PRIVATE} (0):} Oznacza on, że utworzony plik może być odczytany \textit{wyłącznie} przez aplikację, która go stworzyła. Gwarantuje to, że inne aplikacje zainstalowane na telefonie nie będą mogły podglądać zapisanych tam danych.
+\end{itemize}
+
+Mimo prostoty, \texttt{SharedPreferences} posiada istotne wady architektoniczne, które stały się problematyczne w nowoczesnym, reaktywnym programowaniu.
+
+\begin{enumerate}
+    \item \textbf{Synchroniczne API (Blokowanie Wątku):} Najpoważniejszą wadą jest to, że metody odczytu (np. \texttt{getString}, \texttt{getBoolean}) są wywoływane synchronicznie.
+
+    Gdy wywołujemy \texttt{prefs.getBoolean()} na Wątku Głównym (UI Thread), aplikacja musi poczekać na odczyt danych z systemu plików. Jeśli plik preferencji jest duży lub urządzenie jest obciążone operacjami I/O, może to doprowadzić do gubienia klatek animacji (Jank), a w skrajnych przypadkach do błędu \textbf{ANR (Application Not Responding)}.
+
+    \item \textbf{Brak natywnej reaktywności:} \texttt{SharedPreferences} nie udostępnia strumieni danych. Aby obserwować zmiany w ustawieniach, programista musi rejestrować złożony listener \texttt{OnSharedPreferenceChangeListener}. Nie integruje się to naturalnie z biblioteką Kotlin Coroutines ani Flow.
+\end{enumerate}
+
+\section{DataStore}
+
+Google wprowadziło \textbf{DataStore} jako następcę \texttt{SharedPreferences}. Biblioteka ta została zaprojektowana od podstaw z myślą o asynchroniczności i bezpieczeństwie typów.
+
+Główne zalety \texttt{DataStore}:
+\begin{itemize}
+    \item \textbf{Integracja z Korutynami i Flow:} Operacje odczytu są wystawiane jako strumień \texttt{Flow}, a zapisu jako funkcje zawieszające \texttt{suspend}.
+    \item \textbf{Bezpieczeństwo wątkowe:} Operacje dyskowe są domyślnie przenoszone na \path{Dispatchers.IO}.
+    \item \textbf{Obsługa błędów:} Posiada wbudowane mechanizmy łapania wyjątków \texttt{IOException} podczas odczytu pliku.
+\end{itemize}
+
+Istnieją dwa warianty biblioteki:
+\begin{enumerate}
+    \item \textbf{Preferences DataStore:} (Omówimy go teraz) Działa jak \texttt{SharedPreferences} (mapa Klucz-Wartość), nie wymaga definiowania schematu.
+    \item \textbf{Proto DataStore:} Przechowuje typowane obiekty (wymaga definicji schematu przy użyciu Protocol Buffers). Zapewnia bezpieczeństwo typów, ale jest trudniejszy w konfiguracji.
+\end{enumerate}
+
+DataStore nie zwraca wartości natychmiast. Zwraca \textbf{strumień} (\texttt{Flow}), który emituje nową wartość za każdym razem, gdy dane na dysku ulegną zmianie.
+
+Najpierw tworzymy instancję DataStore jako \textbf{Singleton} (rozszerzenie dla \texttt{Context}). Jest to kluczowe, aby uniknąć konfliktów przy jednoczesnym dostępie do pliku.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// W pliku np. DataStoreConfig.kt
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_prefs")
+
+object UserPrefsKeys {
+    // Definiujemy klucze z określeniem typu danych
+    val USER_NAME = stringPreferencesKey("user_name")
+    val IS_DARK_MODE = booleanPreferencesKey("is_dark_mode")
+}
+\end{minted}
+
+Dobrą praktyką jest ukrycie bezpośredniego dostępu do DataStore w warstwie repozytorium.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class UserPreferencesRepository(private val context: Context) {
+
+    // ODCZYT: Zwracamy Flow. UI będzie nasłuchiwać zmian.
+    val userNameFlow: Flow<String> = context.dataStore.data
+        .catch { exception ->
+            // Obsługa błędów odczytu pliku
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+            // Pobieramy wartość lub domyślną ("")
+            preferences[UserPrefsKeys.USER_NAME] ?: ""
+        }
+
+    // ZAPIS: Funkcja zawieszająca (suspend)
+    suspend fun saveUserName(name: String) {
+        // Metoda edit jest transakcyjna (atomowa)
+        context.dataStore.edit { preferences ->
+            preferences[UserPrefsKeys.USER_NAME] = name
+        }
+    }
+}
+\end{minted}
+
+\section{Integracja z architekturą MVVM}
+
+Posiadając warstwę repozytorium (\texttt{UserPreferencesRepository}), która wystawia dane w postaci strumienia \texttt{Flow}, możemy zintegrować je z warstwą prezentacji. Musimy przekonwertować \textit{zimny} strumień z DataStore na \textit{gorący} stan UI, dostępny natychmiast dla widoku. Wykorzystamy do tego operator \texttt{stateIn}.
+
+Rola ViewModelu w tym procesie jest dwojaka:
+\begin{enumerate}
+    \item \textbf{Transformacja:} Zamienia \texttt{Flow<String>} z repozytorium na \texttt{StateFlow<String>}.
+    \item \textbf{Zarządzanie cyklem życia:} Dzięki \texttt{viewModelScope}, nasłuchiwanie zmian w pliku preferencji odbywa się tylko wtedy, gdy ekran jest aktywny.
+\end{enumerate}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class UserViewModel(
+    private val repository: UserPreferencesRepository
+) : ViewModel() {
+
+    // 1. Stan pola tekstowego (tymczasowy, edytowalny przez użytkownika)
+    var textFieldValue by mutableStateOf("")
+        private set
+
+    // 2. Stan zapisany na dysku (trwały, tylko do odczytu)
+    // Operator stateIn konwertuje Flow na StateFlow
+    val savedUserName: StateFlow<String> = repository.userNameFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5000),
+            initialValue = "" // Wartość początkowa zanim wczytamy plik
+        )
+
+    fun onTextFieldValueChanged(newValue: String) {
+        textFieldValue = newValue
+    }
+
+    // Wywołanie zapisu (operacja asynchroniczna)
+    fun onSaveClicked() {
+        viewModelScope.launch {
+            repository.saveUserName(textFieldValue)
+            // UWAGA: Nie musimy ręcznie aktualizować `savedUserName`!
+            // DataStore sam wykryje zmianę pliku i wyemituje nową wartość,
+            // która automatycznie trafi do naszego StateFlow.
+        }
+    }
+}
+\end{minted}
+
+\section{Przykład praktyczny: Ekran Ustawień}
+
+Ostatnim elementem jest warstwa widoku (UI). Dzięki zastosowaniu \texttt{StateFlow}, nasz ekran staje się w pełni reaktywny.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable
+fun UserSettingsScreen(viewModel: UserViewModel = viewModel()) {
+    val savedName by viewModel.savedUserName.collectAsStateWithLifecycle()
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = if (savedName.isBlank()) "Witaj nieznajomy!" 
+                   else "Witaj, $savedName!",
+        )
+        
+        Spacer(Modifier.height(32.dp))
+
+        OutlinedTextField(
+            value = viewModel.textFieldValue,
+            onValueChange = viewModel::onTextFieldValueChanged,
+            label = { Text("Wpisz swoje imię") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
+        Button(
+            onClick = { viewModel.onSaveClicked() },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Zapisz trwale")
+        }
+    }
+}
+\end{minted}
+
+Prześledźmy, co dzieje się po kliknięciu przycisku:
+\begin{enumerate}
+    \item \textbf{UI:} Użytkownik klika \textit{Zapisz}. Wywołuje się \texttt{viewModel.onSaveClicked()}.
+    \item \textbf{ViewModel:} Uruchamia korutynę i zleca \texttt{repository.saveUserName()}.
+    \item \textbf{DataStore:} Zapisuje dane do pliku na dysku (wątek IO).
+    \item \textbf{DataStore (Callback):} Wykrywa zmianę w pliku i emituje nową wartość do strumienia \texttt{userNameFlow}.
+    \item \textbf{ViewModel:} \texttt{StateFlow} odbiera nową wartość i aktualizuje swój stan.
+    \item \textbf{UI:} Komponent \texttt{UserSettingsScreen} otrzymuje powiadomienie o zmianie stanu i przerysowuje się (Recomposition) z nowym imieniem.
+\end{enumerate}
+
+\section{Bezpieczeństwo wątkowe}
+
+Wróćmy na chwilę do największej bolączki \texttt{SharedPreferences} - blokowania wątku głównego. Jak pamiętamy, wywołanie \texttt{prefs.getString()} działo się dokładnie tam, gdzie zostało wywołane (często na UI Thread).
+
+Biblioteka została zaprojektowana tak, aby można było bezpiecznie wywoływać jej metody z wątku głównego, a ciężka praca (operacje I/O, zapis na dysk) zostanie automatycznie przeniesiona na odpowiedni wątek w tle.
+
+DataStore wewnętrznie wykorzystuje korutyny i dyspozytory. Niezależnie od tego, czy odczytujesz dane, czy je zapisujesz, biblioteka deleguje te zadania do puli wątków \texttt{Dispatchers.IO}, która jest zoptymalizowana pod kątem operacji dyskowych i sieciowych.
+
+\begin{enumerate}
+    \item \textbf{Przy zapisie (\texttt{edit}):} Funkcja jest oznaczona jako \texttt{suspend}. Gdy ją wywołujesz, DataStore zawiesza korutynę, przełącza się na wątek IO, dokonuje zapisu atomowego do pliku, a następnie wznawia korutynę na oryginalnym wątku.
+    \item \textbf{Przy odczycie (\texttt{data}):} Strumień \texttt{Flow} emituje wartości, które są odczytywane z dysku w tle.
+\end{enumerate}
+
+W tym przypadku (podobnie jak w ROOM i Retrofit (kolejne rozdziały)), nie jest konieczne manualne przełączanie za pomocą \texttt{withContext}. W przypadku DataStore poniższa konstrukcja jest \textbf{zbędna}:
+
+\begin{minted}[frame=single,framesep=10pt,fontsize=\footnotesize]{kotlin}
+// Podejście Nieprawidłowe (Nadmiarowy kod)
+suspend fun saveToken(token: String) {
+    // DataStore i tak przełączy się na IO, więc to wywołanie jest masłem maślanym
+    withContext(Dispatchers.IO) {
+        context.dataStore.edit { prefs ->
+            prefs[TOKEN_KEY] = token
+        }
+    }
+}
+
+// Podejście Prawidłowe (Main-Safe)
+suspend fun saveToken(token: String) {
+    // Możemy to bezpiecznie wołać z ViewModelu (Main Thread)
+    context.dataStore.edit { prefs ->
+        prefs[TOKEN_KEY] = token
+    }
+}
+\end{minted}
+
+Należy pamiętać, że o ile \textbf{odczyt z dysku} dzieje się na IO, o tyle \textbf{transformacje} danych (operatory \texttt{.map} na strumieniu Flow) wykonują się na tym wątku, na którym nastąpiła subskrypcja (kolekcjonowanie).
+Dla prostych typów (\texttt{String}, \texttt{Boolean}) nie ma to znaczenia, ale przy skomplikowanym przetwarzaniu warto pamiętać o operatorze \texttt{flowOn}, omawianym w Rozdziale 6.
+
+\section{Pełne Przykłady Implementacji}
+
+Poniżej znajdują się kompletne kody źródłowe omawianych zagadnień.
+
+\subsection{Przykład 1: SharedPreferences}
+
+Ten przykład pokazuje "stary styl". Mamy tu menedżera ustawień, który operuje na pliku XML. Zauważ, że aby zaktualizować UI po zmianie przełącznika, musimy ręcznie zmienić stan w Composable (\texttt{isNotificationsEnabled = newCheckedState}), ponieważ SharedPreferences nie powiadamia nas o zmianach automatycznie.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// --- 1. SettingsManager.kt ---
+class SettingsManager(context: Context) {
+    // Tryb MODE_PRIVATE: tylko ta aplikacja ma dostęp do pliku
+    private val prefs = context.getSharedPreferences(
+      "app_settings", 
+      Context.MODE_PRIVATE
+    )
+
+    companion object {
+        private const val NOTIFICATIONS_KEY = "notifications_enabled"
+    }
+
+    // ZAPIS (Asynchroniczny dzięki .apply())
+    fun saveNotificationsSetting(isEnabled: Boolean) {
+        prefs.edit {
+            putBoolean(NOTIFICATIONS_KEY, isEnabled)
+            apply()
+        }
+    }
+
+    // ODCZYT (Synchroniczny - uwaga na blokowanie UI przy dużych plikach!)
+    fun isNotificationEnabled(): Boolean {
+        return prefs.getBoolean(NOTIFICATIONS_KEY, false)
+    }
+}
+
+// --- 2. Screen.kt ---
+@Composable
+fun LegacySettingsScreen() {
+    val context = LocalContext.current
+    val settingsManager = remember { SettingsManager(context) }
+    
+    // Stan lokalny UI
+    var isNotificationsEnabled by remember { 
+        mutableStateOf(settingsManager.isNotificationEnabled()) 
+    }
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text("Ustawienia (Legacy)")
+        Spacer(Modifier.height(16.dp))
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Powiadomienia Push")
+            Switch(
+                checked = isNotificationsEnabled,
+                onCheckedChange = { newState ->
+                    // 1. Aktualizujemy UI
+                    isNotificationsEnabled = newState
+                    // 2. Zapisujemy w tle
+                    settingsManager.saveNotificationsSetting(newState)
+                }
+            )
+        }
+    }
+}
+\end{minted}
+
+\subsection{Przykład 2: DataStore (Architektura MVVM)}
+
+\textbf{Struktura plików:}
+\begin{itemize}
+    \item \texttt{DataStoreConfig.kt} - Singleton instancji DataStore.
+    \item \texttt{UserPreferencesRepository.kt} - Logika odczytu (Flow) i zapisu (suspend).
+    \item \texttt{UserViewModel.kt} - Konwersja Flow na StateFlow.
+    \item \texttt{UserScreen.kt} - Reaktywny widok.
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// --- 1. DataStoreConfig.kt ---
+// Delegat tworzący Singleton. Nazwa pliku to "user_prefs.preferences_pb"
+val Context.dataStore by preferencesDataStore(name = "user_prefs")
+
+// --- 2. UserPreferencesRepository.kt ---
+class UserPreferencesRepository(private val context: Context) {
+    
+    private object Keys {
+        val USER_NAME = stringPreferencesKey("user_name")
+    }
+
+    // ODCZYT: Zwracamy Flow, który emituje dane przy każdej zmianie pliku
+    val userNameFlow: Flow<String> = context.dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) 
+            else throw exception
+        }
+        .map { preferences ->
+            preferences[Keys.USER_NAME] ?: "Anonim"
+        }
+
+    // ZAPIS: Funkcja zawieszająca (działa na Dispatchers.IO)
+    suspend fun saveUserName(name: String) {
+        context.dataStore.edit { preferences ->
+            preferences[Keys.USER_NAME] = name
+        }
+    }
+}
+
+// --- 3. UserViewModel.kt ---
+class UserViewModel(
+    private val repository: UserPreferencesRepository
+) : ViewModel() {
+
+    // Stan pola tekstowego
+    var inputName by mutableStateOf("")
+        private set
+
+    // Stan z dysku (to co jest zapisane)
+    // stateIn zamienia zimny Flow w gorący StateFlow dostępny dla UI
+    val savedName: StateFlow<String> = repository.userNameFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = "Wczytywanie..."
+        )
+
+    fun onInputChange(newValue: String) {
+        inputName = newValue
+    }
+
+    fun saveName() {
+        viewModelScope.launch {
+            repository.saveUserName(inputName)
+            inputName = "" // Czyścimy pole po zapisie
+        }
+    }
+}
+
+// --- 4. UserScreen.kt ---
+@Composable
+fun UserScreen(viewModel: UserViewModel = viewModel()) {
+    // Obserwujemy StateFlow. Każda zmiana w pliku DataStore
+    // spowoduje automatyczną rekompozycję tego widoku.
+    val savedName by viewModel.savedName.collectAsStateWithLifecycle()
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Witaj, $savedName!")
+        
+        Spacer(Modifier.height(32.dp))
+
+        OutlinedTextField(
+            value = viewModel.inputName,
+            onValueChange = viewModel::onInputChange,
+            label = { Text("Zmień swoje imię") },
+            modifier = Modifier.fillMaxWidth()
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
+        Button(
+            onClick = { viewModel.saveName() },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Zapisz w DataStore")
+        }
+    }
+}
+\end{minted}

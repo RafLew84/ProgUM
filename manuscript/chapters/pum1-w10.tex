@@ -1,0 +1,312 @@
+\chapter{Struktura UI i Listy w Compose (Wykład 10)}
+
+W poprzednim rozdziale poznaliśmy podstawowe bloki budulcowe (Row, Column, Box) oraz mechanizm stanu. Teraz przejdziemy do budowania ekranów aplikacji, zgodnych z wytycznymi Material Design. Omówimy szkielet ekranu (\texttt{Scaffold}) oraz efektywne wyświetlanie długich list danych (\texttt{LazyColumn}).
+
+\section{Scaffold - Szkielet Ekranu}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w10-scaffold.png}
+    \caption{Schemat działania Scaffold}
+    \label{fig:pum1-w10-scaffold}
+\end{figure}
+
+\texttt{Scaffold} (rusztowanie) to gotowy komponent implementujący podstawową strukturę wizualną Material Design. Zapewnia on \textit{sloty} (miejsca) na standardowe elementy interfejsu, takie jak:
+\begin{itemize}
+    \item Górny pasek aplikacji (\texttt{TopAppBar})
+    \item Dolny pasek nawigacji (\texttt{BottomBar})
+    \item Pływający przycisk akcji (\texttt{FloatingActionButton})
+    \item Zawartość główną (Content)
+\end{itemize}
+
+Najważniejszą cechą \texttt{Scaffold} jest to, że automatycznie oblicza on przestrzeń zajmowaną przez paski systemowe i aplikacyjne, przekazując nam odpowiedni \texttt{PaddingValues} do głównej zawartości.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MainScreen() {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Moja Aplikacja") }
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { /* akcja */ }) {
+                Icon(Icons.Default.Add, contentDescription = "Dodaj")
+            }
+        }
+    ) { innerPadding ->
+        // WAŻNE: Musimy użyć innerPadding!
+        Column(
+            modifier = Modifier
+                .padding(innerPadding) // Aplikujemy padding od Scaffolda
+                .fillMaxSize()
+                .padding(16.dp) // Nasz własny padding
+        ) {
+            Text("Treść ekranu...")
+        }
+    }
+}
+\end{minted}
+
+
+Częstym błędem jest ignorowanie parametru \texttt{innerPadding} w lambdzie zawartości. Jeśli go nie użyjemy, nasza treść \textit{wjedzie} pod górny pasek aplikacji (TopAppBar), stając się niewidoczną.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w10-inner_padding.png}
+    \caption{Problem innerPadding}
+    \label{fig:pum1-w10-inner_padding}
+\end{figure}
+
+\section{TopAppBar - Górny Pasek}
+
+W Material Design 3 (Compose 1.1+) komponent \texttt{TopAppBar} jest oznaczony jako eksperymentalny (\texttt{@OptIn(ExperimentalMaterial3Api::class)}). Oferuje on cztery główne wersje:
+\begin{itemize}
+    \item \texttt{TopAppBar} (mały, standardowy)
+    \item \texttt{CenterAlignedTopAppBar} (tytuł na środku)
+    \item \texttt{MediumTopAppBar} (średni, zwijany)
+    \item \texttt{LargeTopAppBar} (duży, zwijany)
+\end{itemize}
+
+Konfiguracja akcji (przycisków po prawej) i nawigacji (ikona po lewej) jest bardzo prosta:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+TopAppBar(
+    title = { Text("Szczegóły") },
+    navigationIcon = {
+        IconButton(onClick = { /* nawigacja wstecz */ }) {
+            Icon(Icons.Filled.ArrowBack, "Wróć")
+        }
+    },
+    actions = {
+        IconButton(onClick = { /* udostępnij */ }) {
+            Icon(Icons.Filled.Share, "Udostępnij")
+        }
+        IconButton(onClick = { /* ustawienia */ }) {
+            Icon(Icons.Filled.Settings, "Ustawienia")
+        }
+    }
+)
+\end{minted}
+
+\section{Dolny Pasek Nawigacji (BottomBar)}
+
+W slocie \texttt{bottomBar} komponentu \texttt{Scaffold} najczęściej umieszczamy \texttt{NavigationBar} (Material 3) lub \texttt{BottomAppBar}. Służą one do nawigacji między głównymi ekranami aplikacji.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+NavigationBar {
+    NavigationBarItem(
+        icon = { Icon(Icons.Filled.Home, contentDescription = "Home") },
+        label = { Text("Start") },
+        selected = true, // Logika zaznaczenia
+        onClick = { /* nawigacja */ }
+    )
+    NavigationBarItem(
+        icon = { Icon(Icons.Filled.Person, contentDescription = "Profil") },
+        label = { Text("Profil") },
+        selected = false,
+        onClick = { /* nawigacja */ }
+    )
+}
+\end{minted}
+
+Każdy \texttt{NavigationBarItem} reprezentuje jeden cel nawigacji. Stan \texttt{selected} powinien być sterowany przez aktualny stan nawigacji (np. sprawdzając, czy obecna trasa to \textit{home}).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.25\textwidth]{fig/pum1-w10-scaffold_bars.png}
+    \caption{Dolny pasek nawigacji}
+    \label{fig:pum1-w10-scaffold_bars}
+\end{figure}
+
+\section{Listy Leniwe (Lazy Lists)}
+
+W Compose do obsługiwania list służą komponenty \texttt{LazyColumn} (pionowa lista) i \texttt{LazyRow} (pozioma lista).
+
+Dlaczego nazywamy je \textit{leniwymi}?
+\begin{enumerate}
+    \item \textbf{Zwykła \texttt{Column}}: Renderuje natychmiast \textbf{wszystkie} elementy, które w niej umieścisz. Jeśli dodasz tam 1000 elementów tekstowych, Compose stworzy 1000 węzłów w pamięci, nawet jeśli użytkownik widzi tylko pierwsze 10. To zabójstwo dla wydajności.
+    \item \textbf{\texttt{LazyColumn}}: Renderuje tylko te elementy, które są aktualnie widoczne na ekranie. Gdy przewijasz listę, elementy znikające z góry są usuwane, a nowe elementy pojawiające się od dołu są tworzone w locie.
+\end{enumerate}
+
+Aby przewijanie było płynne, Compose utrzymuje mały \textbf{bufor} (zazwyczaj po 1-2 elementy) tuż poza widocznym obszarem ekranu. Dzięki temu, gdy użytkownik zaczyna przesuwać palcem, system nie musi tworzyć nowego elementu.
+
+Dzięki tej strategii możemy wyświetlać listy z dziesiątkami tysięcy elementów, zużywając tyle pamięci, ile potrzeba na wyświetlenie np. tylko 10 z nich.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val names = listOf("Anna", "Bob", "Charlie", "David")
+
+LazyColumn {
+    // 1. Pojedynczy element
+    item {
+        Text("Nagłówek listy")
+    }
+
+    // 2. Wiele elementów z kolekcji
+    items(names) { name ->
+        Text("Witaj, $name!")
+    }
+
+    // 3. Elementy z indeksem
+    itemsIndexed(names) { index, name ->
+        Text("Pozycja $index: $name")
+    }
+}
+\end{minted}
+
+\section{Stan w Kolekcjach (mutableStateListOf)}
+
+Standardowa lista w Kotlinie (\texttt{MutableList}) nie jest obserwowalna przez Compose. Jeśli dodasz element do zwykłej listy, UI się nie odświeży.
+
+Aby lista była reaktywna, musimy użyć \texttt{mutableStateListOf}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable
+fun TodoList() {
+    // ŹLE: Zmiany nie odświeżą UI
+    // val list = remember { mutableListOf<String>() }
+
+    // DOBRZE: Specjalna lista obserwowalna
+    val list = remember { mutableStateListOf<String>() }
+
+    Column {
+        Button(onClick = { list.add("Zadanie ${list.size + 1}") }) {
+            Text("Dodaj zadanie")
+        }
+        
+        LazyColumn {
+            items(list) { task ->
+                Text(task)
+            }
+        }
+    }
+}
+\end{minted}
+
+Dzięki \texttt{mutableStateListOf}, każda operacja (\texttt{add}, \texttt{remove}, \texttt{clear}) automatycznie wyzwala rekompozycję tych fragmentów UI, które korzystają z listy.
+
+Wielu programistów myli różne sposoby tworzenia list w Compose.
+
+\begin{enumerate}
+    \item \texttt{val list = remember \{ mutableStateListOf<String>() \}} \\
+    To jest standardowy sposób. Lista jest zapamiętana (przeżywa rekompozycję) i obserwowalna (zmiana w liście odświeża UI).
+
+    \item \texttt{val list = mutableListOf<String>()} \\
+    Brak \texttt{remember} oznacza, że przy każdej rekompozycji lista jest tworzona od nowa (resetowana). Brak \texttt{State} oznacza, że zmiany w liście nie odświeżają UI.
+
+    \item \texttt{val list = remember \{ mutableListOf<String>() \}} \\
+    Lista przeżywa rekompozycję (dzięki remember), ale \textbf{nie jest obserwowalna}. Możesz dodawać elementy, ale UI ich nie pokaże, dopóki coś innego nie wymusi odświeżenia ekranu.
+
+    \item \texttt{val list = remember \{ mutableStateOf(mutableListOf<String>()) \}} \\
+    Tutaj obserwowalna jest \textbf{referencja do listy}, a nie sama lista.
+    \begin{itemize}
+        \item \texttt{list.value.add("X")} $\rightarrow$ UI się nie odświeży (referencja się nie zmieniła).
+        \item \texttt{list.value = mutableListOf("Y")} $\rightarrow$ UI się odświeży (zmieniliśmy cały obiekt).
+    \end{itemize}
+\end{enumerate}
+
+\subsection{ListItem - Standardowy element listy}
+Do budowania powtarzalnych elementów wewnątrz \texttt{LazyColumn} często wykorzystuje się komponent \texttt{ListItem}. Posiada on predefiniowane sloty (analogicznie do pól w formularzu) na treść, co eliminuje potrzebę ręcznego układania elementów w \texttt{Row}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+ListItem(
+    headlineContent = { Text("Nazwa kontaktu") },
+    supportingContent = { Text("Ostatnia wiadomość...") },
+    leadingContent = { Icon(Icons.Default.Person, contentDescription = null) },
+    trailingContent = { Checkbox(checked = false, onCheckedChange = {}) }
+)
+\end{minted}
+
+Główne parametry:
+\begin{itemize}
+    \item \texttt{headlineContent} – główny tekst (tytuł).
+    \item \texttt{supportingContent} – mniejszy tekst pomocniczy pod tytułem.
+    \item \texttt{leadingContent} – element na początku wiersza (np. ikona, avatar).
+    \item \texttt{trailingContent} – element na końcu wiersza (np. checkbox, data).
+\end{itemize}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.27\textwidth]{fig/pum1-w10-list_item.png}
+    \caption{Przykładowy komponent \texttt{ListItem}}
+    \label{fig:list_item}
+\end{figure}
+
+\subsection{StickyHeader - Nagłówki przypięte}
+W listach często zachodzi potrzeba pogrupowania elementów (np. kontaktów na literę A, B, C). Funkcja \texttt{stickyHeader} pozwala przypiąć nagłówek sekcji do górnej krawędzi ekranu. Pozostaje on widoczny, dopóki cała sekcja nie zostanie przewinięta poza widok.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun GroupedList(contacts: Map<Char, List<String>>) {
+    LazyColumn {
+        contacts.forEach { (initial, names) ->
+            stickyHeader {
+                Text(
+                    text = initial.toString(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.LightGray)
+                        .padding(8.dp)
+                )
+            }
+
+            items(names) { name ->
+                Text(text = name, modifier = Modifier
+                    .padding(16.dp))
+            }
+        }
+    }
+}
+\end{minted}
+
+Zauważmy, że \texttt{stickyHeader} wymaga adnotacji \texttt{@OptIn(Experimental\-Foundation\-Api::class)}, ponieważ jest to funkcja z pakietu fundamentów Compose, która może ulec zmianie w przyszłych wersjach biblioteki.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.27\textwidth]{fig/pum1-w10-sticky_header.png}
+    \caption{Przykładowy komponent \texttt{stickyHeader}}
+    \label{fig:sticky_header}
+\end{figure}
+
+\section{LazyVerticalGrid - Siatki}
+Do wyświetlania elementów w siatce (np. galeria zdjęć) służy \texttt{LazyVerticalGrid}. Wymaga on zdefiniowania układu kolumn:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+LazyVerticalGrid(
+    columns = GridCells.Adaptive(minSize = 120.dp), // Responsywne kolumny
+    // lub columns = GridCells.Fixed(3) // Sztywne 3 kolumny
+) {
+    items(100) { photoId ->
+        PhotoItem(photoId)
+    }
+}
+\end{minted}
+
+Zwykła siatka (\texttt{LazyVerticalGrid}) układa elementy w równych wierszach. Jeśli jednak nasze elementy mają różną wysokość (np. notatki w Google Keep lub zdjęcia na Pinterest), powstaną puste przestrzenie.
+
+Rozwiązaniem jest \texttt{LazyVerticalStaggeredGrid}. Układa ona elementy jeden pod drugim w kolumnie, dopasowując je tak, by zminimalizować puste miejsce.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+LazyVerticalStaggeredGrid(
+    columns = StaggeredGridCells.Adaptive(minSize = 150.dp),
+    verticalItemSpacing = 4.dp,
+    horizontalArrangement = Arrangement.spacedBy(4.dp)
+) {
+    items(photos) { photo ->
+        // Zdjęcia mogą mieć różne Ratio (wysokość)
+        PhotoCard(photo)
+    }
+}
+\end{minted}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.6\textwidth]{fig/pum1-w10-staggered_grid.png}
+    \caption{Przykładowy komponent \texttt{LazyVerticalGrid} oraz \texttt{LazyVerticalStaggeredGrid}}
+    \label{fig:staggered_grid}
+\end{figure}
+
+Ten komponent jest idealny do wyświetlania treści o zróżnicowanej długości, np. kart produktów z opisami czy galerii zdjęć o różnych proporcjach.

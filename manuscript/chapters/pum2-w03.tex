@@ -1,0 +1,160 @@
+\chapter{Zaawansowana Współbieżność i pobieranie danych (Wykład 3)}
+
+\section{Ustrukturyzowana Współbieżność}
+
+Poprzednio nauczyliśmy się, jak uruchamiać zadania w tle (\textit{nastawiać wodę}) i nie blokować przy tym kuchni. Co w sytuacji, gdy przygotowanie dania wymaga wykonania \textbf{kilku czynności na raz}, a my musimy mieć pewność, że wszystkie zostały ukończone, zanim wydamy posiłek?
+
+Tu z pomocą przychodzi funkcja \texttt{join()}, która jest fundamentem synchronizacji w świecie korutyn.
+
+Wyobraź sobie, że jesteś Szefem Kuchni (Korutyna-Rodzic). Masz przygotować główne danie: \textit{Stek z warzywami}. Nie będziesz robić wszystkiego sam.
+\begin{itemize}
+\item Wołasz Pomocnika nr 1: \textit{Usmaż mięso!} (zajmie to 2 sekundy).
+\item Wołasz Pomocnika nr 2: \textit{Ugotuj warzywa!} (zajmie to 3 sekundy).
+\end{itemize}
+
+Obaj pomocnicy ruszają do pracy w tym samym momencie (współbieżność). Główna korutyn jest wolna i może zająć się innymi sprawami. Ale nie może wydać dania dopóki nie będzie gotowe. To \textit{czekanie} wykonujemy za pomocą \texttt{join()}.
+
+Zobaczmy kod, któy symuluje taką sytuację:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// 1. Szef Kuchni (Rodzic) rozpoczyna pracę
+scope.launch {
+    logs.add("Szef kuchni (rodzic): Zaczynamy!")
+
+    // 2. Zlecenie zadania Pomocnikowi 1 (Dziecko 1)
+    val jobMieso = launch {
+        delay(2000) // Symulacja smażenia
+        logs.add("Kucharz 1: Mięso usmażone (2s).")
+    }
+
+    // 3. Zlecenie zadania Pomocnikowi 2 (Dziecko 2)
+    val jobWarzywa = launch {
+        delay(3000) // Symulacja gotowania
+        logs.add("Kucharz 2: Warzywa gotowe (3s).")
+    }
+
+    logs.add("Szef kuchni: Zadania zlecone, scope czeka na zakończenie...")
+
+    // 4. synchronizacja: Szef czeka na wyniki
+    jobWarzywa.join()
+    jobMieso.join()
+
+    // 5. Finał
+    logs.add("Szef kuchni: Wszyscy skończyli! Można podawać danie.")
+}
+\end{minted}
+
+W przykładzie widzimy koordynację zadań podrzędnych. Cały proces rozpoczyna się w momencie, gdy korutyna nadrzędna - nasz metaforyczny Szef Kuchni - uruchamia podzadania za pomocą funkcji \texttt{launch}. Jest to swego rodzaju \textit{bilet zamówienia}, który daje nam unikalny uchwyt do konkretnej, trwającej korutyny. W naszym przypadku tworzymy dwa takie uchwyty: \texttt{jobMieso} oraz \texttt{jobWarzywa}, które stają się dziećmi głównej korutyny uruchomionej w scope.
+
+Oba zadania startują niemal w tym samym momencie, co oznacza, że nie czekamy z gotowaniem warzyw do momentu, aż mięso będzie gotowe. Dzięki temu całkowity czas operacji nie jest sumą czasów poszczególnych zadań (5 sekund), lecz odpowiada czasowi najdłuższego z nich (3 sekundy). Jednak ta niezależność podzadań rodzi problem \textbf{synchronizacji}: co, jeśli Szef Kuchni zakończy swoją pracę szybciej niż jego pomocnicy? Bez odpowiedniej kontroli, log \textit{Można podawać danie} pojawiłby się natychmiast po zleceniu zadań, co w naszej metaforze oznaczałoby wydanie klientowi pustego talerza, zanim składniki zdążą się ugotować.
+
+Rozwiązaniem problemu wyścigu (race condition) jest funkcja \texttt{join()}. Z technicznego punktu widzenia jest to funkcja zawieszająca (\texttt{suspend function}), która służy do synchronizacji cyklu życia korutyn. Kiedy korutyna nadrzędna (rodzic) napotyka instrukcję \texttt{jobWarzywa.join()}, jej wykonanie zostaje zawieszone. Należy wyraźnie podkreślić różnicę między zawieszeniem a zablokowaniem: wątek obsługujący tę korutynę nie jest blokowany i może w tym czasie wykonywać inne operacje systemowe. Mechanizm \texttt{join} wprowadza korutynę wywołującą w stan oczekiwania, który trwa dopóki obserwowany obiekt \texttt{Job} nie osiągnie stanu końcowego (Completed lub Cancelled). Dopiero gdy podzadanie faktycznie zakończy swoje działanie, maszyna stanów wznawia korutynę rodzica od kolejnej linii kodu. Dzięki jawnemu wywołaniu \texttt{join()} na obu obiektach \texttt{Job}, realizujemy kontrakt Ustrukturyzowanej Współbieżności, w którym rodzic świadomie koordynuje pracę swoich dzieci i gwarantuje, że żadna operacja nie zostanie zakończona przedwcześnie, zapewniając spójność danych i przewidywalność przepływu aplikacji.
+
+Warto zatrzymać się przy aspekcie, który czyni ustrukturyzowaną współbieżność \textit{bezpieczną} - jest to \textbf{automatyczna propagacja anulowania} - wpominaliśmy już o tym wcześniej. Ale omówmy to jeszcze raz.
+
+Wyobraźmy sobie, że nasz Szef Kuchni (rodzic) otrzymuje informację, że klient anulował zamówienie i wychodzi z restauracji. W świecie \textbf{ustrukturyzowanej współbieżności} Szef nie musi biegać po kuchni i osobiście prosić każdego pomocnika o przerwanie pracy. Wywołanie \texttt{job.cancel()} na korutynie-rodzicu \textbf{automatycznie} przesyła sygnał anulowania do wszystkich dzieci (\texttt{jobMieso}, \texttt{jobWarzywa}). Jeśli pomocnicy wykonują funkcje zawieszające (takie jak \texttt{delay}), natychmiast przerwą pracę.
+
+W programowaniu aplikacji na Androida ten mechanizm jest niezwykle istotny. Kiedy użytkownik zamyka ekran (\texttt{Activity}), powiązany z nim zakres (\texttt{viewModelScope} lub \texttt{lifecycleScope}) zostaje anulowany. Dzięki hierarchii rodzic-dziecko, wszystkie trwające zapytania sieciowe czy obliczenia w tle zostają \textit{posprzątane} automatycznie. Zapobiega to wyciekom pamięci i marnowaniu baterii na procesy, których wyniku nikt już nie zobaczy.
+
+\section{Odbieranie Wyników: Mechanizm \texttt{async} i \texttt{await}}
+
+Mimo że funkcja \texttt{launch} jest niezwykle przydatna, posiada jedno istotne ograniczenie: działa na zasadzie \textit{odpal i zapomnij} (\textit{fire-and-forget}). Zwraca ona obiekt \texttt{Job}, który pozwala nam sprawdzić czy praca trwa, lub ją przerwać, ale nie pozwala nam \textit{wyjąć} ze środka żadnej wartości. W świecie rzeczywistym nie zawsze chcemy tylko zlecić zadanie; często potrzebujemy, aby pracownik coś nam przyniósł (np. konkretny składnik z magazynu). Do takich zadań służy funkcja \texttt{async}.
+
+\subsection{Analogia: Kurier i Pusta Skrzynka} 
+Zanim przeanalizujemy kod, posłużmy się analogią zamówienia przesyłki: 
+\begin{itemize} 
+    \item \textbf{async:} To moment kliknięcia \textit{Kup teraz}. Sklep nie daje nam towaru natychmiast, ale daje nam \textbf{numer śledzenia przesyłki} (to jest nasz obiekt \texttt{Deferred}). 
+    \item \textbf{Deferred:} To metaforyczne \textit{puste pudełko}. Pudełko istnieje fizycznie (mamy do niego referencję w kodzie), ale w tej chwili nie możemy z niego skorzystać, bo zawartość jest jeszcze w drodze. 
+    \item \textbf{await():} To moment, w którym czekamy na dzwonek kuriera. Jeśli kurier już był - odbieramy zawartość natychmiast. Jeśli jeszcze jedzie - zawieszamy nasze inne czynności i czekamy, aż pudełko zostanie \textit{odpakowane}. 
+\end{itemize}
+
+\subsection{Przykład Praktyczny: Generator Tajemniczego Hasła} 
+Rozważmy implementację ekranu, który symuluje złożony proces generowania bezpiecznego hasła. Proces ten trwa 3 sekundy i musi zwrócić wynik bezpośrednio do zmiennej stanu interfejsu.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable fun PasswordGeneratorScreen() { 
+    var password by remember { mutableStateOf("...") } 
+    val scope = rememberCoroutineScope()
+
+    // Funkcja symulująca ciężkie obliczenia w tle
+    suspend fun generatePassword(): String {
+        delay(3000) // Symulacja pracy
+        return "Kotlin-Is-Super-Secure-123"
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Generator Tajemniczego Hasła", style = MaterialTheme.typography.headlineSmall)
+        Spacer(Modifier.height(20.dp))
+
+        Button(onClick = {
+            password = "Generowanie..."
+            
+            // Uruchamiamy korutynę nadrzędną (szkielet operacji)
+            scope.launch {
+                // 1. Zlecenie zadania (async) - natychmiast dostajemy 'pudełko' Deferred
+                val deferredPassword: Deferred<String> = async { generatePassword() }
+                
+                // 2. Oczekiwanie (await) - korutyna zawiesza się tutaj na 3 sekundy
+                val result = deferredPassword.await()
+                
+                // 3. Po 3 sekundach korutyna wznawia pracę z gotowym wynikiem
+                password = result
+            }
+        }) {
+            Text("Wygeneruj hasło")
+        }
+
+        Spacer(Modifier.height(20.dp))
+        Text(password, fontSize = 20.sp, fontFamily = FontFamily.Monospace)
+    }
+} 
+\end{minted}
+
+W powyższym kodzie kluczowy jest moment kliknięcia przycisku. Wywołujemy \path{scope.launch}, aby wejść do świata współbieżności. Wewnątrz niego dzieją się dwie rzeczy: Po pierwsze, linia \texttt{async { generatePassword() }} nie blokuje wykonania kodu. Funkcja \texttt{async} natychmiast zwraca obiekt typu \texttt{Deferred<String>}. Gdybyśmy w tym momencie sprawdzili wartość \texttt{deferredPassword}, dowiedzielibyśmy się jedynie, że zadanie jest w toku. Po drugie, wywołanie \texttt{deferredPassword.await()} jest instrukcją dla mechanizmu korutyn: \textit{Zatrzymaj tę konkretną korutynę w tym miejscu i czekaj, aż} \texttt{deferredPassword} \textit{dostarczy wartość}. Co niezwykle ważne - \textbf{wątek UI pozostaje wolny}. Użytkownik widzi napis \texttt{Generowanie...}, ale aplikacja nie jest zamrożona; system może w tym czasie obsłużyć inne zdarzenia.
+
+Gdy funkcja \texttt{generatePassword()} skończy pracę i zwróci \texttt{String}, \texttt{await()} \textit{odpakuje} go i przypisuje do zmiennej \texttt{result}. Dopiero wtedy wykonuje się ostatnia linia: \texttt{password = result}, co powoduje rekompozycję interfejsu i wyświetlenie hasła.
+
+\section{Most między światami: runBlocking}
+
+Wszystkie funkcje, które poznaliśmy do tej pory - \texttt{launch} oraz \texttt{async} - wymagają do działania istniejącego zakresu (\texttt{CoroutineScope}). Istnieją jednak sytuacje, w których musimy poczekać, aż świat korutyn zakończy swoją pracę, zanim pozwolimy światu zewnętrznemu (blokującemu) ruszyć z miejsca. Do tego celu służy \texttt{runBlocking}. Jak sama nazwa wskazuje, jest to funkcja, która \textbf{blokuje bieżący wątek}, na którym została wywołana, dopóki wszystkie korutyny wewnątrz jej bloku nie zostaną zakończone.
+
+Wyobraź sobie strumień kodu asynchronicznego jako płynącą rzekę - korutyny płyną swobodnie, nie przeszkadzając sobie nawzajem. \texttt{runBlocking} jest jak \textbf{tama}, którą stawiamy w poprzek rzeki. 
+\begin{itemize} 
+    \item Woda (wątek) przestaje płynąć dalej za tamę. 
+    \item Cały nurt zostaje zatrzymany tak długo, aż praca wewnątrz tamy nie zostanie ukończona. 
+    \item Dopiero gdy ostatnia korutyna w bloku \texttt{runBlocking} skończy działanie, tama zostaje otwarta i wątek może kontynuować wykonywanie kolejnych linii kodu pod blokiem. 
+\end{itemize}
+
+\subsection{Zastosowanie} 
+Ponieważ \texttt{runBlocking} blokuje wątek, wywołanie go na wątku UI spowoduje natychmiastowe zamrożenie interfejsu użytkownika na cały czas trwania operacji wewnątrz bloku. Jest to powrót do problemu, który korutyny miały rozwiązać.
+
+Kiedy zatem jest to przydatne? 
+\begin{enumerate} 
+    \item \textbf{Testy jednostkowe:} W testach chcemy, aby proces testowy poczekał na wynik operacji asynchronicznej, zanim sprawdzi poprawność wyniku (asercję). 
+    \item \textbf{Funkcja main():} W prostych programach konsolowych Kotlin, gdzie musimy \textit{zatrzymać} program przed zamknięciem, dopóki korutyny nie skończą pracy. 
+    \item \textbf{Integracja z kodem blokującym:} Gdy musimy wywołać kod asynchroniczny wewnątrz biblioteki, która nie wspiera korutyn i wymaga natychmiastowego zwrotu wartości. 
+\end{enumerate}
+
+\subsection{Porównanie mechanizmów} 
+Poniższy przykład pokazuje, jak \texttt{runBlocking} wpływa na przepływ programu w porównaniu do \texttt{launch}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin} 
+fun runBlockingExample() { 
+    println("1. Start programu")
+
+    // Ten blok zatrzyma wątek na 2 sekundy!
+    runBlocking {
+        println("2. Wewnątrz runBlocking - start")
+        delay(2000)
+        println("3. Wewnątrz runBlocking - koniec")
+    }
+
+    println("4. Koniec programu - ta linia czekała na tamę")
+} 
+\end{minted}
+
+W powyższym kodzie napis \textit{4. Koniec programu} pojawi się dopiero po 2 sekundach. Gdybyśmy zamiast \texttt{runBlocking} użyli \texttt{launch} (w odpowiednim \texttt{scope}), napis \textit{4} pojawiłby się natychmiast po napisie \textit{2}, ponieważ rzeka płynęłaby dalej, podczas gdy korutyna pracowałaby \textit{obok}.

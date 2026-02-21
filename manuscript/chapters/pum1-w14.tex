@@ -1,0 +1,245 @@
+\chapter{Aplikacja Hybrydowa i Widżety (Wykład 14)}
+
+Możemy spotkać się z architekturą hybrydową tworząc aplikację na Androida. Nie chodzi tu o aplikacje webowe (Flutter/React Native), ale o łączenie \textbf{Jetpack Compose} z klasycznymi, starszymi komponentami systemu Android, takimi jak \textbf{AppWidgets} (widżety ekranowe).
+
+Widżety w Androidzie (te na ekranie głównym) wciąż opierają się na technologii \texttt{RemoteViews} i XML. Biblioteka dostępna w Compose jest w tej chwili na wczesnym etapie rozwoju (Jetpack Glance - omówiony w dalszej części rozdziału). Dlatego musimy umieć komunikować te dwa światy.
+
+\section{Architektura Aplikacji Hybrydowej}
+
+Załóżmy, że tworzymy prosty licznik (Counter). Chcemy, aby:
+\begin{enumerate}
+    \item Aplikacja (Activity) była napisana w \textbf{Jetpack Compose}.
+    \item Widżet na ekranie głównym był klasycznym \textbf{AppWidgetem}.
+    \item Stan licznika był wspólny – zmiana w aplikacji aktualizuje widżet i odwrotnie.
+\end{enumerate}
+
+Aby to osiągnąć, potrzebujemy \textit{Wspólnego Źródła Prawdy} (\textit{Single Source of Truth}). W tym prostym przypadku idealnie sprawdzą się \textbf{SharedPreferences}.
+
+\section{SharedPreferences}
+
+\texttt{SharedPreferences} to mechanizm do przechowywania prostych danych w formacie klucz-wartość (plik XML). Teraz omówimy jego podstawowe cechy i użycie, w następnym semestrze poznamy bardziej zaawansowane techniki.
+
+\begin{itemize}
+    \item Obsługuje typy proste: \texttt{boolean}, \texttt{float}, \texttt{int}, \texttt{long}, \texttt{String}, \texttt{Set<String>}.
+    \item Działa synchronicznie (odczyt/zapis blokuje wątek, chyba że użyjemy \texttt{apply()}).
+    \item Pozwala nasłuchiwać zmian za pomocą \texttt{OnSharedPreferenceChangeListener}.
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Pobranie instancji
+val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+
+// Zapis (Edycja -> Put -> Apply)
+prefs.edit()
+    .putInt("count", 5)
+    .apply() // Asynchroniczny zapis
+
+// Odczyt
+val count = prefs.getInt("count", 0) // 0 to wartość domyślna
+\end{minted}
+
+\section{Integracja z Jetpack Compose}
+
+Compose działa reaktywnie – odświeża się, gdy zmienia się \texttt{State}. SharedPreferences nie są \texttt{State}, więc musimy stworzyć most. Posłuży nam do tego \texttt{DisposableEffect}.
+
+\subsection{Czym jest Efekt Uboczny (Side Effect)?}
+Funkcje \texttt{@Composable} z założenia powinny być \textbf{czyste} i \textbf{deterministyczne}, co oznacza, że dla tych samych danych wejściowych zawsze generują ten sam wygląd UI, nie zmieniając niczego w otoczeniu.
+
+Wszelkie operacje wykraczające poza ten schemat – np. komunikacja z bazą danych, uruchomienie timera, odtworzenie dźwięku czy \textbf{rejestracja listenera} – nazywamy \textbf{efektami ubocznymi}. Gdybyśmy umieścili taki kod bezpośrednio w ciele funkcji, wykonywałby się on przy każdym odświeżeniu ekranu (rekompozycji), co prowadziłoby do błędów i wycieków pamięci.
+
+\subsection{DisposableEffect}
+Jest to bezpieczny mechanizm obsługi efektu ubocznego, który pozwala wykonać kod przy wejściu komponentu do drzewa kompozycji i (co kluczowe) posprzątać po sobie przy wyjściu. Idealne do rejestrowania i wyrejestrowywania listenerów.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable
+fun CounterScreen(context: Context) {
+    // 1. Stan w Compose
+    var count by remember { mutableStateOf(0) }
+    
+    val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+
+    // 2. Efekt uboczny: Nasłuchiwanie zmian w SharedPreferences
+    DisposableEffect(Unit) {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
+            if (key == "count") {
+                // Gdy zmieni się plik, aktualizujemy stan Compose
+                count = sharedPreferences.getInt("count", 0)
+            }
+        }
+
+        // Rejestracja listenera (onStart)
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        
+        // Inicjalny odczyt
+        count = prefs.getInt("count", 0)
+
+        // Czyszczenie (onStop/onDispose)
+        onDispose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
+    // 3. UI
+    Text(text = "Licznik: $count")
+}
+\end{minted}
+
+Dzięki temu, gdy zewnętrzny proces (np. Widżet) zmieni wartość w SharedPreferences, nasz ekran w Compose automatycznie się odświeży!
+
+\section{App Widgets (Widżety Ekranowe)}
+
+Widżety działają w procesie Systemu (Launchera), a nie naszej aplikacji. Dlatego mają bardzo ograniczone możliwości UI (tylko podstawowe widoki jak \texttt{TextView}, \texttt{Button}, \texttt{ImageView}).
+
+Ponieważ widżet \textit{żyje} na ekranie innej aplikacji (Launchera), nie mamy bezpośredniego dostępu do jego widoków. Nie możemy napisać \texttt{findViewById} ani \texttt{composeView.setContent}. Zamiast tego musimy przygotować \textit{paczkę} z opisem wyglądu (\texttt{RemoteViews}) i wysłać ją do systemu (\texttt{AppWidgetManager}).
+
+Aby wiedzieć, \textit{kiedy} taką paczkę wysłać (np. gdy użytkownik dodał widżet na ekran), potrzebujemy mechanizmu powiadomień - tą rolę pełni \texttt{AppWidgetProvider}.
+
+\subsection{BroadcastReceiver i AppWidgetProvider}
+
+\textbf{BroadcastReceiver} to jeden z czterech głównych komponentów Androida (obok Activity, Service i ContentProvider). Służy do odbierania komunikatów (intencji) wysyłanych przez system lub inne aplikacje (np. "Bateria słaba", "Włączono Wi-Fi"). Działa w tle, ale bardzo krótko – tylko tyle, by obsłużyć zdarzenie.
+
+\textbf{AppWidgetProvider} to nic innego jak specjalny \texttt{BroadcastReceiver}, który został przygotowany do obsługi cyklu życia widżetu (odbiera intencje takie jak \texttt{APPWIDGET\_UPDATE}, \texttt{APPWIDGET\_DELETED} itd.).
+
+
+\textbf{Uwaga:} Mimo że nazwa klasy zawiera słowo \textit{Provider}, \texttt{AppWidgetProvider} \textbf{nie jest} \texttt{ContentProviderem}. ContentProvider służy do udostępniania danych innym aplikacjom (np. baza kontaktów), podczas gdy AppWidgetProvider służy do odbierania zdarzeń systemowych (Broadcastów).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class CounterWidget : AppWidgetProvider() {
+
+    // Wywoływane, gdy trzeba odświeżyć widżet (np. co 30 min lub na żądanie)
+    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+        for (appWidgetId in appWidgetIds) {
+            updateAppWidget(context, appWidgetManager, appWidgetId)
+        }
+    }
+}
+
+fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
+    val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+    val count = prefs.getInt("count", 0)
+
+    // Budowanie widoku dla innego procesu (RemoteViews)
+    val views = RemoteViews(context.packageName, R.layout.widget_counter)
+    views.setTextViewText(R.id.widget_text, count.toString())
+
+    // Obsługa kliknięcia (PendingIntent -> BroadcastReceiver)
+    val intent = Intent(context, CounterReceiver::class.java).apply {
+        action = "INCREMENT"
+    }
+    // PendingIntent pozwala innej aplikacji (Launcherowi) uruchomić nasz Intent
+    val pendingIntent = PendingIntent.getBroadcast(
+        context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    
+    views.setOnClickPendingIntent(R.id.widget_button_plus, pendingIntent)
+
+    // Wysłanie widoku do menedżera
+    appWidgetManager.updateAppWidget(appWidgetId, views)
+}
+\end{minted}
+
+\texttt{PendingIntent} to \textit{token}, który przekazujemy innej aplikacji (np. Launcherowi), pozwalając jej wykonać akcję w naszym imieniu, nawet gdy nasza aplikacja jest zabita.
+
+W powyższym przykładzie, kliknięcie przycisku na widżecie (przez Launchera) wyśle Broadcast do naszej klasy \texttt{CounterReceiver}.
+
+\section{Zamykanie Pętli (CounterReceiver)}
+
+Ostatni element układanki. \texttt{CounterReceiver} odbiera sygnał z widżetu, zmienia dane w SharedPreferences i wymusza odświeżenie widżetu.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class CounterReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == "INCREMENT") {
+            val prefs = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
+            val current = prefs.getInt("count", 0)
+            
+            // 1. Zapisz nową wartość (to wywoła listener w Compose!)
+            prefs.edit().putInt("count", current + 1).apply()
+
+            // 2. Ręcznie odśwież widżet (bo AppWidgetProvider nie nasłuchuje Prefs automatycznie)
+            // ... kod pobierający instancję AppWidgetManagera i wołający updateAppWidget ...
+        }
+    }
+}
+\end{minted}
+
+\section{Podsumowanie Przepływu}
+\begin{enumerate}
+    \item Użytkownik klika "+" na Widżecie.
+    \item Launcher używa \texttt{PendingIntent} -> wysyła Broadcast \texttt{INCREMENT}.
+    \item \texttt{CounterReceiver} odbiera Broadcast -> Zwiększa licznik w \texttt{SharedPreferences}.
+    \item \texttt{SharedPreferences} powiadamia listenerów.
+    \item \texttt{DisposableEffect} w Compose odbiera zmianę -> Aktualizuje UI aplikacji.
+    \item \texttt{CounterReceiver} wymusza odświeżenie Widżetu -> Aktualizuje UI widżetu.
+\end{enumerate}
+
+To przykład architektury zdarzeniowej, gdzie różne, niezależne komponenty komunikują się przez wspólny stan.
+
+\section{Jetpack Glance}
+
+Tradycyjne podejście z \texttt{RemoteViews} jest uciążliwe – wymaga XML, ma ograniczone API i inną składnię niż reszta aplikacji pisanej w Compose. Odpowiedzią Google na ten problem jest biblioteka \textbf{Jetpack Glance}.
+
+Glance to framework, który pozwala budować interfejs widżetów (oraz kafelków na Wear OS) przy użyciu składni znanej z Jetpack Compose.
+
+\textbf{Uwaga:} Pod spodem Glance nadal generuje \texttt{RemoteViews}. To tylko nakładka (kompilator), która tłumaczy kod Compose na instrukcje zrozumiałe dla procesu systemowego. Dzięki temu mamy zalety Compose (deklaratywność, stan) przy zachowaniu kompatybilności z mechanizmem widżetów.
+
+\subsection{Przykład: Licznik w Glance}
+
+Zwróć uwagę, jak bardzo kod przypomina zwykłą aplikację Compose. Nie ma tu XML ani \texttt{RemoteViews}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class CounterGlanceWidget : GlanceAppWidget() {
+
+    // Definicja stanu (używamy Preferences z DataStore lub file-based)
+    override val stateDefinition = PreferencesGlanceStateDefinition
+
+    @Composable
+    override fun Content() {
+        // Odczyt stanu (podobne do collectAsState)
+        val prefs = currentState<Preferences>()
+        val count = prefs[intPreferencesKey("count")] ?: 0
+
+        Column(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .background(Color.White),
+            horizontalAlignment = Alignment.Horizontal.CenterHorizontally,
+            verticalAlignment = Alignment.Vertical.CenterVertically
+        ) {
+            Text(
+                text = "Licznik: $count",
+                style = TextStyle(fontSize = 20.sp)
+            )
+            
+            Button(
+                text = "Zwiększ",
+                onClick = actionRunCallback<IncrementActionCallback>()
+            )
+        }
+    }
+}
+
+// Obsługa akcji (zamiast BroadcastReceivera)
+class IncrementActionCallback : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        updateAppWidgetState(context, glanceId) { prefs ->
+            val current = prefs[intPreferencesKey("count")] ?: 0
+            prefs[intPreferencesKey("count")] = current + 1
+        }
+        CounterGlanceWidget().update(context, glanceId)
+    }
+}
+\end{minted}
+
+\subsection{Kluczowe różnice}
+\begin{itemize}
+    \item \textbf{Modifier}: Używamy \texttt{GlanceModifier} a nie zwykłego \texttt{Modifier}.
+    \item \textbf{Akcje}: Zamiast \texttt{PendingIntent}, mamy bezpieczniejsze typowane callbacki (\texttt{actionRunCallback}).
+    \item \textbf{Komponenty}: To nie są te same komponenty co w \texttt{androidx.compose.material}. To specjalne wersje (\texttt{androidx.glance.text.Text}, \texttt{androidx.glance.Button}) dostosowane do ograniczeń \texttt{RemoteViews}.
+\end{itemize}
+
+Glance to przyszłość tworzenia widżetów, eliminująca większość \textit{boilerplate code} związanego z \texttt{AppWidgetProvider}.

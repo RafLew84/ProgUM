@@ -1,0 +1,301 @@
+\chapter{Fundamenty Aplikacji Android (Wykład 8)}
+
+W tym rozdziale przechodzimy od czystego języka Kotlin do tworzenia aplikacji na platformę Android. Zrozumienie podstawowych komponentów i cyklu życia aplikacji jest kluczowe dla pisania stabilnego i wydajnego oprogramowania mobilnego.
+
+\section{Struktura Aplikacji i Manifest}
+
+Każda aplikacja Android składa się z zestawu komponentów, które są zadeklarowane w pliku \texttt{AndroidManifest.xml}. Jest to \textit{dowód tożsamości} aplikacji. System operacyjny Android odczytuje ten plik przed uruchomieniem jakiegokolwiek kodu aplikacji. Zawiera on:
+\begin{itemize}
+    \item \textbf{Nazwę pakietu} (unikalny identyfikator aplikacji, np. \texttt{com.example.myapp}).
+    \item \textbf{Deklaracje komponentów}: Aktywności (\texttt{<activity>}), Usługi (\texttt{<service>}), Odbiorniki (\texttt{<receiver>}) i Dostawcy treści (\texttt{<provider>}).
+    \item \textbf{Uprawnienia}: Czego aplikacja potrzebuje do działania (np. dostęp do Internetu, kamery).
+\end{itemize}
+
+Przykładowy fragment:
+\begin{minted}[frame=single,framesep=10pt]{xml}
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.myapp">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application ... >
+        <activity android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+\end{minted}
+
+
+W powyższym przykładzie kluczowe są dwa elementy filtru intencji (\texttt{intent-filter}):
+\begin{itemize}
+    \item \textbf{Action MAIN}: Informuje system, że ta aktywność jest głównym punktem wejścia do aplikacji.
+    \item \textbf{Category LAUNCHER}: Powoduje, że ikona aplikacji zostanie umieszczona w menu (launcherze) systemu Android. Bez tej kategorii aplikacja nie byłaby widoczna na liście zainstalowanych programów, a jej ręczne uruchomienie przez użytkownika byłoby niemożliwe.
+\end{itemize}
+
+Aplikacja musi posiadać co najmniej jedną aktywność, aby użytkownik mógł wejść z nią w bezpośrednią interakcję. Choć system dopuszcza pakiety bez interfejsu graficznego (np. biblioteki lub specyficzne usługi systemowe), to właśnie Aktywność jest jedynym komponentem zdolnym do renderowania pełnoekranowego okna i bezpośredniego odbierania zdarzeń dotykowych. Inne elementy, takie jak powiadomienia czy widżety, służą jedynie jako pomocnicze punkty, które w większości przypadków i tak mają za zadanie przekierować użytkownika do konkretnej aktywności w celu wykonania pełnej akcji.
+
+\section{Aktywność (Activity)}
+
+Aktywność (\texttt{Activity}) historycznie, to podstawowy komponent reprezentujący pojedynczy ekran interfejsu użytkownika, z którym użytkownik może wchodzić w interakcję.
+
+\begin{itemize}
+    \item \textbf{Klasycznie (View System)}: Aktywność była centralnym punktem zarządzania UI. Odpowiadała za ładowanie layoutu XML, znajdowanie widoków (\texttt{findViewById}) i obsługę zdarzeń. Często prowadziło to do powstania ogromnych klas (\textit{God Activity}).
+    \item \textbf{Jetpack Compose}: Aktywność staje się lekkim kontenerem (\textit{hostem}). Jej głównym zadaniem jest ustawienie zawartości (\texttt{setContent}) i ewentualnie obsługa specyficznych zdarzeń systemowych. Całe UI jest budowane z funkcji \texttt{@Composable}.
+\end{itemize}
+
+Android zarządza aplikacjami w sposób agresywny, aby oszczędzać baterię i zasoby. Aktywność może zostać w każdej chwili zniszczona (np. obrót ekranu, przyjście połączenia, brak pamięci). Dlatego system powiadamia aktywność o zmianach jej stanu poprzez metody cyklu życia:
+
+\begin{enumerate}
+    \item \texttt{onCreate()}: Aktywność jest tworzona. Tu inicjalizujemy UI i zmienne. Wywołuje się tylko raz.
+    \item \texttt{onStart()}: Aktywność staje się widoczna dla użytkownika, ale nie jest jeszcze interaktywna.
+    \item \texttt{onResume()}: Aktywność jest na pierwszym planie i użytkownik może z nią wchodzić w interakcję.
+    \item \texttt{onPause()}: Aktywność traci focus (np. pojawia się okno dialogowe lub użytkownik wychodzi). Tu zatrzymujemy animacje czy zapisujemy lekkie dane.
+    \item \texttt{onStop()}: Aktywność nie jest już widoczna. Zwalniamy cięższe zasoby.
+    \item \texttt{onDestroy()}: Aktywność jest usuwana z pamięci.
+\end{enumerate}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w08-activity-lifecycle.jpg}
+    \caption{Cykl życia aktywności}
+    \label{fig:activity_lifecycle}
+\end{figure}
+
+
+Dlaczego wprowadzono aż tyle metod? Taka granularność pozwala na precyzyjne zarządzanie zasobami poprzez podział życia aktywności na trzy zagnieżdżone cykle:
+
+\begin{itemize}
+    \item \textbf{Pełny cykl (Entire Lifetime)}: Między \texttt{onCreate} a \texttt{onDestroy}. To czas, w którym obiekt aktywności w ogóle istnieje w pamięci. Tu inicjalizujemy globalny stan.
+    \item \textbf{Widoczny cykl (Visible Lifetime)}: Między \texttt{onStart} a \texttt{onStop}. Użytkownik widzi aplikację na ekranie, co pozwala nam np. utrzymywać zasoby potrzebne do wyświetlania interfejsu.
+    \item \textbf{Cykl pierwszoplanowy (Foreground Lifetime)}: Między \texttt{onResume} a \texttt{onPause}. Aktywność znajduje się na samym wierzchu i posiada tzw. \textit{focus}.
+\end{itemize}
+
+Dobrym sposobem na zapamiętanie tej hierarchii jest analogia aktora w teatrze:
+\begin{itemize}
+    \item \texttt{onCreate}: Aktor przychodzi do teatru i przygotowuje się w garderobie (inicjalizacja).
+    \item \texttt{onStart}: Aktor wchodzi na scenę. Jest widoczny dla publiczności, ale może jeszcze stać w cieniu.
+    \item \texttt{onResume}: Na aktora pada światło reflektora – zaczyna on swoją kwestię i główną interakcję.
+    \item \texttt{onPause}: Reflektor gaśnie. Aktor wciąż jest na scenie, ale uwaga widzów przenosi się na kogoś innego.
+    \item \texttt{onStop}: Aktor schodzi ze sceny za kulisy.
+    \item \texttt{onDestroy}: Aktor zdejmuje kostium i opuszcza budynek teatru (zwalnianie pamięci).
+\end{itemize}
+
+Dzięki takiemu podziałowi system może inteligentnie zarządzać zasobami. Przykładowo, w trybie \textit{split-screen} (podzielony ekran), jedna aplikacja może być w stanie \texttt{onResume} (ta, w której aktualnie piszemy), a druga w \texttt{onPause}, ale wciąż widoczna. Pozwala to np. na dalsze odtwarzanie wideo w tej drugiej aplikacji (\texttt{onStart}/\texttt{onStop}), mimo że nie jest ona w centrum uwagi.
+
+
+Warto podkreślić istotny szczegół techniczny: \texttt{onPause()} jest często przywoływana jako ostatnia \textit{bezpieczna} metoda przed potencjalnym ubiciem procesu przez system. Wynika to z historycznych założeń systemu Android (przed wersją 3.0), gdzie faktycznie po \texttt{onPause()} proces mógł zostać natychmiast usunięty z pamięci w sytuacjach krytycznego braku zasobów. W nowszych wersjach system gwarantuje wykonanie aż do metody \texttt{onStop()}, jednak to \texttt{onPause()} pozostaje momentem, w którym aplikacja przestaje być interaktywna, co czyni tę metodę najlepszym miejscem na szybkie zapisanie kluczowych danych, zanim użytkownik całkowicie opuści ekran.
+
+\section{Zachowanie stanu (State Restoration)}
+
+Gdy system niszczy aktywność z powodów od niego niezależnych (np. obrót ekranu, zmiana języka systemowego lub wymuszone zwolnienie pamięci), stan zmiennych lokalnych wewnątrz klasy zostaje utracony. Aby zapewnić użytkownikowi ciągłość doświadczenia, Android udostępnia mechanizm zapisu i odczytu stanu przy użyciu obiektu \texttt{Bundle}.
+
+\texttt{Bundle} to zoptymalizowana mapa klucz-wartość, która służy do przesyłania danych między procesami (IPC). Ze względu na ograniczenia systemowe (bufor transakcji Binder ma limit ok. 1MB na cały proces), w \texttt{Bundle} należy przechowywać jedynie lekkie dane, takie jak identyfikatory, tekst wpisany w pola czy stany przełączników.
+
+Proces zachowania stanu opiera się na trzech kluczowych punktach:
+
+\begin{enumerate}
+    \item \textbf{Zapis danych (\texttt{onSaveInstanceState})}: System wywołuje tę metodę, gdy aktywność przechodzi do tła i istnieje ryzyko jej zniszczenia. Otrzymujemy obiekt \texttt{outState: Bundle}, do którego wkładamy dane za pomocą metod typu \texttt{putInt()}, \texttt{putString()} itp.
+    \item \textbf{Odczyt w \texttt{onCreate(savedInstanceState: Bundle?)}}: To najczęstsze miejsce przywracania stanu. Jeśli aktywność jest tworzona od zera, parametr ten wynosi \texttt{null}. Jeśli jednak jest odtwarzana po zniszczeniu, zawiera on zapisane wcześniej klucze.
+    \item \textbf{Odczyt w \texttt{onRestoreInstanceState(savedInstanceState: Bundle)}}: Metoda ta jest wywoływana po \texttt{onStart()}. Różni się od \texttt{onCreate} tym, że system wywołuje ją tylko wtedy, gdy faktycznie istnieje stan do odtworzenia, więc przekazany \texttt{Bundle} nigdy nie jest nullem. Pozwala to na oddzielenie logiki inicjalizacji od logiki przywracania UI.
+\end{enumerate}
+
+Współcześnie, w architekturze polecanej przez Google, większość stanu interfejsu powinna być przechowywana w \texttt{ViewModel}, który przetrwa proste zmiany konfiguracji (jak obrót ekranu). Jednak \texttt{Bundle} (często poprzez \texttt{SavedStateHandle} w ViewModelu) pozostaje niezbędny do obsługi sytuacji, w której system zabija proces aplikacji z powodu braku zasobów.
+
+\section{Kontekst (Context)}
+
+\texttt{Context} to klasa abstrakcyjna, która jest \textit{uchwytem} do środowiska, w którym działa aplikacja. Daje dostęp do zasobów systemowych (pliki, bazy danych, preferencje, launchery).
+
+Rodzaje kontekstu:
+\begin{enumerate}
+    \item \textbf{Application Context}: Żyje tak długo jak cała aplikacja. Jest singletonem. Bezpieczny do użycia w warstwie danych, singletonach czy długotrwałych operacjach w tle. Nie posiada wiedzy o motywach (theme) ani UI.
+    \item \textbf{Activity Context}: Żyje tak długo jak aktywność. Posiada wiedzę o UI i stylach. Używany do tworzenia widoków, wyświetlania dialogów i nawigacji.
+\end{enumerate}
+
+\textbf{Uwaga na wycieki pamięci}: Przekazanie \texttt{Activity Context} do obiektu, który żyje dłużej niż aktywność (np. do Singletona), spowoduje, że Garbage Collector nie będzie mógł usunąć zniszczonej aktywności z pamięci.
+
+Warto zadać pytanie: dlaczego w ogóle potrzebujemy obiektu \texttt{Context}, skoro w aplikacjach desktopowych (np. w Javie SE czy C\#) dostęp do plików czy zasobów systemowych odbywa się często bezpośrednio przez standardowe biblioteki języka?
+
+Różnica wynika z architektury Androida i faktu, że aplikacje mobilne działają w środowisku o bardzo ograniczonych zasobach:
+\begin{itemize}
+    \item \textbf{Izolacja (Sandboxing)}: Każda aplikacja działa w swoim własnym procesie z unikalnym identyfikatorem użytkownika (UID). Nie może ona po prostu otworzyć dowolnego pliku na dysku. \texttt{Context} jest \textit{przepustką}, która pozwala systemowi zidentyfikować aplikację i nadać jej uprawnienia do korzystania z zasobów systemowych.
+    \item \textbf{Zarządzanie cyklem życia}: W przeciwieństwie do aplikacji desktopowej, która zazwyczaj działa dopóki użytkownik jej nie zamknie, komponenty Androida są stale tworzone i niszczone przez system. Istnienie wielu rodzajów kontekstu pozwala systemowi precyzyjnie określić, jak długo dany zasób powinien być zarezerwowany.
+\end{itemize}
+
+Dlaczego tworząc klasy odpowiedzialne za bazę danych (np. Room) lub warstwę sieciową (np. Retrofit + OkHttp) czasem musimy przekazać \texttt{Context}?
+\begin{itemize}
+    \item \textbf{Baza danych}: Musi wiedzieć, gdzie fizycznie utworzyć plik \texttt{.db}. Ścieżka do chronionego folderu danych aplikacji (\texttt{/data/data/nazwa.pakietu/databases}) jest dostępna wyłącznie poprzez metodę \texttt{getDatabasePath()}, która należy do kontekstu.
+    \item \textbf{Retrofit/OkHttp}: Sam \texttt{Retrofit} nie wymaga \texttt{Context}. \texttt{Context} bywa potrzebny na etapie konfiguracji klienta \texttt{OkHttp} (np. \texttt{cacheDir} dla HTTP cache) albo przy dostępie do usług systemowych (np. \texttt{ConnectivityManager}).
+\end{itemize}
+
+W takich przypadkach kluczowe jest przekazanie \textbf{Application Context}. Ponieważ baza danych czy klient sieciowy to zazwyczaj obiekty typu Singleton (żyjące przez cały czas działania programu), trzymanie w nich referencji do \texttt{Activity Context} uniemożliwiłoby systemowi usunięcie zamkniętego ekranu z pamięci, prowadząc do jej wycieku.
+
+Z punktu widzenia programisty, \texttt{Activity} jest pełnoprawnym obiektem typu \texttt{Context} dzięki wielopoziomowemu dziedziczeniu. Hierarchia klas w systemie Android prezentuje się następująco:
+
+\begin{itemize}
+    \item \textbf{Any (Kotlin) / Object (Java)}: Korzeń hierarchii klas.
+    \item \textbf{Context}: Klasa abstrakcyjna definiująca kontrakt (interfejs) do usług systemowych.
+    \item \textbf{ContextWrapper}: Implementacja wzorca projektowego \textit{Dekorator} (Proxy). Zamiast samodzielnie implementować logikę, posiada referencję do innego kontekstu i deleguje do niego wszystkie wywołania.
+    \item \textbf{Application} i \textbf{Service}: Dziedziczą bezpośrednio po \texttt{ContextWrapper}.
+    \item \textbf{ContextThemeWrapper}: Rozszerzenie \texttt{ContextWrapper}, które dodaje obsługę motywów (\textit{Themes}) i stylów graficznych.
+    \item \textbf{Activity}: Dziedziczy po \texttt{ContextThemeWrapper}.
+\end{itemize}
+
+Mimo że \texttt{Activity} dziedziczy po \texttt{Context}, sama w sobie nie zawiera kodu odpowiedzialnego za niskopoziomowe operacje systemowe (jak dostęp do systemu plików). Gdy system Android uruchamia proces aplikacji, tworzy obiekt wewnętrznej, ukrytej klasy \texttt{ContextImpl}. Jest to właściwa implementacja, która komunikuje się z jądrem systemu.
+
+Podczas inicjalizacji aktywności, system wywołuje metodę \texttt{attachBaseContext(contextImpl)}, wstrzykując ten obiekt do środka. Dzięki temu wywołanie w kodzie \texttt{openFileInput()} wewnątrz aktywności jest de facto przekazywane do obiektu \texttt{ContextImpl}, który wykonuje faktyczną pracę. Ten mechanizm pozwala na zachowanie lekkiej struktury komponentów przy jednoczesnym dostępie do potężnych funkcji systemowych.
+
+\section{Intencje (Intent)}
+
+\texttt{Intent} (Intencja) to obiekt-wiadomość, służący do komunikacji między komponentami (nawet z różnych aplikacji). System Android działa tu jak listonosz.
+
+\subsection{Intencje Jawne (Explicit)}
+Wskazujemy dokładnie, którą klasę chcemy uruchomić. Używane wewnątrz własnej aplikacji. W aplikacjach opartych na Jetpack Compose, nawigację pomiędzy ekranami realizuje się za pomocą biblioteki \texttt{Navigation Compose}, która wewnętrznie również wykorzystuje intencje jawne. Nie tworzymy już jawnie obiektów \texttt{Intent}, a jedynie wywołujemy funkcje nawigacyjne. Poniżej znajduje się przykład użycia intencji jawnej w tradycyjnym podejściu z użyciem \texttt{Activity}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val intent = Intent(context, SecondActivity::class.java)
+intent.putExtra("USER_ID", 123) // Przekazywanie danych (Bundle) pod maską
+context.startActivity(intent)
+\end{minted}
+
+\subsection{Intencje Niejawne (Implicit)}
+Deklarujemy \textbf{co} chcemy zrobić (akcję), a system szuka odpowiedniego wykonawcy.
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://google.com"))
+context.startActivity(intent)
+\end{minted}
+
+Proces dopasowania intencji niejawnej do konkretnego komponentu nazywamy \textbf{Rozwiązywaniem Intencji} (ang. \textit{Intent Resolution}). System operacyjny (poprzez \texttt{PackageManager}) analizuje wiadomość na podstawie trzech kryteriów:
+\begin{itemize}
+    \item \textbf{Akcja (Action)}: Nazwa operacji do wykonania (np. \texttt{ACTION\_VIEW}, \texttt{ACTION\_SEND}).
+    \item \textbf{Dane (Data)}: Adres URI danych oraz ich typ MIME (np. \texttt{image/jpeg}).
+    \item \textbf{Kategoria (Category)}: Dodatkowe informacje o rodzaju komponentu, który powinien obsłużyć intencję (np. \texttt{CATEGORY\_BROWSABLE}).
+\end{itemize}
+
+Aby aplikacja mogła obsłużyć intencję niejawną, musi zadeklarować \texttt{<intent-filter>} w pliku \texttt{AndroidManifest.xml}. Jest to deklaracja możliwości komponentu.
+
+Kiedy wywołujemy \texttt{startActivity} z intencją niejawną, system wykonuje następujący proces:
+\begin{enumerate}
+    \item \textbf{Przeszukiwanie}: \texttt{PackageManager} skanuje manifesty wszystkich zainstalowanych aplikacji w poszukiwaniu filtrów pasujących do żądania.
+    \item \textbf{Testy dopasowania}: Intencja musi przejść trzy testy:
+    \begin{itemize}
+        \item \textbf{Test akcji}: Akcja w intencji musi znajdować się na liście akcji filtra.
+        \item \textbf{Test kategorii}: Wszystkie kategorie zawarte w intencji muszą być obecne w filtrze (filtr może mieć ich więcej, ale nie mniej).
+        \item \textbf{Test danych}: Schemat URI (np. \texttt{https}), host oraz typ MIME muszą być zgodne z definicją w tagu \texttt{<data>}.
+    \end{itemize}
+    \item \textbf{Reakcja}:
+    \begin{itemize}
+        \item Jeśli pasuje dokładnie jeden komponent, system uruchamia go bezpośrednio.
+        \item Jeśli pasuje wiele komponentów, system wyświetla okno wyboru (\textit{Resolver Activity}), pozwalając użytkownikowi wybrać preferowaną aplikację.
+        \item Jeśli nie zostanie znaleziona żadna pasująca aktywność, aplikacja rzuca wyjątek \texttt{ActivityNotFoundException}.
+    \end{itemize}
+\end{enumerate}
+
+\section{Pełny Przykład Niejawnej Intencji}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+package com.example.openurlapp
+
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import android.os.Bundle
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+// Ważny import dla LocalContext
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Punkt startowy Jetpack Compose
+        setContent {
+            MaterialTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    UrlOpenerScreen()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun UrlOpenerScreen() {
+    // 1. Pobieramy Context bieżącej aktywności
+    val context = LocalContext.current
+    
+    // Stan: tekst wpisany przez użytkownika
+    var urlText by remember { mutableStateOf("https://developer.android.com") }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Otwieranie URL (Intencja Niejawna)")
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = urlText,
+            onValueChange = { urlText = it },
+            label = { Text("Wpisz adres URL") },
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(onClick = {
+            try {
+                // 2. Tworzymy intencję: "Chcę ZOBACZYĆ (View) te DANE (Uri)"
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(urlText))
+                
+                // 3. Uruchamiamy - system szuka odpowiedniej aplikacji
+                context.startActivity(intent)
+                
+            } catch (e: ActivityNotFoundException) {
+                // 4. Obsługa błędu, gdy brak przeglądarki
+                Toast.makeText(
+                    context, 
+                    "Nie znaleziono aplikacji do otwarcia linku!", 
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }) {
+            Text("Otwórz w przeglądarce")
+        }
+    }
+}
+\end{minted}
+
+Powyższy kod demonstruje kompletną mini-aplikację. Omówmy kluczowe elementy specyficzne dla Androida:
+
+\begin{itemize}
+    \item \texttt{setContent} \\
+    Jest to most między światem Aktywności a światem Composable. Wszystko, co znajduje się wewnątrz bloku \texttt{setContent}, jest drzewem UI budowanym przez Jetpack Compose.
+
+
+    \item \texttt{LocalContext.current} \\
+    W Jetpack Compose funkcje UI (\texttt{@Composable}) są niezależne od klasy \texttt{Activity}, w której się znajdują. Nie mamy więc bezpośredniego dostępu do słowa kluczowego \texttt{this} (reprezentującego Aktywność).
+    Aby uzyskać dostęp do \texttt{Context} (potrzebnego np. do uruchamiania intencji), używamy mechanizmu \texttt{CompositionLocal}. \texttt{LocalContext.current} \textit{sięga} w górę drzewa UI i pobiera Kontekst, który został tam udostępniony przez system. Jest to bezpieczny sposób na zdobycie referencji do środowiska aplikacji wewnątrz dowolnej funkcji Composable.
+
+    \item[\texttt{Toast}] 
+    To prosty mechanizm wyświetlania krótkich komunikatów, które nie blokują interfejsu (pojawiają się jako \textit{dymek} na dole ekranu) i znikają automatycznie.
+    Metoda \texttt{makeText} przyjmuje trzy parametry:
+    \begin{enumerate}
+        \item \textbf{Context}: Kontekst aplikacji (gdzie wyświetlić).
+        \item \textbf{Tekst}: Treść komunikatu.
+        \item \textbf{Czas trwania}: \texttt{LENGTH\_SHORT} lub \texttt{LENGTH\_LONG}.
+    \end{enumerate}
+    Należy pamiętać o wywołaniu \texttt{.show()} na końcu – bez tego Toast się nie pojawi.
+\end{itemize}

@@ -1,0 +1,177 @@
+\chapter{Zarządzanie Pamięcią i Garbage Collection (Wykład 2)}
+
+Programując w językach wysokiego poziomu, takich jak Kotlin czy Java, nie myślimy o tym, co dzieje się \textit{pod maską}. Mamy luksus automatycznego zarządzania pamięcią – tworzymy obiekty, używamy ich, a potem po prostu o nich zapominamy. Maszyna Wirtualna (JVM) lub środowisko uruchomieniowe Androida (ART) zajmuje się resztą. 
+
+\textit{Nieświadomość} kosztów, jakie niosą ze sobą nasze decyzje projektowe, prowadzi do aplikacji, które działają wolno, zacinają się (tzw. \textit{jank}) i zużywają baterię w zastraszającym tempie. Posiadanie intuicji o sposobie funkcjonowania pamięci, pozwoli nam pisać kod nie tylko poprawny, ale i \textit{wydajny}.
+
+\section{Typy danych i organizacja pamięci}
+
+Zanim przejdziemy do sprzątania (GC), musimy zrozumieć, jak bałagan powstaje – czyli jak dane są układane w pamięci.
+
+Mimo że w Kotlinie \textit{wszystko jest obiektem}, pod spodem (na poziomie JVM/ART) wciąż operujemy na typach prostych, które mają ściśle określone rozmiary. Warto mieć intuicję, ile \textit{ważą} nasze dane:
+
+\begin{itemize}
+    \item \textbf{1 bajt}: \texttt{Boolean} (teoretycznie 1 bit, ale adresowalny jako bajt), \texttt{Byte}.
+    \item \textbf{2 bajty}: \texttt{Short}, \texttt{Char} (UTF-16).
+    \item \textbf{4 bajty}: \texttt{Int}, \texttt{Float}.
+    \item \textbf{8 bajtów}: \texttt{Long}, \texttt{Double}.
+\end{itemize}
+
+\textbf{Dlaczego o tym wspominamy, skoro w Kotlinie nie mamy jawnego dostępu do typów prymitywnych?}
+
+W przeciwieństwie do Javy, gdzie istnieje wyraźny podział na \texttt{int} (prymityw) i \texttt{Integer} (obiekt), Kotlin oferuje jednolitą składnię opartą na klasach. Pod maską jednak kompilator wykonuje istotną optymalizację: wszędzie tam, gdzie to możliwe, zamienia nasze obiekty na surowe typy prymitywne w bajtkodzie.
+
+Kiedy dochodzi do kosztownego \textbf{opakowywania} (\textit{boxing}) w obiekt?
+\begin{itemize}
+    \item \textbf{Typy nullowalne}: \texttt{Int?} musi być obiektem, ponieważ surowy prymityw nie może przyjąć wartości \texttt{null}.
+    \item \textbf{Generyki}: Standardowe kolekcje, takie jak \texttt{List<Int>}, zawsze przechowują obiekty.
+\end{itemize}
+
+To, czy dana jest reprezentowana jako prymityw, czy jako obiekt, wpływa na jej postać w pamięci: prymityw to \textbf{wartość} zapisana bezpośrednio w miejscu deklaracji, natomiast obiekt to \textbf{referencja} (wskaźnik) do obszaru na stercie, gdzie znajdują się faktyczne dane.
+
+Pamięć operacyjną aplikacji możemy podzielić na dwa główne obszary, które działają w zupełnie inny sposób.
+
+\textbf{Stos (Stack)} to pamięć podręczna dla aktualnie wykonywanych metod. Działa bardzo szybko (LIFO - Last In, First Out).
+\begin{itemize}
+    \item Przechowuje zmienne lokalne (typy proste) oraz \textit{referencje} do obiektów.
+    \item Jest czyszczony automatycznie po wyjściu z funkcji (zdjęciu ramki stosu).
+    \item Alokacja tutaj jest niemal natychmiastowa.
+\end{itemize}
+
+\textbf{Sterta (Heap)} to wielki magazyn na obiekty.
+\begin{itemize}
+    \item Tutaj ląduje \textbf{każdy} obiekt utworzony przez \texttt{new} (w Javie) lub konstruktor (w Kotlinie).
+    \item Dostęp jest wolniejszy niż do stosu.
+    \item To tutaj działa Garbage Collector.
+\end{itemize}
+
+Wyobraź sobie, że \textbf{Stos} to tablica korkowa nad twoim biurkiem. Przypinasz tam małe karteczki z notatkami (zmienne lokalne) i nitki (referencje). Nitki prowadzą do wielkiego magazynu w piwnicy – \textbf{Sterty}. Tam leżą właściwe teczki z dokumentami (obiekty). Gdy zdejmujesz karteczkę z tablicy (koniec funkcji), nitka znika. Ale teczka w piwnicy zostaje, dopóki ktoś (GC) nie zauważy, że żadna nitka do niej nie prowadzi.
+
+\section{Zarządzanie pamięcią: Ręczne vs Automatyczne}
+
+W językach takich jak C czy C++, programista zarządza życiem i śmiercią obiektów.
+\begin{itemize}
+    \item \texttt{malloc()} – alokujesz pamięć.
+    \item \texttt{free()} – musisz ją zwolnić.
+\end{itemize}
+
+Daje to pełną kontrolę, ale rodzi poważne problemy:
+\begin{itemize}
+    \item \textbf{Wycieki pamięci (Memory Leaks)}: Zapomniałeś zwolnić pamięć? Zostaje zajęta na zawsze (do restartu procesu).
+    \item \textbf{Dangling Pointers}: Zwolniłeś pamięć, ale nadal masz do niej referencję ("wskaźnik donikąd"). Próba użycia kończy się błędem (segmentation fault).
+\end{itemize}
+
+Kotlin (działający na JVM/ART) zdejmuje z nas ten obowiązek. Wprowadza \textbf{Garbage Collector (GC)} – automatycznego sprzątacza.
+
+\section{Garbage Collection}
+
+Garbage Collection opiera się na prostym założeniu: \textit{Obiekt jest śmieciem, jeśli nie jest osiągalny z żadnego "korzenia" (GC Root).}
+
+GC buduje wirtualną mapę powiązań, zwaną \textbf{grafem obiektów}. Każdy nowo utworzony obiekt, do którego przypiszemy referencję, staje się węzłem w tym grafie, a same referencje stanowią krawędzie (połączenia). 
+
+Proces ten jest w pełni automatyczny i niewidoczny dla programisty:
+\begin{itemize}
+    \item Przy każdym przypisaniu (np. \texttt{val user = User()}) system odnotowuje nowe połączenie.
+    \item Graf \textit{rośnie} i zmienia się dynamicznie w trakcie działania aplikacji.
+    \item GC okresowo przeszukuje ten graf, zaczynając od punktów startowych, aby sprawdzić, do których \textit{wysp} pamięci wciąż prowadzi jakaś ścieżka.
+\end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w02-gc-graph.png}
+    \caption{Graf obiektów.}
+    \label{fig:gc-graph}
+\end{figure}
+
+Co jest \textit{korzeniem}, czyli obiektem, który na pewno jest potrzebny?
+\begin{itemize}
+    \item \textbf{Zmienne lokalne na stosie}: Wszystko, co jest w aktualnie wykonujących się funkcjach.
+    \item \textbf{Pola statyczne}: Obiekty przypięte do klas (np. \texttt{companion object}).
+    \item \textbf{Aktywne wątki}: Dopóki wątek działa, jego obiekty są żywe.
+    \item \textbf{Referencje JNI}: Obiekty trzymane przez kod natywny (C/C++).
+\end{itemize}
+
+Proces sprzątania można podzielić na trzy fazy (w dużym uproszczeniu):
+
+\begin{enumerate}
+    \item \textbf{Mark (Oznaczanie)}:
+    GC wstrzymuje działąnie wątków aplikacji (choć nowsze GC robią to współbieżnie). Przechodzi przez cały graf obiektów, zaczynając od GC Roots. Każdy odwiedzony obiekt oznacza jako \textit{żywy} (Live Object).
+    
+    \item \textbf{Sweep (Czyszczenie)}:
+    GC przegląda stertę. Wszystko, co \textit{nie zostało} oznaczone w fazie Mark, jest uznawane za śmieci (Dead Objects) i pamięć jest zwalniana.
+    
+    \item \textbf{Compact (Defragmentacja)}:
+    To kluczowy krok. Po usunięciu śmieci, w pamięci powstają \textit{dziury} (fragmentacja). GC przesuwa żywe obiekty obok siebie, aby zwolnić duży, ciągły blok pamięci. Dzięki temu alokacja nowych obiektów jest bardzo szybka (wystarczy przesunąć wskaźnik).
+\end{enumerate}
+
+\section{Hipoteza Generacyjna (Generational Hypothesis)}
+
+Badania nad zachowaniem programów pokazały ciekawą prawidłowość, zwaną \textbf{Hipotezą Generacyjną}:
+\begin{quote}
+    \textit{Większość obiektów umiera młodo.}
+\end{quote}
+
+Obiekty tymczasowe (zmienne w pętlach, iteratory, zdarzenia UI) żyją bardzo krótko. Jeśli obiekt przeżyje ten początkowy okres, prawdopodobnie będzie żył bardzo długo (np. singletony, cache, główne usługi).
+
+Na tej podstawie pamięć sterty podzielono na strefy (Generacje):
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w02-gc-generations.png}
+    \caption{Podział sterty na generacje: Eden, Survivor Spaces i Old Generation.}
+    \label{fig:gc-generations}
+\end{figure}
+
+\subsection*{Młoda Generacja}
+Tu rodzą się wszystkie nowe obiekty. Jest mała i bardzo często czyszczona. Dzieli się na:
+\begin{itemize}
+    \item \textbf{Eden}: Miejsce narodzin. Gdy się zapełni, następuje \textbf{Minor GC}.
+    \item \textbf{Survivor Space (S1 i S2)}: Dwie bliźniacze przestrzenie dla ocalałych.
+\end{itemize}
+
+\textbf{Cykl życia w Młodej Generacji:}
+\begin{enumerate}
+    \item Nowe obiekty lądują w \textbf{Edenie}.
+    \item Gdy Eden się zapełni -> \textbf{Minor GC}.
+    \item Żywe obiekty z Edenu i (na przykład) S1 są kopiowane do pustego S2.
+    \item Wiek obiektów (licznik przeżyć) jest zwiększany.
+    \item Eden i S1 są czyszczone do zera (bardzo szybko!).
+    \item W kolejnym cyklu S1 i S2 zamieniają się rolami.
+\end{enumerate}
+
+\subsection*{Stara Generacja}
+Jeśli obiekt przeżyje wystarczająco dużo cykli (np. 15) w Survivor Space, zostaje \textbf{promowany} do Starej Generacji.
+\begin{itemize}
+    \item Ta strefa zbiera \textit{weteranów}.
+    \item Jest czyszczona znacznie rzadziej, ale sprzątanie tutaj (\textbf{Major GC}) jest znacznie bardziej kosztowne i trwa dłużej.
+\end{itemize}
+
+\section*{Wnioski}
+
+\begin{enumerate}
+    \item \textbf{Unikaj alokacji w pętlach i \texttt{onDraw()}}: Mimo że GC jest szybki, tworzenie tysięcy obiektów w klatce animacji (16 ms) zapcha Eden i wymusi częste pauzy (GC pauses), co użytkownik odczuje jako \textit{klatkowanie} interfejsu.
+    \item \textbf{Szczelność pamięci (Memory Leaks)}: GC nie posprząta obiektu, do którego wciąż masz referencję (nawet jeśli już go nie potrzebujesz). Klasyczny błąd na Androidzie: trzymanie referencji do \texttt{Activity} lub \texttt{Context} w obiekcie statycznym lub długo żyjącym wątku. To uniemożliwia zwolnienie całego ekranu z pamięci
+    \item \textbf{Wybieraj odpowiednie struktury}: Preferuj tablice i \texttt{ArrayList} nad rozproszonymi strukturami, jeśli zależy ci na wydajności.
+\end{enumerate}
+
+\subsection*{Metaspace (Metadata Space)}
+Przestrzeń Metadata to obszar pamięci JVM przeznaczony na przechowywanie informacji o strukturze uruchamianego kodu, a nie samych danych (obiektów) tworzonych przez programistę.
+
+\textbf{Co zawiera ta przestrzeń?}
+Przechowywane są tam „przepisy” na klasy, czyli metadane potrzebne maszynie wirtualnej do działania:
+\begin{itemize}
+    \item \textbf{Definicje klas}: Nazwy klas, ich rodzice (nadklasy) oraz implementowane interfejsy.
+    \item \textbf{Definicje metod}: Kod bajtowy metod oraz informacje o parametrach.
+    \item \textbf{Pola}: Nazwy i typy pól (zmiennych w klasie).
+    \item \textbf{Pula stałych (Constant Pool)}: Referencje do stałych używanych w klasie.
+\end{itemize}
+
+\textbf{Ważne rozróżnienie: Heap vs Native Memory}
+Na wielu diagramach (w tym powyższym) przestrzeń ta bywa włączana do ramki sterty. Jest to uproszczenie nawiązujące do starszych wersji Javy (przed Java 8), gdzie istniał obszar \textit{PermGen} będący częścią sterty. W nowszych wersjach:
+\begin{itemize}
+    \item Obszar ten nazywa się \textbf{Metaspace}.
+    \item \textbf{Nie jest już częścią sterty} (Heap).
+    \item Znajduje się w \textbf{Pamięci Natywnej} (Native Memory), czyli korzysta bezpośrednio z pamięci RAM, a nie z limitu pamięci przydzielonego dla sterty (\texttt{-Xmx}).
+\end{itemize}
+
+Gdy aplikacja wczytuje nową klasę, JVM zapisuje informację o jej strukturze właśnie w Metaspace. Jeśli aplikacja wczytuje tysiące klas (np. przy użyciu dużych frameworków), obszar ten rośnie dynamicznie, zajmując dostępną pamięć operacyjną urządzenia.

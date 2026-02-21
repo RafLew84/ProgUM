@@ -1,0 +1,730 @@
+\chapter{Wstrzykiwanie Zależności: Hilt (Wykład 11)}
+
+W poprzednich dwóch rozdziałach zbudowaliśmy solidne fundamenty warstwy danych:
+\begin{itemize}
+    \item \textbf{Room (Rozdział 9)} do przechowywania danych lokalnych.
+    \item \textbf{Retrofit (Rozdział 10)} do pobierania danych z sieci.
+\end{itemize}
+
+Jednakże, aby połączyć te elementy z widokiem (Compose), musieliśmy pisać dużo kodu \textit{sklejającego} w \texttt{MainActivity}. Tworzyliśmy tam ręcznie instancje bazy danych, sieci, repozytoriów i fabryk. W tym rozdziale nauczymy się, jak zautomatyzować ten proces, używając standardu przemysłowego w świecie Androida - biblioteki \textbf{Hilt}.
+
+\section{Manualne Wstrzykiwanie Zależności}
+
+Zacznijmy od analizy kodu, którym zakończyliśmy poprzedni wykład. Spójrzmy krytycznym okiem na naszą klasę \texttt{MainActivity}.
+
+W podejściu, które stosowaliśmy dotychczas, to \texttt{Activity} (lub klasa \texttt{Application}) pełniła rolę \textit{Wszechwiedzącego}, który wie wszystko o tym, jak stworzyć każdy obiekt w aplikacji.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// KOD Z POPRZEDNIEGO ROZDZIAŁU (Manual DI)
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // 1. Activity musi wiedzieć, jak skonfigurować Retrofita
+        // (lub pobierać go z singletona)
+        val apiService = RetrofitInstance.api
+        
+        // 2. Activity musi wiedzieć, że Repozytorium potrzebuje API
+        val repository = NewsRepository(apiService)
+        
+        // 3. Activity musi wiedzieć, jak zbudować ViewModelFactory
+        val viewModelFactory = NewsViewModelFactory(repository)
+
+        setContent {
+            // 4. Activity wstrzykuje fabrykę do ViewModelu
+            val viewModel: NewsViewModel = viewModel(factory = viewModelFactory)
+            NewsScreen(viewModel = viewModel)
+        }
+    }
+}
+\end{minted}
+
+Powyższe podejście posiada kilka poważnych wad:
+\begin{enumerate}
+    \item \textbf{Silne Sprzężenie (Tight Coupling):} Nasze widoki (Activity/Compose) wiedzą za dużo o warstwie danych. Jeśli zmienimy konstruktor \texttt{NewsRepository} (np. dodamy tam bazę danych Room), będziemy musieli poprawić kod w każdym miejscu, gdzie to repozytorium jest tworzone.
+    \item \textbf{Boilerplate Code:} W dużej aplikacji, gdzie mamy 50 ViewModeli, pisanie dla każdego z nich osobnej fabryki (\texttt{ViewModelProvider.Factory}) jest żmudne i podatne na błędy.
+    \item \textbf{Trudne testowanie:} Jeśli \texttt{MainActivity} na sztywno korzysta z \texttt{RetrofitInstance}, bardzo trudno jest podmienić API na \textit{fałszywe} (Mock) podczas testów UI, aby np. symulować brak internetu.
+\end{enumerate}
+
+\textbf{Wstrzykiwanie Zależności (Dependency Injection)} to technika programowania, w której obiekty nie tworzą swoich zależności, ale otrzymują je z zewnątrz.
+
+Można to zobrazować to analogią Komputera i Myszki (Portu USB):
+
+\begin{itemize}
+    \item \textbf{Bez DI:} Komputer ma myszkę \textit{przylutowaną} na stałe do płyty głównej.
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Computer {
+    // Komputer sam tworzy myszkę. Jest od niej silnie zależny.
+    // Nie da się jej wymienić na inny model ani łatwo przetestować.
+    private val mouse = WiredMouse() 
+    
+    fun click() { mouse.leftClick() }
+}
+\end{minted}
+    \item \textbf{Z DI:} Komputer posiada \textit{Port USB} (konstruktor). Wstrzykujemy do niego dowolne urządzenie spełniające interfejs \texttt{Mouse}.
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class Computer(private val mouse: Mouse) { // Wstrzyknięcie przez konstruktor
+    fun click() { mouse.leftClick() }
+}
+
+// Użycie:
+// Możemy podłączyć zwykłą myszkę...
+val officeComputer = Computer(WiredMouse()) 
+
+// ...albo wstrzyknąć myszkę gamingową bez zmieniania kodu komputera!
+val gamingComputer = Computer(GamingMouseRGB())
+\end{minted}
+
+\end{itemize}
+
+\section{Odwrócenie Sterowania}
+
+Aby DI działało w dużej skali, potrzebujemy kogoś, kto będzie zarządzał tymi wszystkimi zależnościami - \textit{kontenera}, który wie, jak stworzyć wszystkie niezbędne elementy i jak dostarczyć go do komputera. Tę koncepcję nazywamy \textbf{Odwróceniem Sterowania (Inversion of Control)}. Zamiast: \textit{Ja (Activity) tworzę Repozytorium}, mówimy: \textit{Ja (Activity) potrzebuję Repozytorium, dostarcz mi je}.
+
+W świecie Androida rolę takiego inteligentnego kontenera pełni biblioteka \textbf{Hilt}.
+
+\section{Biblioteka Hilt}
+
+Historycznie w świecie Androida dominowała biblioteka \textbf{Dagger 2}, ale wymaga pisania dużej ilości skomplikowanego kodu konfiguracyjnego. Hilt to biblioteka stworzona przez Google, która jest nakładką na Daggera.
+
+\begin{itemize}
+    \item \textbf{Zaleta:} Zachowuje wydajność Daggera (generowanie kodu w czasie kompilacji, brak narzutu w Runtime).
+    \item \textbf{Ułatwienie:} Standaryzuje sposób wstrzykiwania zależności, eliminując potrzebę ręcznego tworzenia \textit{Komponentów} i \textit{Subkomponentów}.
+\end{itemize}
+
+\subsection{Konfiguracja projektu (Gradle)}
+
+Aby skorzystać z Hilt, musimy dodać odpowiednie pluginy i zależności.
+
+W pliku \texttt{build.gradle.kts(Project)} dodajemy plugin Hilt w bloku \texttt{plugins}. Wersja biblioteki powinna być zgodna z aktualnymi wydaniami.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+plugins {
+    // ... inne pluginy (np. android.application, kotlin.android)
+    id("com.google.dagger.hilt.android") version "2.57.2" apply false
+}
+\end{minted}
+
+W pliku \texttt{build.gradle.kts(Module)}, w module aplikacji musimy zastosować plugin oraz dodać biblioteki. Hilt wykorzystuje procesor adnotacji, dlatego używamy \texttt{ksp}.
+
+\begin{minted}[frame=single,framesep=10pt,fontsize=\footnotesize]{kotlin}
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    
+    // 1. Pluginy Hilt i ksp
+    id("com.google.devtools.ksp")
+    id("com.google.dagger.hilt.android")
+}
+
+dependencies {
+    // 2. Biblioteka Hilt
+    implementation("com.google.dagger:hilt-android:2.57.2")
+    
+    // 3. Kompilator (generuje kod Daggera)
+    ksp("com.google.dagger:hilt-android-compiler:2.57.2")
+}
+\end{minted}
+
+\subsection{Fundament aplikacji (@HiltAndroidApp)}
+
+Wszystkie aplikacje korzystające z Hilt muszą zawierać klasę dziedziczącą po \texttt{Application}, oznaczoną adnotacją \texttt{@HiltAndroidApp}.
+
+Jest to punkt, w którym generowany jest \textit{Korzeń Grafu Zależności} (Root Component). To stąd Hilt czerpie wiedzę o wszystkich singletonach w aplikacji.
+
+W pierwszym kroku tworzymy klasę reprezentującą aplikację:
+
+\begin{minted}[frame=single,framesep=10pt,]{kotlin}
+// Ta adnotacja jest WYMAGANA. Bez niej Hilt nie zadziała.
+@HiltAndroidApp
+class NewsApplication : Application()
+\end{minted}
+
+Następnie rejestrujemy klasę w AndroidManifest.xml. Samo stworzenie klasy nie wystarczy. Musimy poinformować system Android, że ma jej użyć przy starcie procesu. Robimy to w atrybucie \texttt{android:name} tagu \texttt{<application>}.
+
+\begin{minted}[frame=single,framesep=10pt]{xml}
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" ...>
+
+    <application
+        android:name=".NewsApplication" 
+        ... >
+        
+        <activity android:name=".MainActivity" ... />
+    </application>
+</manifest>
+\end{minted}
+
+Po wykonaniu tych kroków i przebudowaniu projektu (Sync Gradle), Hilt jest gotowy do pracy.
+
+\section{Podstawy Wstrzykiwania}
+
+Po skonfigurowaniu klasy \texttt{Application}, kontener DI jest zainicjalizowany, jednak graf zależności pozostaje pusty. Aby biblioteka Hilt mogła zarządzać obiektami, musimy zdefiniować dwa kluczowe aspekty:
+\begin{enumerate}
+    \item \textbf{Binding Definitions (Definicje Wiązań):} Instrukcje dla kompilatora, w jaki sposób instancjonować poszczególne klasy.
+    \item \textbf{Injection Targets (Cele Wstrzykiwania):} Komponenty systemu Android, które mają otrzymać zależności z kontenera.
+\end{enumerate}
+
+Wyróżniamy dwie techniki wstrzykiwania: \textit{Constructor Injection} (preferowana) oraz \textit{Field Injection} (wymuszona przez architekturę systemu Android). Podstawową metodą rozszerzania grafu zależności w Hilt jest adnotacja \texttt{@Inject} umieszczona przy konstruktorze klasy.
+
+Zastosowanie tej adnotacji skutkuje dwoma operacjami podczas kompilacji (Annotation Processing):
+\begin{itemize}
+    \item \textbf{Rejestracja w grafie:} Klasa staje się dostępna dla kontenera DI. Hilt generuje dla niej niejawnie fabrykę (Factory).
+    \item \textbf{Deklaracja zależności:} Parametry konstruktora są traktowane jako zależności wymagane do utworzenia instancji. Hilt automatycznie podejmie próbę ich rezolucji (odnalezienia) w grafie.
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Plik: NewsRepository.kt
+
+// Adnotacja @Inject informuje Hilt, jak utworzyć instancję NewsRepository.
+// Jest to tzw. "Binding" (Wiązanie).
+class NewsRepository @Inject constructor(
+    // Parametr apiService jest zależnością, 
+    // którą Hilt musi dostarczyć (resolve).
+    private val apiService: NewsApiService 
+) {
+    suspend fun getNews() = apiService.getTopHeadlines()
+}
+\end{minted}
+
+W powyższym przykładzie, każde żądanie wstrzyknięcia typu \texttt{NewsRepository} spowoduje automatyczne utworzenie obiektu przez Hilt, przy uprzednim rozwiązaniu zależności \texttt{apiService}.
+
+\subsection{Integracja z komponentami Androida (@AndroidEntryPoint)}
+
+W systemie Android cykl życia kluczowych komponentów (\texttt{Activity}, \texttt{Fragment}, \texttt{Service}, \texttt{BroadcastReceiver}) jest zarządzany przez system operacyjny, a nie przez programistę. Instancjonowanie tych klas odbywa się za pomocą mechanizmu refleksji systemowej, co uniemożliwia zastosowanie wstrzykiwania przez konstruktor.
+
+W takich przypadkach stosujemy wzorzec \textit{Field Injection} (Wstrzykiwanie do pól). Aby umożliwić wstrzykiwanie do klas systemowych, musimy oznaczyć je adnotacją \path{@AndroidEntryPoint}.
+
+Adnotacja ta generuje indywidualny kontener DI (Hilt Component) dla danej klasy, powiązany z jej cyklem życia (np. \texttt{ActivityComponent}).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Plik: MainActivity.kt
+
+@AndroidEntryPoint 
+class MainActivity : ComponentActivity() {
+
+    // Field Injection: Hilt wstrzyknie instancję po utworzeniu Activity,
+    // ale przed wywołaniem onCreate().
+    // Pola nie mogą być prywatne (wymaganie generowanego kodu).
+    @Inject 
+    lateinit var analytics: AnalyticsLogger 
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // W tym momencie pole 'analytics' jest już zainicjalizowane i bezpieczne do użycia.
+        analytics.logEvent("App Started")
+        
+        setContent {
+            // ...
+        }
+    }
+}
+\end{minted}
+
+\section{Moduły Hilt: Dostarczanie Zależności Zewnętrznych}
+
+Mechanizm wsrzykiwania przez konstruktur jest wystarczający dla klas należących do projektu. Napotykamy jednak barierę w przypadku zależności pochodzących z zewnętrznych bibliotek (Third-Party Libraries), takich jak \texttt{Retrofit}, \texttt{OkHttp} czy \texttt{Room}.
+
+Wyróżniamy dwie główne przeszkody uniemożliwiające użycie adnotacji \texttt{@Inject}:
+\begin{enumerate}
+    \item \textbf{Brak dostępu do kodu źródłowego:} Nie możemy zmodyfikować klasy bibliotecznej, aby dodać adnotację do jej konstruktora.
+    \item \textbf{Złożona instancjacja:} Obiekty te często są tworzone za pomocą wzorca Budowniczy lub Metoda Fabrykująca, a nie poprzez proste wywołanie konstruktora.
+\end{enumerate}
+
+Rozwiązaniem tego problemu są \textbf{Moduły Hilt}. Moduł to klasa (lub obiekt) pełniąca rolę fabryki, w której definiujemy metody dostarczające instancje wymaganych typów.
+
+\subsection{Struktura Modułu (@Module, @InstallIn)}
+
+Każdy moduł musi być opatrzony dwiema adnotacjami:
+\begin{itemize}
+    \item \texttt{@Module}: Informuje Hilt, że ta klasa zawiera definicje wiązań.
+    \item \texttt{@InstallIn(Component::class)}: Określa, w którym kontenerze (komponencie) Hilt mają być dostępne zależności z tego modułu. Determinuje to czas życia obiektów.
+\end{itemize}
+
+Najczęściej używanym komponentem jest \texttt{SingletonComponent}, który jest powiązany z cyklem życia całej aplikacji (klasy \texttt{Application}).
+
+\subsection{Definiowanie Dostawców (@Provides)}
+
+Wewnątrz modułu tworzymy funkcje opatrzone adnotacją \texttt{@Provides}. Ciało takiej funkcji zawiera logikę niezbędną do utworzenia i skonfigurowania instancji obiektu.
+
+Poniżej przedstawiono implementację modułu sieciowego, zastępującą ręcznie tworzony singleton \texttt{RetrofitInstance} z poprzedniego wykładu.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Plik: di/NetworkModule.kt
+
+@Module
+@InstallIn(SingletonComponent::class) 
+object NetworkModule {
+
+    // Definicja wiązania dla typu Retrofit.
+    // Adnotacja @Singleton gwarantuje, że w obrębie aplikacji powstanie tylko
+    // jedna instancja klienta (kluczowe dla puli połączeń HTTP).
+    @Provides
+    @Singleton 
+    fun provideRetrofit(): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://newsapi.org/v2/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    // Definicja wiązania dla typu NewsApiService.
+    // Zależność 'retrofit' w parametrze zostanie automatycznie dostarczona
+    // przez metodę provideRetrofit() zdefiniowaną powyżej.
+    @Provides
+    @Singleton
+    fun provideNewsApiService(retrofit: Retrofit): NewsApiService {
+        return retrofit.create(NewsApiService::class.java)
+    }
+}
+\end{minted}
+
+Dzięki powyższej konfiguracji, gdy \texttt{NewsRepository} zażąda w konstruktorze obiektu \texttt{NewsApiService}, Hilt automatycznie wywoła metodę \texttt{provideNewsApiService}.
+
+\subsection{Dostęp do Kontekstu Aplikacji (@ApplicationContext)}
+
+Konfiguracja bazy danych Room wymaga dostępu do obiektu \texttt{Context}. Hilt udostępnia predefiniowane wiązanie dla kontekstu aplikacji poprzez adnotację kwalifikującą \texttt{@ApplicationContext}.
+
+Pozwala to na bezpieczne wstrzykiwanie kontekstu do modułów bez ryzyka wycieków pamięci (Memory Leaks) związanych z przechowywaniem referencji do Activity.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Plik: di/DatabaseModule.kt
+
+@Module
+@InstallIn(SingletonComponent::class)
+object DatabaseModule {
+
+    @Provides
+    @Singleton
+    fun provideDatabase(
+        // Wstrzyknięcie kontekstu systemowego
+        @ApplicationContext context: Context
+    ): AppDatabase {
+        return Room.databaseBuilder(
+            context,
+            AppDatabase::class.java,
+            "news_database"
+        ).build()
+    }
+
+    // Udostępnienie DAO bezpośrednio do grafu zależności.
+    // Dzięki temu Repozytoria nie muszą zależeć od całej bazy (AppDatabase),
+    // a jedynie od konkretnego DAO (Interface Segregation Principle).
+    @Provides
+    fun provideArticleDao(database: AppDatabase): ArticleDao {
+        return database.articleDao()
+    }
+}
+\end{minted}
+
+\section{Zarządzanie Cyklem Życia i Zakresy (Scopes)}
+
+W domyślnej konfiguracji, Hilt (podobnie jak Dagger 2) zachowuje się jak fabryka bezstanowa. Oznacza to, że każde żądanie wstrzyknięcia zależności powoduje utworzenie \textbf{nowej instancji} obiektu.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class AnalyticsAdapter @Inject constructor() { ... }
+
+// Wstrzyknięcie 1: Tworzony jest obiekt A (adres pamięci: @1234)
+@Inject lateinit var analytics1: AnalyticsAdapter
+
+// Wstrzyknięcie 2: Tworzony jest obiekt B (adres pamięci: @5678)
+@Inject lateinit var analytics2: AnalyticsAdapter
+\end{minted}
+
+Dla lekkich obiektów (np. presenterów, helperów) jest to zachowanie pożądane. Jednak w przypadku ciężkich zasobów (Klient HTTP, Połączenie z Bazą Danych) lub obiektów przechowujących stan (Repository z cachem w pamięci RAM), konieczne jest zapewnienie unikalności instancji w określonym czasie. Do sterowania tym zachowaniem służą \textbf{Zakresy (Scopes)}.
+
+\subsection{Dostępne Zakresy w Hilt}
+
+Przypisanie zakresu do wiązania (klasy lub metody \texttt{@Provides}) sprawia, że kontener DI przechowuje utworzoną instancję w pamięci podręcznej i zwraca ją przy każdym kolejnym zapytaniu, dopóki dany komponent istnieje.
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\linewidth}{|l|l|X|}
+\hline
+\textbf{Komponent Hilt} & \textbf{Adnotacja Zakresu} & \textbf{Czas życia obiektu} \\ \hline
+SingletonComponent      & \texttt{@Singleton}        & Cały czas działania aplikacji (Application) \\ \hline
+ActivityRetainedComponent & \texttt{@ActivityRetainedScoped} & Przetrwa obrót ekranu (dla ViewModeli) \\ \hline
+ActivityComponent       & \texttt{@ActivityScoped}   & Czas życia pojedynczej Aktywności \\ \hline
+ViewModelComponent      & \texttt{@ViewModelScoped}  & Czas życia ViewModelu \\ \hline
+FragmentComponent       & \texttt{@FragmentScoped}   & Czas życia Fragmentu \\ \hline
+\end{tabularx}
+\caption{Mapowanie komponentów Hilt na zakresy.}
+\end{table}
+
+\subsection{Zastosowanie @Singleton}
+
+Najczęściej używanym zakresem w warstwie danych jest \texttt{@Singleton}. Gwarantuje on, że w całej aplikacji będzie istniała tylko jedna instancja danej klasy. Jest to krytyczne dla:
+\begin{itemize}
+    \item \textbf{Retrofit/OkHttpClient:} Utrzymują one pulę połączeń TCP/IP. Tworzenie ich wielokrotnie jest bardzo kosztowne obliczeniowo.
+    \item \textbf{RoomDatabase:} Zarządza połączeniem z plikiem SQLite.
+    \item \textbf{Repositories (z cache):} Jeśli repozytorium trzyma dane w zmiennej (np. \texttt{List<Data>}), musi być Singletonem, aby dane nie zniknęły przy przeładowaniu widoku.
+\end{itemize}
+
+Przykład z naszego modułu sieciowego:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
+
+    @Provides
+    @Singleton // <--- KLUCZOWE: Wymusza jedną instancję
+    fun provideRetrofit(): Retrofit {
+        // Ta metoda wykona się tylko RAZ podczas życia aplikacji.
+        // Kolejne żądania zwrócą zapamiętany obiekt.
+        return Retrofit.Builder()...build() 
+    }
+}
+\end{minted}
+
+\subsection{Hierarchia Komponentów}
+
+Komponenty Hilt tworzą hierarchię drzewiastą. Zależności są dostępne "w dół" hierarchii:
+\begin{itemize}
+    \item Obiekt z \texttt{SingletonComponent} może być wstrzyknięty do \texttt{Activity}, \texttt{ViewModel} czy \texttt{Fragment}.
+    \item Obiekt z \texttt{ActivityComponent} nie może być wstrzyknięty do \texttt{SingletonComponent} (błąd kompilacji).
+\end{itemize}
+
+Zasada ta chroni przed wyciekami pamięci (Memory Leaks). Nie można wstrzyknąć obiektu o krótszym cyklu życia (np. Activity) do obiektu o dłuższym cyklu życia (np. Singleton Repozytorium), ponieważ Repozytorium trzymałoby referencję do zniszczonej Aktywności.
+
+\section{Integracja z ViewModel}
+
+W standardowym podejściu (bez DI), wstrzykiwanie zależności do ViewModelu jest problematyczne, ponieważ ViewModele muszą przetrwać zmiany konfiguracji (np. obrót ekranu). Wymaga to tworzenia skomplikowanych klas typu \texttt{ViewModelProvider.Factory}, które ręcznie przekazują zależności do konstruktora. Biblioteka Hilt całkowicie eliminuje konieczność pisania fabryk. Udostępnia ona dedykowany komponent \texttt{ViewModelComponent} oraz specjalną adnotację \texttt{@HiltViewModel}.
+
+\subsection{Adnotacja @HiltViewModel}
+
+Aby umożliwić automatyczne wstrzykiwanie zależności do ViewModelu, musimy spełnić dwa warunki:
+\begin{enumerate}
+    \item Oznaczyć klasę adnotacją \texttt{@HiltViewModel}.
+    \item Użyć \texttt{@Inject constructor} dla konstruktora.
+\end{enumerate}
+
+Zmodyfikujmy nasz \texttt{NewsViewModel} z poprzedniego wykładu:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Plik: NewsViewModel.kt
+
+@HiltViewModel // <--- Krok 1: Informujemy Hilt o tym ViewModelu
+class NewsViewModel @Inject constructor(
+    // <--- Krok 2: Hilt sam wstrzyknie Repozytorium
+    private val repository: NewsRepository 
+) : ViewModel() {
+
+    // Reszta kodu bez zmian...
+    private val _uiState = MutableStateFlow<NewsUiState>(NewsUiState.Loading)
+    val uiState = _uiState.asStateFlow()
+    
+    init {
+        fetchNews()
+    }
+    // ...
+}
+\end{minted}
+
+\subsection{Pobieranie ViewModelu w Compose}
+
+Aby pobrać instancję tak skonfigurowanego ViewModelu wewnątrz funkcji Composable, używamy funkcji pomocniczej \texttt{hiltViewModel()}.
+
+Biblioteka ta wykonuje pod spodem następujące kroki:
+\begin{itemize}
+    \item Sprawdza, czy istnieje już instancja ViewModelu dla danego ekranu (jeśli tak, zwraca ją).
+    \item Jeśli nie, prosi Hilt o utworzenie nowej instancji, rozwiązując wszystkie zależności w konstruktorze.
+    \item Powiąże ViewModel z cyklem życia obecnego widoku (Activity lub wpisu w Navigation Graph).
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Wymagana zależność w build.gradle:
+// implementation("androidx.hilt:hilt-navigation-compose:<version_number>")
+
+@Composable
+fun NewsScreen(
+    // Hilt automatycznie znajdzie i wstrzyknie odpowiedni ViewModel
+    viewModel: NewsViewModel = hiltViewModel() 
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // ... reszta UI
+}
+\end{minted}
+
+\section{Przykład Praktyczny: Refaktoryzacja}
+
+Podsumujmy zdobytą wiedzę, patrząc na to, jak zmienił się nasz punkt wejścia do aplikacji - plik \texttt{MainActivity.kt}.
+
+\subsection{Przed wprowadzeniem Hilt (Rozdział 10)}
+
+Kod był \textit{zanieczyszczony} logiką konfiguracyjną:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// STARA WERSJA (Manual DI)
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // Ręczne tworzenie grafu zależności
+        val api = RetrofitInstance.api
+        val repo = NewsRepository(api)
+        val factory = NewsViewModelFactory(repo) // Ręczna fabryka
+
+        setContent {
+            val viewModel: NewsViewModel = viewModel(factory = factory)
+            NewsScreen(viewModel)
+        }
+    }
+}
+\end{minted}
+
+\subsection{Po wprowadzeniu Hilt}
+
+Dzięki przeniesieniu odpowiedzialności za tworzenie obiektów do Modułów (sekcja 11.4) i zastosowaniu automatyzacji, nasza Activity staje się czysta i zgodna z zasadą Single Responsibility Principle.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// NOWA WERSJA (Hilt)
+@AndroidEntryPoint // <--- Punkt wejścia
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // Brak ręcznego tworzenia obiektów!
+        // Hilt zarządza wszystkim w tle.
+
+        setContent {
+            // NewsScreen wewnątrz używa hiltViewModel(), 
+            // więc tutaj nie musimy nic przekazywać.
+            NewsScreen() 
+        }
+    }
+}
+\end{minted}
+
+\subsection{Przepływ Danych (Podsumowanie)}
+
+Kompletny przepływ sterowania w naszej aplikacji wygląda teraz następująco:
+
+\begin{enumerate}
+    \item \textbf{Start Aplikacji:} Tworzona jest klasa \texttt{NewsApplication} z adnotacją \texttt{@HiltAndroidApp}. Hilt buduje graf zależności, tworząc singletony zdefiniowane w \texttt{NetworkModule} (Retrofit).
+    \item \textbf{Start Activity:} Uruchamia się \texttt{MainActivity} z adnotacją \texttt{@AndroidEntryPoint}.
+    \item \textbf{Start Ekranu:} Funkcja \texttt{NewsScreen} wywołuje \texttt{hiltViewModel()}.
+    \item \textbf{Tworzenie ViewModelu:} Hilt zauważa, że \texttt{NewsViewModel} wymaga \texttt{NewsRepository}.
+    \item \textbf{Tworzenie Repozytorium:} Hilt zauważa, że \texttt{NewsRepository} wymaga \texttt{NewsApiService}.
+    \item \textbf{Wstrzyknięcie:} Hilt pobiera gotowego Retrofita (Singleton), tworzy serwis API, tworzy Repozytorium, tworzy ViewModel i dostarcza go do Widoku.
+\end{enumerate}
+
+Cały ten skomplikowany proces dzieje się automatycznie, a my musimy jedynie zdefiniować \textit{przepisy} (Moduły) i oznaczyć klasy odpowiednimi adnotacjami.
+
+\section{Pełny Kod Przykładu: News Reader (Hilt Edition)}
+
+Poniżej znajduje się kompletny kod źródłowy kluczowych plików aplikacji, po przeprowadzeniu migracji z ręcznego wstrzykiwania zależności (Manual DI) na bibliotekę Hilt.
+
+\subsection{Punkt Startowy Aplikacji}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// NewsApplication.kt
+package com.example.newsreader
+
+@HiltAndroidApp // Generuje graf zależności (Root Component)
+class NewsApplication : Application()
+\end{minted}
+
+\subsection{Moduł Sieciowy (DI)}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// di/NetworkModule.kt
+package com.example.newsreader.di
+
+@Module
+@InstallIn(SingletonComponent::class) // Dostępne w całej aplikacji
+object NetworkModule {
+
+    @Provides
+    @Singleton // Jedna instancja Retrofita na całą aplikację
+    fun provideRetrofit(): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://newsapi.org/v2/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideNewsApi(retrofit: Retrofit): NewsApiService {
+        return retrofit.create(NewsApiService::class.java)
+    }
+}
+\end{minted}
+
+\subsection{Warstwa Danych (Repository)}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Model artykułu (powinien pasować do tego z API)
+data class Article(
+    val title: String,
+    val description: String?,
+    val url: String? = null,
+    val urlToImage: String? = null
+)
+
+// data/NewsRepository.kt
+package com.example.newsreader.data
+
+// @Inject mówi Hiltowi: "Tak twórz instancje tej klasy".
+// Hilt automatycznie znajdzie 'apiService' w NetworkModule.
+class NewsRepository @Inject constructor(
+    private val apiService: NewsApiService
+) {
+    suspend fun getTopHeadlines() = apiService.getTopHeadlines().articles
+}
+\end{minted}
+
+\subsection{Warstwa Prezentacji (ViewModel)}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+
+// Stany widoku
+sealed interface NewsUiState {
+    data object Loading : NewsUiState
+    data class Success(val articles: List<Article>) : NewsUiState
+    data class Error(val message: String) : NewsUiState
+}
+
+// ui/NewsViewModel.kt
+package com.example.newsreader.ui
+
+@HiltViewModel // Eliminujemy potrzebę pisania ViewModelFactory
+class NewsViewModel @Inject constructor(
+    private val repository: NewsRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow<NewsUiState>(NewsUiState.Loading)
+    val uiState = _uiState.asStateFlow()
+
+    init {
+      fetchData
+    }
+
+    fun fetchData(){
+        viewModelScope.launch {
+            try {
+                val news = repository.getTopHeadlines()
+                _uiState.update { NewsUiState.Success(news) }
+            } catch (e: Exception) {
+                _uiState.update { NewsUiState.Error("Błąd pobierania") }
+            }
+        }
+    }
+}
+\end{minted}
+
+\subsection{Warstwa UI (Compose i Activity)}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// MainActivity.kt
+package com.example.newsreader
+
+@AndroidEntryPoint // Wymagane, aby Activity mogło 
+                   // hostować ekrany korzystające z Hilt
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            NewsScreen()
+        }
+    }
+}
+
+@Composable
+fun NewsScreen(
+    // ViewModel jest wstrzykiwany
+    viewModel: NewsViewModel = hiltViewModel()
+) {
+    // Obserwujemy stan ze StateFlow
+    val state by viewModel.uiState.collectAsState()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("News Reader (Hilt)") }
+            )
+        }
+    ) { paddingValues ->
+        // Kontener główny z paddingiem od Scaffolda
+        Box(
+            modifier = Modifier
+                .padding(paddingValues)
+                .fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            when (val currentState = state) {
+                // 1. Stan Ładowania
+                is NewsUiState.Loading -> {
+                    CircularProgressIndicator()
+                }
+
+                // 2. Stan Błędu
+                is NewsUiState.Error -> {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Błąd: ${currentState.message}",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(onClick = { viewModel.fetchData() }) {
+                            Text("Spróbuj ponownie")
+                        }
+                    }
+                }
+
+                // 3. Stan Sukcesu (Lista)
+                is NewsUiState.Success -> {
+                    if (currentState.articles.isEmpty()) {
+                        Text("Brak artykułów do wyświetlenia.")
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(currentState.articles) { article ->
+                                ArticleItem(article)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- POJEDYNCZY ELEMENT LISTY ---
+
+@Composable
+fun ArticleItem(article: Article) {
+    Card(
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = article.title,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            
+            if (!article.description.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = article.description,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+\end{minted}

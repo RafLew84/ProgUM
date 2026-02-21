@@ -1,0 +1,788 @@
+\chapter{Praca w chmurze i bazy danych czasu rzeczywistego (Firebase Firestore) (Wykład 14)}
+
+\section{Architektura Serverless i Model NoSQL}
+
+W poprzednich rozdziałach budowaliśmy aplikacje w oparciu o architekturę, w której my byliśmy odpowiedzialni za lokalną bazę danych (Room), i korzystaliśmy z gotowych API (REST/Retrofit). W tym rozdziale zmieniamy podejście. Skorzystamy z modelu \textbf{Backend-as-a-Service (BaaS)}, w którym infrastruktura serwerowa jest dostarczana przez platformę zewnętrzną - w tym przypadku \textbf{Firebase}.
+
+\subsection{Backend-as-a-Service (BaaS)}
+
+Tradycyjne tworzenie backendu wymaga postawienia serwera (np. w Ktor lub Spring Boot), konfiguracji bazy danych (np. PostgreSQL) oraz zarządzania hostingiem (np. AWS lub Google Cloud).
+
+Firebase (platforma Google) zdejmuje z nas ten ciężar, oferując gotowe moduły:
+\begin{itemize}
+    \item \textbf{Firestore:} Baza danych w chmurze.
+    \item \textbf{Authentication:} Gotowy system logowania (Google, Facebook, Email).
+    \item \textbf{Cloud Functions:} Logika biznesowa uruchamiana w odpowiedzi na zdarzenia (architektura Serverless).
+    \item \textbf{Storage:} Miejsce na pliki (zdjęcia, wideo).
+\end{itemize}
+
+Dzięki temu programista może stworzyć w pełni funkcjonalny system (od bazy danych po logowanie) bez pisania ani jednej linijki kodu \textit{serwerowego}.
+
+\subsection{SQL (Room) vs NoSQL (Firestore)}
+
+Najważniejszą zmianą dla programisty jest przejście z relacyjnej bazy danych (SQL) na bazę dokumentową (NoSQL). SQL działa na zasadzie tabel i sztywnych relacji. Musimy z góry zdefiniować schemat (Schema). Jeśli chcemy dodać nowe pole do tabeli, musimy przeprowadzić migrację bazy danych.
+
+Cloud Firestore jest bazą nierelacyjną. Nie ma tu tabel ani wierszy. Zamiast tego mamy:
+\begin{enumerate}
+    \item \textbf{Kolekcje (Collections):} Kontenery na dokumenty (odpowiednik tabeli, np. \texttt{users}).
+    \item \textbf{Dokumenty (Documents):} Obiekty JSON przechowywane w kolekcji (odpowiednik wiersza).
+    \item \textbf{Pola (Fields):} Pary klucz-wartość wewnątrz dokumentu.
+\end{enumerate}
+
+Tabela \ref{tab:sql_vs_nosql} przedstawia mapowanie pojęć między tymi dwoma światami.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{SQL (Room)} & \textbf{NoSQL (Firestore)} \\ \hline
+Tabela (Table) & Kolekcja (Collection) \\ \hline
+Wiersz (Row) & Dokument (Document) \\ \hline
+Kolumna (Column) & Pole (Field) \\ \hline
+Klucz obcy (Foreign Key) & Referencja (Reference) \\ \hline
+Relacja (Join) & Zazwyczaj brak (Denormalizacja) \\ \hline
+\end{tabular}
+\caption{Porównanie terminologii SQL i NoSQL}
+\label{tab:sql_vs_nosql}
+\end{table}
+
+\textbf{Kluczowa różnica:} W Firestore dokumenty mogą mieć różną strukturę w obrębie tej samej kolekcji (schemat jest elastyczny), a zamiast łączyć tabele (JOIN), często duplikujemy dane (denormalizacja), aby przyspieszyć odczyt.
+
+\section{Konfiguracja środowiska (Firebase Setup)}
+
+Integracja aplikacji z Firebase różni się od dodania zwykłej biblioteki. Wymaga ona dwustronnej konfiguracji: utworzenia projektu w konsoli chmurowej oraz \textit{przedstawienia} naszej aplikacji serwerom Google za pomocą unikalnego identyfikatora i pliku konfiguracyjnego. 
+
+Pierwszym krokiem jest utworzenie logicznego kontenera na nasze dane w chmurze.
+
+\begin{enumerate}
+    \item Przejdź do strony \url{https://console.firebase.google.com/} i zaloguj się kontem Google.
+    \item Kliknij \textbf{"Add project"}. Nadaj mu nazwę (np. \textit{MovieApp-Cloud}) i wyłącz Google Analytics (nie jest potrzebne w tym ćwiczeniu).
+    \item Po utworzeniu projektu, na ekranie głównym kliknij ikonę Androida (\textit{Get started by adding Firebase to your app}).
+\end{enumerate}
+
+Podczas rejestracji aplikacji zostaniesz poproszony o \textbf{Android package name}. Musi on być identyczny z tym w pliku \texttt{build.gradle} twojej aplikacji (np. \texttt{com.example.movieapp}).
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|p{10cm}|}
+\hline
+\textbf{Pole} & \textbf{Opis} \\ \hline
+Package name & Musi dokładnie pasować do \texttt{applicationId} w \texttt{app/build.gradle.kts}. \\ \hline
+App nickname & Nazwa wyświetlana tylko w konsoli (opcjonalne). \\ \hline
+SHA-1 & Odcisk cyfrowy klucza, którym podpisana jest aplikacja. Wymagany do logowania przez Google (Auth) i Dynamic Links. Do samego Firestore jest opcjonalny, ale warto go dodać. \\ \hline
+\end{tabular}
+\caption{Pola wymagane przy rejestracji aplikacji w Firebase}
+\end{table}
+
+Po zarejestrowaniu aplikacji konsola wygeneruje plik \texttt{google-services.json}. Jest to \textit{dowód tożsamości} Twojej aplikacji. Zawiera on klucze API, adres URL bazy danych i identyfikatory projektu.
+
+\begin{enumerate}
+    \item Pobierz plik \texttt{google-services.json} na dysk.
+    \item W Android Studio przełącz widok projektu z \textit{Android} na \textbf{"Project"} (lewy górny róg panelu plików).
+    \item Przeciągnij plik do katalogu \texttt{app/} (obok pliku \texttt{build.gradle} modułu).
+\end{enumerate}
+
+\textbf{Uwaga dotycząca bezpieczeństwa:} Plik ten zawiera klucze API, które teoretycznie są publiczne (zaszyte w aplikacji), ale dobre praktyki sugerują, by nie umieszczać go w publicznych repozytoriach GitHub, jeśli projekt jest open-source. W projektach komercyjnych jest on częścią repozytorium.
+
+Musimy dodać zależności Gradle:
+
+\textbf{1. Poziom Projektu (Project build.gradle.kts):}
+Definiujemy wersję pluginu Google Services.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// build.gradle.kts (Project)
+plugins {
+    // ...
+    id("com.google.gms.google-services") version "4.4.0" apply false
+}
+\end{minted}
+
+\textbf{2. Poziom Modułu (App build.gradle.kts):}
+Aplikujemy plugin i dodajemy zależności.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// app/build.gradle.kts (Module)
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    // Aplikujemy plugin Google Services
+    id("com.google.gms.google-services")
+}
+
+dependencies {
+    // Import Firebase BoM (Bill of Materials)
+    // To jedyne miejsce, gdzie definiujemy wersję (32.7.0)
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+
+    // Biblioteki Firebase (BEZ podawania wersji)
+    // Wersje zostaną pobrane automatycznie z BOM
+    implementation("com.google.firebase:firebase-firestore-ktx")
+    implementation("com.google.firebase:firebase-analytics")
+}
+\end{minted}
+
+Po dodaniu tych zmian należy wykonać \textbf{Gradle Sync}. Jeśli synchronizacja przebiegnie pomyślnie, aplikacja jest gotowa do komunikacji z chmurą.
+
+Ostatnim krokiem jest utworzenie samej instancji bazy danych w konsoli:
+\begin{enumerate}
+    \item W menu bocznym konsoli Firebase wybierz \textbf{Firestore Database}.
+    \item Kliknij \textbf{Create database}.
+    \item Wybierz lokalizację serwera (np. \texttt{eur3 (europe-west)} dla Polski - mniejsze opóźnienia).
+    \item W kroku \textit{Security Rules} wybierz \textbf{Start in test mode}.
+\end{enumerate}
+
+\section{Modelowanie danych w Firestore}
+
+Firestore jest bazą dokumentową. Oznacza to, że nie definiujemy schematu (Schema) na poziomie bazy danych. Możemy w tej samej kolekcji zapisać dokument posiadający tylko pole \texttt{name}, a obok niego dokument posiadający pola \texttt{name, age, address}.
+
+Mimo tej elastyczności, w aplikacji Androidowej (która jest silnie typowana) dążymy do narzucenia pewnej struktury poprzez klasy DTO (Data Transfer Objects). Model danych w Firestore przypomina system plików na dysku komputera:
+\begin{itemize}
+    \item \textbf{Kolekcja} to folder. Może zawierać tylko dokumenty (nie inne kolekcje bezpośrednio).
+    \item \textbf{Dokument} to plik (np. JSON). Zawiera dane oraz ewentualnie linki do podfolderów (Subkolekcji).
+\end{itemize}
+
+Struktura zawsze musi występować naprzemiennie:
+\begin{center}
+\texttt{Kolekcja $\rightarrow$ Dokument $\rightarrow$ Kolekcja $\rightarrow$ Dokument ...}
+\end{center}
+
+Przykład struktury dla aplikacji E-commerce:
+\begin{verbatim}
+users (kolekcja)
+  |-- user_abc123 (dokument)
+       |-- name: "Jan Kowalski"
+       |-- email: "jan@example.com"
+       |-- orders (subkolekcja)
+             |-- order_999 (dokument)
+                  |-- total: 150.00
+                  |-- items: [...]
+\end{verbatim}
+
+\textbf{Płytkie zapytania (Shallow Queries):} Pobranie dokumentu \texttt{user\_abc123} pobiera tylko jego pola (name, email). Nie pobiera automatycznie danych z subkolekcji \texttt{orders}. Aby pobrać zamówienia, trzeba wykonać osobne zapytanie do subkolekcji. Jest to kluczowa różnica względem relacji w SQL.
+
+Biblioteka Firestore dla Androida posiada wbudowany mechanizm mapowania (POJO mapper), który automatycznie zamienia dokumenty JSON na obiekty Kotlina. Aby działał on poprawnie, musimy spełnić jeden techniczny wymóg: \textbf{klasa musi posiadać konstruktor bezargumentowy}.
+
+W Kotlinie osiągamy to najłatwiej, nadając wszystkim polom w \texttt{data class} wartości domyślne.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// data/remote/model/MovieDto.kt
+
+data class MovieDto(
+    // 1. Mapowanie ID dokumentu na pole w klasie
+    @DocumentId 
+    val id: String = "",
+
+    // 2. Pola danych (muszą mieć wartości domyślne!)
+    val title: String = "",
+    val description: String = "",
+    
+    // Nazwa pola w bazie musi pasować do nazwy zmiennej
+    // lub używamy @PropertyName("poster_path")
+    val posterUrl: String? = null,
+    
+    val rating: Double = 0.0,
+
+    // 3. Obsługa czasu serwerowego
+    @ServerTimestamp 
+    val createdAt: Date? = null
+)
+\end{minted}
+
+Najważniejsze adnotacje:
+
+\begin{itemize}
+    \item \textbf{\texttt{@DocumentId}}:
+    W Firestore ID dokumentu jest częścią metadanych, a nie ciałem JSON-a. Ta adnotacja mówi bibliotece: \textit{Weź ID tego dokumentu i wpisz go w to pole podczas deserializacji}. Dzięki temu nie musimy ręcznie przepisywać ID po pobraniu danych.
+    
+    \item \textbf{\texttt{@ServerTimestamp}}:
+    Gdy wysyłamy obiekt do bazy, pole to zostanie zamienione na \texttt{null}, a serwer Firestore wstawi w to miejsce swój aktualny czas. Jest to krytyczne dla synchronizacji danych między użytkownikami z różnych stref czasowych lub ze źle ustawionym zegarem w telefonie.
+    
+    \item \textbf{\texttt{@PropertyName("name")}}:
+    Opcjonalna adnotacja (podobna do \texttt{@SerializedName} z Gsona), jeśli nazwa pola w bazie różni się od nazwy w kodzie (np. \texttt{first\_name} vs \texttt{firstName}).
+\end{itemize}
+
+Firestore obsługuje bogatszy zestaw typów niż SQLite:
+\begin{itemize}
+    \item \textbf{Proste:} String, Number (Long/Double), Boolean, Null.
+    \item \textbf{Złożone:}
+    \begin{itemize}
+        \item \textbf{Map:} Zagnieżdżony obiekt JSON (mapuje się na \texttt{Map<String, Any>} lub inną zagnieżdżoną klasę DTO).
+        \item \textbf{Array:} Lista wartości (mapuje się na \texttt{List<T>}). Uwaga: Tablice w Firestore nie powinny być duże, ponieważ nie można pobrać tylko części tablicy.
+        \item \textbf{Timestamp:} Precyzyjny znacznik czasu.
+        \item \textbf{GeoPoint:} Szerokość i długość geograficzna.
+    \end{itemize}
+\end{itemize}
+
+\section{Integracja z Czystą Architekturą}
+
+W architekturze MVVM zależy nam na tym, aby warstwa UI (ViewModel) otrzymywała dane w postaci strumieni (\texttt{Flow}), nie wiedząc o tym, że pod spodem działa SDK Firebase.
+
+Wyzwanie polega na tym, że biblioteka Firestore została napisana w oparciu o mechanizm \textbf{Callbacków} (interfejsy typu \texttt{OnSuccessListener}, \texttt{addSnapshotListener}), a nie funkcje zawieszające (\texttt{suspend}). Musimy więc zbudować most między tymi technologiami.
+
+Aby zamienić nasłuchiwanie w czasie rzeczywistym na \texttt{Flow}, używamy konstruktora \texttt{callbackFlow}. Tworzy on strumień, który pozostaje otwarty tak długo, jak długo ktoś go obserwuje (collect), i pozwala nam ręcznie emitować wartości wewnątrz callbacka. Poniżej schemat implementacji metody \texttt{getMoviesStream()} w repozytorium:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// data/repository/FirestoreMovieRepository.kt
+
+override fun getMoviesStream(): Flow<List<Movie>> = callbackFlow {
+    // 1. Referencja do kolekcji
+    val collection = firestore.collection("movies")
+
+    // 2. Rejestracja listenera (To jest API Firebase)
+    val listenerRegistration = collection.addSnapshotListener { snapshot, error ->
+        
+        // A. Obsługa błędu
+        if (error != null) {
+            close(error) // Zamyka Flow i rzuca wyjątek do kolektora
+            return@addSnapshotListener
+        }
+
+        // B. Mapowanie danych
+        if (snapshot != null) {
+            val movies = snapshot.documents.map { doc ->
+                // Zamiana JSON na obiekt DTO, a potem na domenę
+                val dto = doc.toObject(MovieDto::class.java)
+                // Ważne: toObject może zwrócić null, jeśli dokument jest pusty
+                dto?.toDomain() 
+            }.filterNotNull()
+
+            // C. Emisja do strumienia
+            trySend(movies) 
+        }
+    }
+
+    // 3. Sprzątanie (Bardzo ważne!)
+    // Blok awaitClose zawiesza korutynę do momentu, aż Flow zostanie anulowany
+    // (np. użytkownik zamknie ekran). Wtedy wykonuje się kod w środku.
+    awaitClose {
+        listenerRegistration.remove() // Odpinamy listener, by nie wyciekała pamięć
+    }
+}
+\end{minted}
+
+Pułapka \texttt{awaitClose}: Jeśli pominiesz blok \texttt{awaitClose}, funkcja \texttt{callbackFlow} zakończy się natychmiast po zarejestrowaniu listenera, a strumień zostanie zamknięty. \texttt{awaitClose} utrzymuje strumień przy życiu.
+
+Do operacji, które nie wymagają nasłuchiwania w czasie rzeczywistym (np. dodanie produktu, usunięcie, lub jednorazowe pobranie), używamy funkcji zawieszających.
+
+Standardowe API Firebase zwraca obiekt \texttt{Task<T>}. Aby nie używać callbacków \path{addOnSuccessListener}, korzystamy z biblioteki pomocniczej \texttt{kotlinx-coroutines-play-services}, która dodaje funkcję rozszerzającą \texttt{.await()}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// data/repository/FirestoreMovieRepository.kt
+
+class FirestoreMovieRepository(...) {
+
+    // ZAPIS (Create)
+    override suspend fun addMovie(movie: Movie) {
+        val dto = movie.toDto()
+        
+        // .await() zawiesza korutynę do momentu ukończenia zapisu w chmurze
+        // Jeśli wystąpi błąd (np. brak sieci + brak cache), rzuci wyjątek.
+        firestore.collection("movies")
+            .document(movie.id) // Używamy własnego ID lub .document() dla auto-ID
+            .set(dto)
+            .await() 
+    }
+
+    // USUWANIE (Delete)
+    override suspend fun deleteMovie(id: String) {
+        firestore.collection("movies")
+            .document(id)
+            .delete()
+            .await()
+    }
+    
+    // ODCZYT JEDNORAZOWY (One-shot Get)
+    override suspend fun getMovieDetails(id: String): Movie {
+        val snapshot = firestore.collection("movies")
+            .document(id)
+            .get() // Pobiera stan na ten moment
+            .await()
+            
+        return snapshot.toObject(MovieDto::class.java)?.toDomain() 
+            ?: throw Exception("Movie not found")
+    }
+}
+\end{minted}
+
+Warto zaznaczyć, że SDK Firestore jest zoptymalizowane.
+\begin{itemize}
+    \item \texttt{addSnapshotListener} domyślnie wywołuje callback na wątku głównym (Main Thread). Jest to bezpieczne, ponieważ Firestore wykonuje operacje sieciowe na własnej puli wątków w tle, a na główny wątek wrzuca tylko gotowe wyniki.
+    \item Jeśli jednak mapowanie danych (linia \texttt{snapshot.documents.map}) jest kosztowne obliczeniowo (np. lista 1000 elementów), warto przenieść emisję na inny dispatcher wewnątrz \texttt{flowOn(Dispatchers.Default)} w ViewModelu lub Repozytorium.
+\end{itemize}
+
+\section{Operacje zapisu i modyfikacji}
+
+Firestore oferuje kilka metod zapisu, które różnią się sposobem generowania identyfikatorów oraz zachowaniem w przypadku istniejących danych.
+
+Wszystkie poniższe operacje zwracają obiekt \texttt{Task<Void>}, co oznacza, że w Kotlinie możemy użyć na nich funkcji \texttt{.await()}, aby zawiesić korutynę do momentu potwierdzenia zapisu przez serwer. Biblioteki Firebase są napisane w Javie, gdzie typy generyczne nie obsługują \texttt{void} (pustego zwrotu). Używana jest więc klasa-wrapper \texttt{java.lang.Void}. W Kotlinie funkcja \texttt{.await()} zwraca wtedy wartość \texttt{null}, którą po prostu ignorujemy, traktując całe wywołanie jak funkcję zwracającą \texttt{Unit}. Mamy dwie strategie tworzenia nowych dokumentów:
+
+\begin{enumerate}
+    \item \textbf{Automatyczne ID (\texttt{add}):}
+    Gdy nie zależy nam na konkretnym identyfikatorze (np. nowy komentarz, log błędu). Firestore wygeneruje unikalny ciąg 20 znaków.
+    
+    \item \textbf{Własne ID (\texttt{set}):}
+    Gdy identyfikator pochodzi z zewnątrz (np. \texttt{userId} z Firebase Auth, kod EAN produktu, numer PESEL).
+\end{enumerate}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// data/repository/FirestoreWriteRepository.kt
+
+// STRATEGIA 1: add() - Firestore generuje ID
+suspend fun addComment(content: String) {
+    val comment = hashMapOf("content" to content)
+    
+    // Wynikiem jest referencja do nowo utworzonego dokumentu
+    val newDocRef = firestore.collection("comments").add(comment).await()
+    println("Utworzono komentarz o ID: ${newDocRef.id}")
+}
+
+// STRATEGIA 2: set() - My narzucamy ID
+suspend fun createUserProfile(userId: String, name: String) {
+    val user = UserDto(id = userId, name = name)
+    
+    // Dokument będzie miał ID takie samo jak userId z Auth
+    firestore.collection("users")
+        .document(userId)
+        .set(user)
+        .await()
+}
+\end{minted}
+
+Przejdźmy do aktualizacji danych, miejsce gdzie najczęściej popełnia się błędy.
+
+\begin{itemize}
+    \item \textbf{\texttt{set(data)} (Nadpisanie):}
+    Domyślnie metoda \texttt{set} \textbf{usuwa} całą dotychczasową zawartość dokumentu i zastępuje ją nowym obiektem. Jeśli dokument miał 50 pól, a my przekażemy obiekt z 2 polami, pozostałe 48 zostanie skasowanych.
+    
+    \item \textbf{\texttt{update()} (Częściowa edycja):}
+    Modyfikuje tylko wskazane pola. Jeśli dokument nie istnieje, operacja zakończy się błędem.
+    
+    \item \textbf{\texttt{set(..., SetOptions.merge())} (Upsert):}
+    Połączenie \textit{Update} i \textit{Insert}. Jeśli dokument istnieje - aktualizuje wskazane pola. Jeśli nie istnieje - tworzy go. Jest to najbezpieczniejsza metoda synchronizacji danych.
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// PRZYKŁAD: Zmiana tylko ceny produktu
+
+suspend fun updatePrice(productId: String, newPrice: Double) {
+    // Sposób A: update() - wymaga, by dokument istniał
+    try {
+        firestore.collection("products").document(productId)
+            .update("price", newPrice)
+            .await()
+    } catch (e: Exception) {
+        // Rzuci błąd, jeśli produkt nie istnieje
+    }
+
+    // Sposób B: Merge (Upsert) - bezpieczniejszy dla synchronizacji
+    val data = mapOf("price" to newPrice)
+    firestore.collection("products").document(productId)
+        .set(data, SetOptions.merge()) // Nie kasuje innych pól!
+        .await()
+}
+\end{minted}
+
+\textbf{Notacja kropkowa (Dot Notation):} Aby zaktualizować pole w zagnieżdżonym obiekcie (Mapie), używamy kropki w nazwie pola. Np. \texttt{update("address.city", "Wrocław")}. Nie przesyłaj całego obiektu \texttt{address}, bo nadpiszesz inne jego pola.
+
+Usuwanie jest proste, ale posiada jedną krytyczną cechę w bazach NoSQL, która jest nieintuicyjna dla osób znających SQL (gdzie działa \textit{Cascade Delete}).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+suspend fun deleteUser(userId: String) {
+    firestore.collection("users").document(userId)
+        .delete()
+        .await()
+}
+\end{minted}
+
+\textbf{Pułapka Subkolekcji:} Usunięcie dokumentu w Firestore \textbf{NIE usuwa} zawartych w nim subkolekcji. 
+Jeśli usuniesz dokument \texttt{users/jan}, ale Jan miał subkolekcję \texttt{users/jan/orders}, to zamówienia nadal istnieją w bazie, ale stają się \textit{osierocone} (nie można ich znaleźć, przeglądając konsolę w zwykły sposób, ale można się do nich odwołać bezpośrednio). Aby usunąć wszystko, trzeba ręcznie pobrać i usunąć każdy dokument z subkolekcji.
+
+Czasami musimy wykonać kilka operacji atomowo (wszystko albo nic).
+\begin{itemize}
+    \item \textbf{WriteBatch:} Pozwala wykonać do 500 operacji (set, update, delete) naraz. Jeśli jedna się nie powiedzie (np. brak sieci), żadna nie zostanie wykonana. Nie blokuje to bazy dla innych użytkowników.
+    \item \textbf{Transaction:} Bardziej zaawansowane. Pozwala odczytać wartość, a następnie ją zmienić (np. inkrementacja licznika polubień), gwarantując, że nikt inny nie zmienił jej w międzyczasie.
+\end{itemize}
+
+\section{Zaawansowane zapytania i indeksy}
+
+Firestore jest bazą zoptymalizowaną pod kątem szybkości odczytu. Gwarantuje ona, że czas pobierania danych zależy od liczby wyników, a nie od wielkości całej kolekcji. Pobranie 50 filmów z bazy zawierającej 100 dokumentów czas zalezy glownie od liczby zwracanych wynikow, przy poprawnym indeksowaniu.
+
+Aby to osiągnąć, Firestore nakłada na programistów pewne ograniczenia dotyczące konstrukcji zapytań i wymaga indeksowania każdego pola, po którym chcemy wyszukiwać. Zapytania tworzymy poprzez łańcuchowe wywoływanie metod na obiekcie \texttt{CollectionReference}. Każde wywołanie zwraca obiekt \texttt{Query}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// data/repository/FirestoreQueryExample.kt
+
+fun getSciFiMoviesStream(): Flow<List<Movie>> = callbackFlow {
+    val query = firestore.collection("movies")
+        // 1. Filtrowanie (równość)
+        .whereEqualTo("genre", "Sci-Fi")
+        // 2. Filtrowanie (zakres)
+        .whereGreaterThan("rating", 4.0)
+        // 3. Sortowanie
+        .orderBy("rating", Query.Direction.DESCENDING)
+        // 4. Limitowanie wyników
+        .limit(10)
+
+    val listener = query.addSnapshotListener { ... }
+    awaitClose { listener.remove() }
+}
+\end{minted}
+
+W przeciwieństwie do SQL, gdzie klauzula \texttt{WHERE} pozwala na dowolną kombinację warunków, Firestore posiada sztywne reguły:
+
+\begin{enumerate}
+    \item \textbf{Jeden zakres na zapytanie:}
+    Możesz filtrować zakresem (>, <, >=, <=) tylko po \textbf{jednym} polu w pojedynczym zapytaniu.
+    \begin{itemize}
+        \item \textcolor{green}{DOBRZE:} \texttt{whereGreaterThan("age", 18).whereLessThan("age", 30)}
+        \item \textcolor{red}{ŹLE:} \texttt{whereGreaterThan("age", 18).whereGreaterThan("income", 5000)}
+    \end{itemize}
+    
+    \item \textbf{Zgodność sortowania i filtrowania:}
+    Jeśli filtrujesz zakresowo po polu X (np. \texttt{age > 18}), pierwsze sortowanie (\texttt{orderBy}) również musi dotyczyć pola X.
+    
+    \item \textbf{Brak "prawdziwego" OR:}
+    Do niedawna operacja \texttt{OR} nie istniała. Obecnie używamy operatora \texttt{whereIn} (dla tablic) lub \texttt{Filter.or}, ale mają one swoje limity wydajnościowe (maksymalnie 30 klauzul alternatywnych).
+\end{enumerate}
+
+Aby zapytania były szybkie, Firestore używa indeksów.
+
+\textbf{1. Indeksy Jednopolowe (Single-field indexes):}
+Są tworzone automatycznie dla każdego pola w dokumencie. Dzięki temu proste zapytania (\texttt{whereEqualTo("city", "Warsaw")}) działają od razu, bez konfiguracji.
+
+\textbf{2. Indeksy Złożone (Composite indexes):}
+Są wymagane, gdy zapytanie łączy warunki na wielu polach jednocześnie, np.:
+\texttt{Kategoria == "Książki" AND Cena > 50 zł}.
+
+Gdy spróbujesz wykonać takie zapytanie bez indeksu, aplikacja wyrzuci błąd, a w \textbf{Logcat} zobaczysz specjalny komunikat:
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{text}
+com.google.firebase.firestore.FirebaseFirestoreException: FAILED_PRECONDITION: 
+The query requires an index. You can create it here: 
+https://console.firebase.google.com/v1/r/project/my-app/firestore...
+\end{minted}
+
+Firestore \textbf{nie obsługuje} klasycznego wyszukiwania tekstu (np. znalezienie słowa \textit{terminator} w długim opisie filmu).
+Operator \texttt{whereGreaterThan} i \texttt{startAt} pozwalają jedynie na wyszukiwanie prefiksów (słowa zaczynające się na...).
+
+Rozwiązania tego problemu:
+\begin{enumerate}
+    \item \textbf{Podejście (Array-contains):}
+    Podczas zapisywania filmu, tworzymy dodatkowe pole \texttt{keywords} (tablicę słów), np. \texttt{["star", "wars", "new", "hope"]}. Wyszukiwanie polega na zapytaniu:
+    \texttt{whereArrayContains("keywords", "hope")}.
+    
+    \item \textbf{Podejście Alternatywne:}
+    Integracja z zewnętrznym silnikiem wyszukiwania, takim jak \textbf{Algolia} lub \textbf{Typesense}. Dane z Firestore są synchronizowane z silnikiem wyszukiwania (przez Cloud Functions), a aplikacja mobilna pyta silnik o wyniki wyszukiwania, otrzymując ID dokumentów.
+\end{enumerate}
+
+\section{Tryb Offline i Synchronizacja}
+
+W Rozdziale 13 budowaliśmy obsługę trybu offline ręcznie, tworząc lokalną bazę Room i pisząc logikę synchronizacji w Repozytorium. Firestore oferuje funkcjonalność \textbf{Offline Persistence} wbudowaną bezpośrednio w SDK.
+
+Dla platformy Android (i iOS) tryb ten jest \textbf{włączony domyślnie}. Oznacza to, że każda aplikacja korzystająca z Firestore jest z definicji aplikacją \textit{Offline-first}.
+
+Gdy aplikacja pobiera dane z chmury, Firestore zapisuje ich kopię w lokalnej, wewnętrznej bazie danych (ukrytej implementacji LevelDB/SQLite) na urządzeniu.
+
+Gdy użytkownik traci zasięg:
+\begin{itemize}
+    \item \textbf{Odczyt:} Zapytania \texttt{get()} oraz listenery \texttt{addSnapshotListener} automatycznie przełączają się na czytanie z lokalnego cache. Nie trzeba zmieniać kodu repozytorium.
+    \item \textbf{Zapis:} Operacje \texttt{add/set/update} zapisują zmianę lokalnie i dodają ją do \textit{kolejki oczekującej}.
+    \item \textbf{Synchronizacja:} Gdy urządzenie odzyska połączenie, SDK automatycznie wysyła kolejkę zmian na serwer i pobiera najnowsze aktualizacje.
+\end{itemize}
+
+Jedną z najważniejszych cech Firestore jest tzw. \textbf{Optimistic UI Update}. W klasycznym podejściu REST, gdy użytkownik klika \textit{Wyślij wiadomość}, aplikacja pokazuje spinner (ładowanie), wysyła żądanie do serwera i dopiero po otrzymaniu \texttt{HTTP 200 OK} wyświetla wiadomość na liście. Przy wolnym internecie trwa to irytująco długo.
+
+W Firestore dzieje się to inaczej:
+\begin{enumerate}
+    \item Użytkownik klika \textit{Wyślij}.
+    \item SDK zapisuje wiadomość w lokalnym cache.
+    \item Listener (\texttt{onSnapshot}) odpala się \textbf{natychmiast} (w ułamku sekundy), emitując nową listę wiadomości zawierającą dodany element.
+    \item UI aktualizuje się od razu. Użytkownik ma wrażenie, że aplikacja jest niesamowicie szybka.
+    \item W tle SDK wysyła dane do chmury. Gdy serwer potwierdzi zapis, listener może odpalić się drugi raz (zaktualizować metadane), ale dla użytkownika jest to niewidoczne.
+\end{enumerate}
+
+Czasami UI musi wiedzieć, czy dane, które wyświetla, są \textit{ostateczne} (z serwera), czy \textit{tymczasowe} (z cache, jeszcze niewysłane). Służą do tego metadane migawki (\texttt{SnapshotMetadata}). Możemy to wykorzystać np. do wyszarzenia wiadomości na czacie, która jeszcze nie dotarła do serwera.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// data/repository/FirestoreChatRepository.kt
+
+collection.addSnapshotListener { snapshot, e ->
+    if (snapshot != null) {
+        
+        // Sprawdzenie źródła danych
+        val source = if (snapshot.metadata.isFromCache) {
+            "Lokalny Cache"
+        } else {
+            "Serwer"
+        }
+        Log.d("Firestore", "Dane pochodzą z: $source")
+
+        val messages = snapshot.documents.map { doc ->
+            val message = doc.toObject(MessageDto::class.java)
+            
+            // hasPendingWrites = true oznacza, że ten konkretny dokument
+            // został zmodyfikowany lokalnie, ale nie dotarł jeszcze do chmury.
+            message.isSending = doc.metadata.hasPendingWrites()
+            
+            message
+        }
+        trySend(messages)
+    }
+}
+\end{minted}
+
+Cache Firestore nie rośnie w nieskończoność. Domyślnie limit wynosi \textbf{100 MB}. Gdy zostanie przekroczony, SDK usuwa najstarsze, nieużywane dokumenty (algorytm LRU - Least Recently Used). Możemy skonfigurować ten limit przy starcie aplikacji:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Konfiguracja w Module DI
+val settings = FirebaseFirestoreSettings.Builder()
+    .setCacheSizeBytes(FirebaseFirestoreSettings.CACHE_SIZE_UNLIMITED) // Lub np. 50 MB
+    .setPersistenceEnabled(true) // Domyślnie true, można wyłączyć
+    .build()
+
+firestore.firestoreSettings = settings
+\end{minted}
+
+Mimo że tryb offline działa świetnie, ma swoje granice:
+\begin{itemize}
+    \item \textbf{Wyszukiwanie:} Nie można wykonywać zapytań offline, które wymagają indeksów, których jeszcze nie ma w cache (np. filtrowanie dużej kolekcji, której użytkownik nigdy wcześniej nie pobrał).
+    \item \textbf{Transakcje:} Operacje transakcyjne (\texttt{runTransaction}) \textbf{nie działają offline}, ponieważ wymagają one połączenia z serwerem w celu sprawdzenia spójności danych. W trybie offline należy używać \texttt{WriteBatch}.
+    \item \textbf{Reguły bezpieczeństwa:} Walidacja uprawnień (Security Rules) odbywa się na serwerze. Jeśli użytkownik spróbuje wykonać niedozwoloną operację offline, dowie się o błędzie dopiero po odzyskaniu połączenia.
+\end{itemize}
+
+\section{Przykład: Współdzielona Lista Zakupów (ToDo)}
+
+Jako podsumowanie rozdziału stworzymy kompletną mini-aplikację: listę zadań, która synchronizuje się w czasie rzeczywistym między wieloma urządzeniami. Wykorzystamy wiedzę o \texttt{callbackFlow}, mapowaniu DTO oraz operacjach zapisu.
+
+Aplikacja będzie pozwalała na:
+\begin{enumerate}
+    \item Wyświetlanie listy zadań (Real-time).
+    \item Dodawanie nowego zadania.
+    \item Oznaczanie zadania jako wykonane (Update).
+    \item Usuwanie zadania (Delete).
+\end{enumerate}
+
+Rozdzielamy model domenowy (używany w UI) od modelu DTO (używanego do serializacji JSON w Firestore).
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// domain/model/Task.kt
+package com.example.todoapp.domain.model
+
+data class Task(
+    val id: String,
+    val content: String,
+    val isDone: Boolean
+)
+
+// data/remote/model/TaskDto.kt
+package com.example.todoapp.data.remote.model
+
+import com.google.firebase.firestore.DocumentId
+import com.google.firebase.firestore.ServerTimestamp
+import java.util.Date
+
+// Pamiętaj: Wartości domyślne są wymagane dla pustego konstruktora!
+data class TaskDto(
+    @DocumentId val id: String = "",
+    val content: String = "",
+    @field:JvmField val isDone: Boolean = false, // @field pomaga w mapowaniu booleanów
+    @ServerTimestamp val createdAt: Date? = null
+)
+
+// Extension function do mapowania
+fun TaskDto.toDomain() = Task(
+    id = this.id,
+    content = this.content,
+    isDone = this.isDone
+)
+\end{minted}
+
+
+Przejdźmy do Repozytorium które implementuje logikę \textit{nasłuchiwania} zmian.
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// data/repository/TaskRepository.kt
+package com.example.todoapp.data.repository
+
+
+class TaskRepository @Inject constructor(
+    private val firestore: FirebaseFirestore
+) {
+    private val collection = firestore.collection("tasks")
+
+    // 1. ODCZYT (Real-time)
+    fun getTasksStream(): Flow<List<Task>> = callbackFlow {
+        // Sortujemy: najpierw niewykonane, potem wg daty utworzenia
+        val query = collection
+            .orderBy("isDone", Query.Direction.ASCENDING)
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+
+        val listener = query.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
+            }
+
+            if (snapshot != null) {
+                val tasks = snapshot.documents.mapNotNull { doc ->
+                    doc.toObject(TaskDto::class.java)?.toDomain()
+                }
+                trySend(tasks)
+            }
+        }
+
+        awaitClose { listener.remove() }
+    }
+
+    // 2. ZAPIS (Create)
+    suspend fun addTask(content: String) {
+        val task = TaskDto(
+            content = content,
+            isDone = false
+            // createdAt ustawi serwer dzieki @ServerTimestamp
+        )
+        collection.add(task).await()
+    }
+
+    // 3. AKTUALIZACJA (Update)
+    suspend fun toggleTask(taskId: String, isDone: Boolean) {
+        // Aktualizujemy tylko jedno pole
+        collection.document(taskId).update("isDone", isDone).await()
+    }
+
+    // 4. USUWANIE (Delete)
+    suspend fun deleteTask(taskId: String) {
+        collection.document(taskId).delete().await()
+    }
+}
+\end{minted}
+
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// di/FirebaseModule.kt
+package com.example.todoapp.di
+
+@Module
+@InstallIn(SingletonComponent::class)
+object FirebaseModule {
+
+    @Provides
+    @Singleton
+    fun provideFirestore(): FirebaseFirestore {
+        // Używamy wersji KTX
+        return Firebase.firestore 
+    }
+}
+\end{minted}
+
+ViewModel jest prosty, ponieważ \texttt{callbackFlow} w repozytorium wykonuje całą ciężką pracę związaną z aktualizacją stanu.
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// presentation/TasksViewModel.kt
+package com.example.todoapp.presentation
+
+@HiltViewModel
+class TasksViewModel @Inject constructor(
+    private val repository: TaskRepository
+) : ViewModel() {
+
+    // Strumień automatycznie aktualizuje UI, gdy zmieni się coś w chmurze
+    val tasks: StateFlow<List<Task>> = repository.getTasksStream()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    fun onAddTask(content: String) {
+        if (content.isBlank()) return
+        viewModelScope.launch {
+            repository.addTask(content)
+        }
+    }
+
+    fun onToggleTask(task: Task) {
+        viewModelScope.launch {
+            repository.toggleTask(task.id, !task.isDone)
+        }
+    }
+
+    fun onDeleteTask(task: Task) {
+        viewModelScope.launch {
+            repository.deleteTask(task.id)
+        }
+    }
+}
+\end{minted}
+
+Interfejs reaguje na zmiany w \texttt{StateFlow}. Dzięki Firestore, jeśli uruchomisz tę aplikację na dwóch telefonach (lub telefonie i emulatorze), kliknięcie Checkboxa na jednym urządzeniu natychmiast odznaczy go na drugim.
+
+\begin{minted}[frame=single,framesep=10pt,breaklines]{kotlin}
+// presentation/TasksScreen.kt
+
+@Composable
+fun TasksScreen(
+    viewModel: TasksViewModel = hiltViewModel()
+) {
+    val tasks by viewModel.tasks.collectAsState()
+    var newTaskText by remember { mutableStateOf("") }
+
+    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        // Sekcja dodawania
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextField(
+                value = newTaskText,
+                onValueChange = { newTaskText = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("Co trzeba kupić?") }
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Button(onClick = {
+                viewModel.onAddTask(newTaskText)
+                newTaskText = "" // Czyścimy pole po dodaniu
+            }) {
+                Text("Dodaj")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Lista zadań
+        LazyColumn {
+            items(tasks, key = { it.id }) { task ->
+                TaskItem(
+                    task = task,
+                    onToggle = { viewModel.onToggleTask(task) },
+                    onDelete = { viewModel.onDeleteTask(task) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun TaskItem(
+    task: Task,
+    onToggle: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = task.isDone,
+            onCheckedChange = { onToggle() }
+        )
+        Text(
+            text = task.content,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Default.Delete, contentDescription = "Usuń")
+        }
+    }
+}
+\end{minted}

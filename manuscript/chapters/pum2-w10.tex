@@ -1,0 +1,493 @@
+\chapter{Komunikacja Sieciowa: Retrofit (Wykład 10)}
+
+W poprzednim rozdziale nauczyliśmy się przechowywać dane lokalnie na urządzeniu. Jest to podejście typu \textbf{Offline-First}. Jednak współczesne aplikacje mobilne rzadko działają w izolacji. Aby pobrać prognozę pogody, wyświetlić listę najnowszych wiadomości czy zsynchronizować zadania między urządzeniami, musimy skomunikować się z zewnętrznym serwerem.
+
+Komunikacja sieciowa w aplikacjach mobilnych opiera się zazwyczaj na architekturze REST (Representational State Transfer).
+\begin{itemize}
+    \item \textbf{Klient (Twoja Aplikacja):} Wysyła żądanie HTTP (Request) pod określony adres URL.
+    \item \textbf{Serwer (API):} Przetwarza żądanie i odsyła odpowiedź (Response).
+\end{itemize}
+
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w10-retrofitscheme.png}
+    \caption{Schemat MVVM z biblioteką Retrofit.}
+    \label{fig:Figura retrofitscheme}
+\end{figure}
+
+Operacja sieciowa jest zjawiskiem wysoce nieprzewidywalnym. Czas odpowiedzi serwera (Latency) zależy od jakości zasięgu (LTE/5G/WiFi), obciążenia łącza czy odległości geograficznej od serwera. Może to trwać od 50 ms do nawet kilku sekund. Ze względu na tę nieprzewidywalność, system Android narzuca rygorystyczne ograniczenie: \textbf{Wykonywanie jakichkolwiek operacji sieciowych na Wątku Głównym (UI Thread) jest niewskazane.} Próba wykonania kodu sieciowego wewnątrz \texttt{MainActivity} (bez użycia korutyn lub wątków tła) zakończy się natychmiastowym wyrzuceniem wyjątku \texttt{NetworkOnMainThreadException}.
+
+\section{Uprawnienia aplikacji}
+
+Domyślnie aplikacja na Androida nie ma prawa łączyć się z Internetem. Aby to umożliwić, musimy zadeklarować odpowiednie uprawnienie w pliku manifestu. Jest to uprawnienie typu \textit{Normal}, co oznacza, że jest przyznawane automatycznie przy instalacji i nie wymaga odrębnej zgody użytkownika w czasie działania (Runtime Permission).
+
+\begin{minted}[frame=single,framesep=10pt]{xml}
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application ...>
+        ...
+    </application>
+</manifest>
+\end{minted}
+
+\section{Biblioteka Retrofit 2}
+
+W początkach systemu Android do obsługi sieci używano klasy \texttt{HttpURLConnection}. Wymagało to ręcznego otwierania strumieni, buforowania danych, obsługi kodowania znaków i ręcznego parsowania tekstu zwracanego formatu (np. JSON) na obiekty Javy.
+
+Firma Square stworzyła bibliotekę \texttt{Retrofit}, która ułatwiła ten proces. Retrofit to tzw. \textit{Type-safe HTTP client}, który pozwala programiście zdefiniować API jako prosty interfejs w Kotlinie.
+Zamiast pisać kod implementujący połączenie, my tylko \textit{deklarujemy}, jak wygląda zapytanie (metoda HTTP, ścieżka, parametry). Retrofit automatycznie generuje kod wykonawczy.
+
+Główne zalety:
+\begin{enumerate}
+    \item \textbf{Abstrakcja:} Ukrywa niskopoziomowe szczegóły protokołu HTTP.
+    \item \textbf{Automatyczna konwersja (Serializacja/Deserializacja):} Współpracuje z bibliotekami takimi jak GSON, Moshi czy Scalars, automatycznie zamieniając odebraną odpowiedź na obiekty \texttt{data class}.
+    \item \textbf{Integracja z Kotlin Coroutines:} Retrofit natywnie wspiera funkcje zawieszające (\texttt{suspend}).
+\end{enumerate}
+
+Dzięki wsparciu dla korutyn, zapytanie sieciowe w kodzie wygląda jak zwykłe wywołanie synchroniczne, ale zachowuje pełne bezpieczeństwo wątkowe (Main-Safety).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Definicja interfejsu (Retrofit)
+interface NewsApi {
+    @GET("articles")
+    suspend fun getArticles(): List<Article>
+}
+
+// Użycie w ViewModelu
+viewModelScope.launch {
+    try {
+        // To wywołanie:
+        // 1. ZAWIESI korutynę (zwolni wątek UI).
+        // 2. Wykona zapytanie sieciowe w tle.
+        // 3. WZNOWI korutynę na wątku UI, gdy nadejdą dane.
+        val articles = api.getArticles()
+        
+        // Tutaj mamy już gotową listę obiektów, możemy zaktualizować UI
+        uiState = articles
+    } catch (e: Exception) {
+        // Obsługa błędów (np. brak internetu)
+    }
+}
+\end{minted}
+
+W powyższym przykładzie nie musimy używać \texttt{withContext(Dispatchers.IO)}. Przełączanie odbywa się, podobnie jak w Room i DataStore, automatycznie.
+
+\section{Metody protokołu HTTP (Semantyka)}
+
+W architekturze REST każda operacja na danych (CRUD) jest ściśle powiązana z odpowiednią metodą protokołu HTTP. Wybór metody informuje serwer o intencjach klienta.
+
+Najczęściej używane metody to:
+
+\begin{itemize}
+    \item \textbf{GET:} Służy wyłącznie do pobierania danych. Jest operacją bezpieczną i zazwyczaj nie powinna modyfikować stanu serwera (np. pobierz listę artykułów, pobierz szczegóły użytkownika).
+    \item \textbf{POST:} Służy do wysyłania nowych danych na serwer w celu utworzenia zasobu (np. dodaj nowy komentarz, zarejestruj użytkownika). Dane przesyłane są w ciele żądania (Body).
+    \item \textbf{PUT:} Służy do pełnej aktualizacji istniejącego zasobu. Klient wysyła kompletną nową wersję obiektu, która zastępuje starą.
+    \item \textbf{PATCH:} Służy do częściowej modyfikacji zasobu. Wysyłamy tylko te pola, które mają ulec zmianie (np. zmiana samego hasła, bez przesyłania reszty profilu).
+    \item \textbf{DELETE:} Jak nazwa wskazuje, usuwa wskazany zasób z serwera.
+\end{itemize}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Operacja CRUD} & \textbf{Metoda HTTP} & \textbf{Adnotacja Retrofit} \\ \hline
+Create (Utwórz)        & POST                 & \texttt{@POST}              \\ \hline
+Read (Odczytaj)        & GET                  & \texttt{@GET}               \\ \hline
+Update (Aktualizuj)    & PUT / PATCH          & \texttt{@PUT} / \texttt{@PATCH} \\ \hline
+Delete (Usuń)          & DELETE               & \texttt{@DELETE}            \\ \hline
+\end{tabular}
+\caption{Mapowanie operacji CRUD na metody HTTP.}
+\end{table}
+
+\section{Modelowanie Danych (Data Transfer Objects)}
+
+Zanim zaczniemy pobierać dane, musimy przygotować dla nich \textit{pojemniki}. W inżynierii oprogramowania obiekty służące wyłącznie do przesyłania danych między podsystemami (np. Serwer $\rightarrow$ Aplikacja) nazywamy \textbf{DTO (Data Transfer Objects)}.
+
+Serwery REST API najczęściej zwracają dane w formacie JSON (JavaScript Object Notation). Naszym zadaniem jest stworzenie klas w Kotlinie (\texttt{data class}), które odwzorowują strukturę tego JSON-a (Dodajmy tutaj że ten proces można zautomatyzować przez instalację odpowiednich pluginów).
+
+Standardy nazewnictwa w JSON i Kotlinie często się różnią:
+\begin{itemize}
+    \item \textbf{JSON:} Często używa notacji \texttt{snake\_case} (np. \texttt{first\_name}, \texttt{created\_at}).
+    \item \textbf{Kotlin:} Często stosujemy notację \texttt{camelCase} (np. \texttt{firstName}, \texttt{createdAt}).
+\end{itemize}
+
+Aby rozwiązać ten konflikt bez łamania konwencji języka, używamy adnotacji \path{@SerializedName} (z biblioteki GSON). Działa ona jak \textit{mapa}, mówiąca konwerterowi: \textit{"Pole 'user\_avatar\_url' z JSON-a przypisz do zmiennej 'avatarUrl'"}.
+
+Załóżmy, że serwer zwraca następujący obiekt artykułu:
+
+\begin{minted}[frame=single,framesep=10pt]{json}
+{
+  "id": 90210,
+  "title": "Nowy Android 15 wydany!",
+  "published_at": "2024-05-12T10:00:00Z",
+  "author": {
+    "name": "Jan Kowalski",
+    "is_admin": true
+  }
+}
+\end{minted}
+
+Odpowiadające mu klasy w Kotlinie wyglądają następująco:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+data class ArticleDto(
+    // Nazwa identyczna jak w JSON -> adnotacja niepotrzebna
+    val id: Long,
+    
+    val title: String,
+    
+    // Mapowanie snake_case -> camelCase
+    @SerializedName("published_at")
+    val publishedAt: String,
+    
+    // Obiekty zagnieżdżone
+    val author: AuthorDto
+)
+
+data class AuthorDto(
+    val name: String,
+    
+    @SerializedName("is_admin")
+    val isAdmin: Boolean
+)
+\end{minted}
+
+\section{Definiowanie Interfejsu API (Service)}
+
+Sercem biblioteki Retrofit jest interfejs. To tutaj deklarujemy, jakie operacje nasza aplikacja może wykonać na serwerze. Nie piszemy ciała metod - robimy to wyłącznie za pomocą adnotacji i typów zwracanych. Retrofit wygeneruje kod wykonawczy w czasie działania aplikacji.
+
+Najprostszy przypadek to pobranie zasobu ze stałego adresu URL.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+interface NewsApiService {
+    // Żądanie zostanie wysłane na adres: BASE_URL + "articles"
+    // Funkcja MUSI być suspend, aby współpracować z korutynami.
+    @GET("articles")
+    suspend fun getArticles(): List<ArticleDto>
+}
+\end{minted}
+
+Rzadko zdarza się, że pobieramy zawsze to samo. Często chcemy pobrać konkretny artykuł lub przefiltrować listę.
+
+Parametr Path (@Path):
+Używamy, gdy zmienna jest częścią ścieżki URL.
+\begin{minted}[frame=single,framesep=10pt,fontsize=\footnotesize]{kotlin}
+// Zapytanie o konkretny artykuł, np. GET articles/123
+@GET("articles/{id}")
+suspend fun getArticleDetail(
+    @Path("id") articleId: Long
+): ArticleDto
+\end{minted}
+
+Parametr Query (@Query):
+Używamy do filtrowania, sortowania lub stronicowania (to, co występuje po znaku \texttt{?}).
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Zapytanie: GET articles?category=tech&sort=desc
+@GET("articles")
+suspend fun getArticles(
+    @Query("category") category: String,
+    @Query("sort") sortBy: String = "desc"
+): List<ArticleDto>
+\end{minted}
+
+Gdy chcemy wysłać obiekt do serwera (np. utworzyć nowy komentarz), używamy metody POST oraz adnotacji \texttt{@Body}. Retrofit automatycznie zserializuje obiekt do formatu JSON przed wysłaniem.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+data class CommentRequest(
+    val articleId: Long,
+    val content: String
+)
+
+interface NewsApiService {
+    @POST("comments")
+    suspend fun postComment(@Body request: CommentRequest): Response<Unit>
+}
+\end{minted}
+
+Często API wymaga autoryzacji (np. klucza API). Możemy dodać nagłówek statycznie lub dynamicznie.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// 1. Statyczny nagłówek dla metody
+@Headers("User-Agent: MyAndroidApp/1.0")
+@GET("articles")
+suspend fun getNews(): List<ArticleDto>
+
+// 2. Dynamiczny nagłówek (np. token sesji)
+@GET("profile")
+suspend fun getProfile(
+    @Header("Authorization") token: String
+): UserDto
+\end{minted}
+
+\section{Konfiguracja Klienta (Retrofit Builder)}
+
+Mając zdefiniowany model danych (DTO) oraz interfejs API, musimy utworzyć instancję biblioteki Retrofit. Proces ten przypomina konfigurację bazy danych Room - również tutaj zastosujemy wzorzec Singleton, aby nie tworzyć kosztownych połączeń sieciowych wielokrotnie.
+
+\subsection{Zależności (Gradle)}
+
+Najpierw upewnijmy się, że w pliku \texttt{build.gradle (Module: app)} znajdują się wymagane biblioteki. Retrofit jest modułowy - sam w sobie obsługuje tylko połączenia HTTP. Do parsowania JSON-a potrzebujemy dodatkowego \textit{konwertera}.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+dependencies {
+    // Silnik Retrofit
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    // Konwerter JSON -> Kotlin Object (GSON)
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    
+    // Opcjonalnie: OkHttp do logowania zapytań w konsoli (Debugging)
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
+}
+\end{minted}
+
+\subsection{Implementacja Singletona}
+
+Tworzymy obiekt, który będzie zarządzał konfiguracją. Kluczowe elementy to:
+\begin{itemize}
+    \item \textbf{Base URL:} Adres główny API. \textbf{Uwaga:} Musi zawsze kończyć się znakiem ukośnika \texttt{/}.
+    \item \textbf{ConverterFactory:} Klasa odpowiedzialna za serializację/deserializację (tutaj GSON).
+    \item \textbf{OkHttpClient:} Klient HTTP, w którym możemy skonfigurować np. timeouty (czas oczekiwania na serwer).
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+object RetrofitInstance {
+    
+    private const val BASE_URL = "https://newsapi.org/v2/"
+
+    // Konfiguracja klienta HTTP (opcjonalne logowanie)
+    private val client = OkHttpClient.Builder()
+        .addInterceptor { chain ->
+            val request = chain.request().newBuilder()
+                // Możemy tu dodać globalny nagłówek, np. klucz API
+                .addHeader("X-Api-Key", "TWOJ_KLUCZ_API") 
+                .build()
+            chain.proceed(request)
+        }
+        .build()
+
+    // Leniwa inicjalizacja Retrofita
+    val api: NewsApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(NewsApiService::class.java)
+    }
+}
+\end{minted}
+
+\section{Obsługa Błędów i Stany UI}
+
+W przeciwieństwie do lokalnej bazy danych, zapytanie sieciowe może zakończyć się niepowodzeniem na wiele sposobów (brak zasięgu, błąd 404, błąd 500). Aplikacja musi być na to gotowa.
+
+Zamiast trzymać w ViewModelu osobne zmienne \texttt{isLoading}, \texttt{errorText}, \texttt{data}, eleganckim rozwiązaniem jest użycie \textbf{Sealed Interface}. Dzięki temu widok zawsze znajduje się w jednym, ściśle określonym stanie.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+sealed interface NewsUiState {
+    // 1. Stan początkowy / Ładowanie
+    data object Loading : NewsUiState
+    
+    // 2. Sukces - mamy dane do wyświetlenia
+    data class Success(val articles: List<ArticleDto>) : NewsUiState
+    
+    // 3. Błąd - coś poszło nie tak
+    data class Error(val message: String) : NewsUiState
+}
+\end{minted}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class NewsViewModel : ViewModel() {
+
+    // Stan wewnętrzny (edytowalny)
+    private val _uiState = MutableStateFlow<NewsUiState>(NewsUiState.Loading)
+    
+    // Stan publiczny (tylko do odczytu)
+    val uiState = _uiState.asStateFlow()
+
+    init {
+        fetchNews()
+    }
+
+    fun fetchNews() {
+        viewModelScope.launch {
+            // Ustawiamy stan na ładowanie
+            _uiState.update { NewsUiState.Loading }
+            
+            try {
+                // Wywołanie sieciowe (Retrofit + Suspend)
+                val response = RetrofitInstance.api.getTopHeadlines()
+                
+                // Sukces: Aktualizujemy stan danymi
+                _uiState.update { 
+                    NewsUiState.Success(response.articles) 
+                }
+            } catch (e: IOException) {
+                // Błąd sieci (brak internetu, timeout)
+                _uiState.update { 
+                    NewsUiState.Error("Brak połączenia z internetem") 
+                }
+            } catch (e: HttpException) {
+                // Błąd serwera (4xx, 5xx)
+                _uiState.update { 
+                    NewsUiState.Error("Błąd serwera: ${e.code()}") 
+                }
+            } catch (e: Exception) {
+                // Inne błędy
+                _uiState.update { 
+                    NewsUiState.Error("Nieznany błąd: ${e.message}") 
+                }
+            }
+        }
+    }
+}
+\end{minted}
+
+\section{Przykład Praktyczny: Aplikacja News Reader}
+
+Zepnijmy wszystko w całość. Stworzymy ekran, który reaguje na zmiany stanu: wyświetla kręciołek podczas ładowania, listę po pobraniu danych lub komunikat błędu w razie awarii.
+
+\subsection{Model i API}
+
+Zdefiniujmy strukturę danych i endpoint (jak w poprzednich punktach).
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// DTO (Data Transfer Object)
+data class NewsResponse(val articles: List<ArticleDto>)
+data class ArticleDto(val title: String, val description: String?)
+
+// Interfejs Retrofit
+interface NewsApiService {
+    @GET("top-headlines?country=us")
+    suspend fun getTopHeadlines(): NewsResponse
+}
+\end{minted}
+
+\subsection{Warstwa Repozytorium}
+
+Repozytorium ukrywa źródło danych. Jeśli w przyszłości dodamy cache w bazie Room, zmienimy kod tylko tutaj, a ViewModel pozostanie bez zmian.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class NewsRepository(private val apiService: NewsApiService) {
+    
+    // Funkcja zawieszająca, przekazująca żądanie do Retrofita
+    suspend fun getNews(): List<ArticleDto> {
+        return apiService.getTopHeadlines().articles
+    }
+}
+\end{minted}
+
+\subsection{ViewModel z obsługą StateFlow}
+
+ViewModel przyjmuje repozytorium w konstruktorze. Używamy \texttt{StateFlow} do zarządzania stanem.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class NewsViewModel(private val repository: NewsRepository) : ViewModel() {
+
+    // Backing property
+    private val _uiState = MutableStateFlow<NewsUiState>(NewsUiState.Loading)
+    val uiState = _uiState.asStateFlow()
+
+    init {
+        fetchNews()
+    }
+
+    fun fetchNews() {
+        viewModelScope.launch {
+            _uiState.update { NewsUiState.Loading }
+            
+            try {
+                // Pobieramy dane z REPOZYTORIUM, nie bezpośrednio z API
+                val articles = repository.getNews()
+                
+                _uiState.update { NewsUiState.Success(articles) }
+            } catch (e: IOException) {
+                _uiState.update { NewsUiState.Error("Brak internetu") }
+            } catch (e: HttpException) {
+                _uiState.update { NewsUiState.Error("Błąd serwera: ${e.code()}") }
+            } catch (e: Exception) {
+                _uiState.update { NewsUiState.Error("Nieznany błąd") }
+            }
+        }
+    }
+}
+
+// Fabryka potrzebna do wstrzyknięcia Repozytorium do ViewModelu
+class NewsViewModelFactory(private val repository: NewsRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(NewsViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return NewsViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+\end{minted}
+
+\subsection{Widok (Compose)}
+
+Warstwa UI obserwuje stan i reaguje na niego.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable
+fun NewsScreen(viewModel: NewsViewModel) { // ViewModel przekazywany jako parametr
+    
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Wiadomości") }) }
+    ) { padding ->
+        Box(modifier = Modifier.padding(padding).fillMaxSize(), 
+          contentAlignment = Alignment.Center) {
+            when (val currentState = state) {
+                is NewsUiState.Loading -> CircularProgressIndicator()
+                is NewsUiState.Error -> {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = currentState.message)
+                        Button(onClick = { viewModel.fetchNews() }) { Text("Ponów") }
+                    }
+                }
+                is NewsUiState.Success -> {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(currentState.articles) { article ->
+                            ArticleItem(article)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+\end{minted}
+
+\subsection{Punkt wejścia (MainActivity)}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // 1. Utworzenie instancji API (z Singletona)
+        val apiService = RetrofitInstance.api
+        
+        // 2. Utworzenie Repozytorium
+        val repository = NewsRepository(apiService)
+        
+        // 3. Utworzenie ViewModelu przez Fabrykę
+        val viewModelFactory = NewsViewModelFactory(repository)
+
+        setContent {
+            val viewModel: NewsViewModel = viewModel(factory = viewModelFactory)
+            NewsScreen(viewModel = viewModel)
+        }
+    }
+}
+\end{minted}
+
+\section{Singleton vs Application Class}
+
+Zauważmy różnicę w sposobie inicjalizacji klienta sieciowego względem bazy danych z Rozdziału 9.
+\begin{itemize}
+    \item W przypadku \textbf{Room}, musieliśmy użyć klasy \texttt{Application}, ponieważ baza danych wymaga dostępu do \texttt{Context} (systemu plików urządzenia).
+    \item W przypadku \textbf{Retrofita}, zastosowaliśmy uproszczenie w postaci statycznego obiektu (\texttt{object RetrofitInstance}). Jest to możliwe, ponieważ klient HTTP w swojej podstawowej formie nie zależy od systemu Android i nie wymaga \texttt{Contextu}.
+\end{itemize}

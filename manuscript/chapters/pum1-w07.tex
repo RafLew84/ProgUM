@@ -1,0 +1,172 @@
+\chapter{Inicjalizacja i Delegacja (Wykład 7)}
+
+W tym rozdziale zajmiemy się mechanizmami, które pozwalają na efektywne zarządzanie inicjalizacją właściwości oraz przekazywaniem odpowiedzialności za ich obsługę do innych obiektów. Poznamy słowa kluczowe \texttt{lateinit}, \texttt{by lazy} oraz wzorzec Delegata.
+
+\section{Opóźniona Inicjalizacja (\texttt{lateinit})}
+
+W Kotlinie właściwości klasy, które nie są nullowalne (nie mają \texttt{?}), muszą zostać zainicjalizowane w konstruktorze lub od razu przy deklaracji. Czasami jednak nie znamy wartości początkowej w momencie tworzenia obiektu – np. gdy jest ona wstrzykiwana przez framework (np. Dependency Injection w Androidzie).
+
+W takich sytuacjach używamy modyfikatora \texttt{lateinit}. Jest to zmienna, która nie jest nullowalna, ale nie jest zainicjalizowana w konstruktorze.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class MyService {
+    lateinit var database: Database // Nie musimy od razu przypisywać wartości
+    
+    fun init() {
+        database = Database() // Inicjalizacja później
+    }
+    
+    fun query() {
+        // Jeśli wywołamy to przed init(), dostaniemy wyjątek
+        database.query() 
+    }
+}
+\end{minted}
+
+\textbf{Ograniczenia:}
+\begin{itemize}
+    \item Tylko dla zmiennych \texttt{var}.
+    \item Nie można używać z typami prostymi (prymitywnymi) jak \texttt{Int}, \texttt{Double}, \texttt{Boolean}.
+    \item Typ nie może być nullowalny.
+\end{itemize}
+
+Aby upewnić się, czy zmienna została zainicjalizowana, możemy użyć referencji \texttt{.isInitialized}:
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+if (::database.isInitialized) {
+    println("Baza gotowa")
+}
+\end{minted}
+
+\section{Delegaty (Delegated Properties)}
+
+Delegacja właściwości to mechanizm, w którym obsługa metod \texttt{get()} (i ew. \texttt{set()}) jest przekazywana do innego obiektu. Składnia wykorzystuje słowo kluczowe \texttt{by}.
+
+Delegaty to mechanizm pozwalający na przekazywanie odpowiedzialności za implementację właściwości innemu obiektowi - przekazanie wywołania metod get() i set() do innego obiektu.
+
+Do dyspozycji mamy dwa wbudowane interfejsy definiujące sygnatury metod tylko do odczytu oraz do odczytu i zapisu właściwości.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+interface ReadOnlyProperty<in R, out T> {
+    operator fun getValue(thisRef: R, property: KProperty<*>): T
+}
+
+interface ReadWriteProperty<in R, T> {
+    operator fun getValue(thisRef: R, property: KProperty<*>): T
+    operator fun setValue(thisRef: R, property: KProperty<*>, value: T)
+}
+\end{minted}
+
+
+\texttt{KProperty} to interfejs z biblioteki refleksji (\texttt{kotlin.reflect}), który reprezentuje deklarację właściwości. Dzięki niemu w metodzie delegata (\texttt{getValue}/\texttt{setValue}) mamy dostęp do metadanych właściwości, do której delegat jest przypisany – przede wszystkim do jej nazwy (\texttt{name}), ale też np. typu czy adnotacji.
+
+Zapis \texttt{KProperty<*>} wykorzystuje tak zwaną \textbf{projekcję gwiazdkową} (\textit{star-projection}). Oznacza ona, że delegat może obsługiwać właściwość dowolnego typu, a my nie potrzebujemy znać tego konkretnego typu w miejscu deklaracji metody \texttt{getValue}.
+
+Mówiąc prościej: \texttt{KProperty<*>} pasuje do każdej właściwości (\texttt{KProperty<String>}, \texttt{KProperty<Int>} itd.), ponieważ wewnątrz delegata zazwyczaj interesują nas tylko metadane samej właściwości (np. jej nazwa), a nie typ wartości, jaką ona przechowuje. Jest to bezpieczny sposób na powiedzenie \textit{nie obchodzi mnie, jaki to dokładnie typ generyczny, o ile jest to KProperty}.
+
+\subsection{Inicjalizacja Leniwa (\texttt{by lazy})}
+
+Najpopularniejszym delegatem w Kotlinie jest \texttt{lazy}. Pozwala on na obliczenie wartości właściwości dopiero przy jej \textbf{pierwszym użyciu}. Wynik jest zapamiętywany i zwracany przy wszystkich kolejnych odwołaniach. Jest to idealne rozwiązanie dla kosztownych operacji (np. wczytywanie pliku, nawiązywanie połączenia z bazą danych, skomplikowane obliczenia), których nie chcemy wykonywać, jeśli nie będą potrzebne.
+
+Wyobraź sobie, że masz w domu \textit{magiczną skrzynię}, która rzekomo zawiera bardzo ciężki przedmiot (np. kowadło). Dopóki nie otworzysz skrzyni (nie spróbujesz użyć przedmiotu), w środku tak naprawdę nic nie ma (pamięć nie jest zajęta). Dopiero w momencie pierwszego otwarcia (pierwszy dostęp do zmiennej), przedmiot jest "materializowany" (tworzony). Od tej pory, każde kolejne otwarcie skrzyni pokazuje ten sam, już istniejący przedmiot.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class DataProcessor {
+    val heavyData: List<String> by lazy {
+        println("Ładowanie danych z dysku...") // Wykona się tylko raz!
+        Thread.sleep(1000) // Symulacja długiej operacji
+        listOf("Dane 1", "Dane 2", "Dane 3")
+    }
+}
+
+fun main() {
+    val processor = DataProcessor()
+    println("Procesor utworzony") 
+    // "Ładowanie danych..." jeszcze się nie pojawiło
+    
+    println(processor.heavyData) // Pierwsze użycie: Inicjalizacja + Wypisanie
+    println(processor.heavyData) // Drugie użycie: Tylko wypisanie (pamięć podręczna)
+}
+\end{minted}
+
+Delegat \texttt{lazy} domyślnie jest \textbf{bezpieczny wątkowo} (thread-safe). Oznacza to, że jeśli wiele wątków spróbuje jednocześnie odczytać właściwość \texttt{by lazy} po raz pierwszy, mechanizm synchronizacji zagwarantuje, że kod inicjalizujący wykona się \textbf{tylko raz}, a wszystkie wątki otrzymają tę samą instancję.
+
+Dzięki temu \texttt{by lazy} jest świetnym sposobem na implementację wzorca \textbf{Singleton} dla pojedynczej właściwości lub kosztownego zasobu. Nie musimy martwić się o ręczną synchronizację (jak w Javie \texttt{synchronized} czy \texttt{double-check locking}) – Kotlin robi to za nas.
+
+\subsection{Obserwowanie zmian (\texttt{Delegates.observable})}
+
+Ten delegat pozwala na \textbf{przypięcie obserwatora} do właściwości. Za każdym razem, gdy wartość właściwości ulegnie zmianie, wywoływana jest funkcja lambda (callback) z informacją o zmianie. Jest to bardzo przydatne do logowania, aktualizacji UI po zmianie danych, czy powiadamiania innych części systemu.
+
+Delegat przyjmuje dwa argumenty:
+\begin{enumerate}
+    \item \textbf{Wartość początkową} (default value).
+    \item \textbf{Funkcję lambda} wywoływaną po każdej zmianie. Lambda ta otrzymuje trzy parametry:
+    \begin{itemize}
+        \item \texttt{property}: Metadane właściwości (\texttt{KProperty}).
+        \item \texttt{oldValue}: Poprzednia wartość.
+        \item \texttt{newValue}: Nowa wartość.
+    \end{itemize}
+\end{enumerate}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+import kotlin.properties.Delegates
+
+var user: String by Delegates.observable("<brak>") { prop, old, new ->
+    println("Właściwość '${prop.name}' zmieniona: '$old' -> '$new'")
+}
+
+fun main() {
+    user = "Jan"     // Wypisze: Właściwość 'user' zmieniona: '<brak>' -> 'Jan'
+    user = "Anna"    // Wypisze: Właściwość 'user' zmieniona: 'Jan' -> 'Anna'
+}
+\end{minted}
+
+Callback wywoływany jest \textbf{po} przypisaniu nowej wartości (dlatego wewnątrz lambdy pole ma już nową wartość).
+
+\subsection{Wetowanie zmian (\texttt{Delegates.vetoable})}
+
+Ten delegat działa podobnie do \texttt{observable}, ale daje możliwość \textbf{zablokowania (zawetowania)} zmiany. Funkcja lambda jest wywoływana \textbf{przed} przypisaniem nowej wartości i musi zwrócić wartość typu \texttt{Boolean}:
+\begin{itemize}
+    \item \texttt{true}: Zmiana zostaje zatwierdzona.
+    \item \texttt{false}: Zmiana zostaje odrzucona (zmienna zachowuje starą wartość).
+\end{itemize}
+
+Jest to idealne miejsce na prostą walidację danych "w locie".
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+var age: Int by Delegates.vetoable(0) { prop, old, new ->
+    println("Próba zmiany ${prop.name} z $old na $new")
+    new >= 0 // Warunek: wiek nie może być ujemny
+}
+
+age = 10     // Zatwierdzone (10 >= 0)
+println(age) // 10
+
+age = -5     // Odrzucone (-5 < 0) - pozostaje stara wartość
+println(age) // 10
+\end{minted}
+
+\subsection{Delegowanie do Mapy}
+
+Kotlin pozwala na użycie mapy jako delegata dla właściwości. W tym mechanizmie nazwa właściwości jest używana jako klucz do pobrania wartości z mapy.
+
+Jest to szczególnie przydatne w sytuacjach, gdy pracujemy z \textbf{dynamicznymi zestawami danych}, takimi jak:
+\begin{itemize}
+    \item Parsowanie obiektów JSON, bez tworzenia dedykowanych klas DTO dla każdej struktury.
+    \item Praca z konfiguracjami aplikacji, gdzie parametry są wczytywane do mapy (np. z pliku .properties).
+    \item Interakcja z zewnętrznymi API lub bibliotekami, które zwracają dane w postaci par klucz-wartość.
+\end{itemize}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class User(val map: Map<String, Any?>) {
+    val name: String by map
+    val age: Int by map
+}
+
+val data = mapOf("name" to "Jan", "age" to 25)
+val u = User(data)
+println(u.name) // "Jan"
+\end{minted}
+
+Wymogiem jest, aby klucze w mapie (\texttt{String}) odpowiadały dokładnie nazwom właściwości.
+
+Jeśli użyjemy \texttt{MutableMap}, możemy delegować również właściwości zmienne (\texttt{var}). Wtedy przypisanie wartości do właściwości zaktualizuje odpowiedni wpis w mapie.

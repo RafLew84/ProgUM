@@ -1,0 +1,519 @@
+\chapter{Reaktywne Zarządzanie Stanem (Wykład 5)}
+
+\section{Strumienie}
+
+W poprzednich rozdziałach (szczególnie przy omawianiu Coroutines i MVVM) nauczyliśmy się pobierać dane z wykorzystaniem funkcji zawieszających (\texttt{suspend}). Typowa funkcja w naszym repozytorium wyglądała tak:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Stare podejście: Zwróć i zapomnij
+suspend fun getUserNames(): List<String> {
+    // 1. Wyślij zapytanie
+    // 2. Czekaj na odpowiedź
+    return listOf("Anna", "Jan", "Piotr") // 3. Zwróć wynik i zakończ funkcję
+}
+\end{minted}
+
+To podejście ma jedną, zasadniczą wadę: jest jednorazowe. Funkcja zwraca wynik i kończy swoje działanie. Jeśli później na serwerze zarejestruje się nowy użytkownik ("Zofia"), nasza aplikacja o tym nie wie. Widok wyświetla nieaktualne dane, dopóki użytkownik ręcznie nie odświeży ekranu.
+
+Współczesne aplikacje rzadko działają na danych statycznych. Większość funkcji, z których korzystamy na co dzień, to procesy rozciągnięte w czasie:
+\begin{itemize}
+    \item \textbf{Czat:} Wiadomości przychodzą jedna po drugiej.
+    \item \textbf{GPS:} Lokalizacja zmienia się z każdym krokiem użytkownika.
+    \item \textbf{Pobieranie pliku:} Chcemy widzieć postęp (1\%, 2\%, ... 100\%), a nie czekać w ciemności na koniec.
+    \item \textbf{Giełda/Krypto:} Ceny zmieniają się kilkadziesiąt razy na minutę.
+\end{itemize}
+
+Potrzebujemy mechanizmu, który nie zwraca \textit{jednej paczki danych}, ale otwiera \textit{kanał}, którym dane mogą płynąć tak długo, jak to konieczne.
+
+Odpowiedzią na to zapotrzebowanie jest \textbf{Flow} (Strumień). Jest to asynchroniczny strumień danych, który emituje wartości sekwencyjnie. 
+
+Różnice między klasyczną listą a strumieniem są fundamentalne:
+\begin{itemize}
+    \item \textbf{List<T>:} Dane są dostępne natychmiast, cała grupa na raz. Aby uzyskać nowe dane, musisz ponownie wywołać funkcję.
+    \item \textbf{Flow<T>:} Dane są obliczane lub pobierane asynchronicznie i emitowane pojedynczo (lub grupami) w czasie. Aplikacja nasłuchuje zmian, zamiast o nie pytać.
+\end{itemize}
+
+Możemy zapytać: \textit{"Przecież używaliśmy \texttt{mutableStateOf} i UI też odświeżało się automatycznie. Po co nam Flow?"}. Choć oba mechanizmy są reaktywne, służą do czegoś innego:
+
+\begin{enumerate}
+    \item \textbf{mutableStateOf (Stan UI):} To kontener na \textbf{aktualną} wartość dla widoku. Mówi Compose: \textit{Przerysuj się, gdy to się zmieni}. Jest ściśle związane z warstwą UI. Nie powinniśmy używać go w warstwie danych (Repozytorium), ponieważ uzależnilibyśmy logikę biznesową od biblioteki interfejsu.
+    
+    \item \textbf{Flow (Transport Danych):} To mechanizm przesyłania danych z warstw niższych (Baza Danych, Sieć) do ViewModelu. Jest to czysty Kotlin, \textbf{niezależny od Androida}. Posiada operatory (jak \texttt{map}, \texttt{filter}, \texttt{combine}), które pozwalają obrabiać dane \textit{w locie}.
+\end{enumerate}
+
+Wzorzec architektury wygląda więc tak:
+\begin{center}
+\textbf{Repozytorium (Flow)} $\xrightarrow{strumien}$ \textbf{ViewModel (State)} $\xrightarrow{stan}$ \textbf{Widok (UI)}
+\end{center}
+Repozytorium dostarcza strumień zmian (Flow), a ViewModel zamienia go na stabilny stan dla widoku (State).
+
+\section{Flow - Zimny Strumień}
+
+Podstawowy typ \texttt{Flow} w Kotlinie jest tzw. strumieniem zimnym (\textit{Cold Stream}). Oznacza to, że kod produkujący dane (wewnątrz bloku \texttt{flow \{ ... \}}) jest \textbf{pasywny}. Nie wykonuje się, dopóki ktoś nie zażąda danych.
+
+Aby to zrozumieć, wyobraźmy sobie film w serwisie streamingowym (np. YouTube lub Netflix).
+
+\begin{itemize}
+    \item \textbf{Definicja Flow (Plik na serwerze):} Film istnieje na serwerach YouTube. Ma swój scenariusz (klatki wideo następują po sobie). Jednak samo istnienie pliku nie powoduje, że film się odtwarza. Serwer nie zużywa zasobów na przesyłanie danych w pustkę.
+    
+    \item \textbf{Operator \texttt{collect} (Przycisk Play):} Transmisja danych rozpoczyna się dopiero w momencie, gdy użytkownik kliknie \textit{Odtwarzaj}. W świecie Flow odpowiednikiem tego przycisku jest funkcja \texttt{collect()}.
+    
+    \item \textbf{Niezależność Widzów:} To najważniejsza cecha. Jeśli trzech użytkowników włączy ten sam film:
+    \begin{itemize}
+        \item Użytkownik A kliknął "Play" minutę temu $\rightarrow$ widzi 60. sekundę filmu.
+        \item Użytkownik B klika "Play" teraz $\rightarrow$ widzi 1. sekundę filmu (początek).
+    \end{itemize}
+    Każdy subskrybent otrzymuje swoją \textbf{własną, niezależną kopię strumienia}. Strumień startuje dla niego od zera.
+\end{itemize}
+
+Spójrzmy na przykład:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// 1. DEFINICJA (Przepis / Film na serwerze)
+// Ten kod NIE wykonuje się w momencie przypisania do zmiennej!
+val numberStream: Flow<Int> = flow {
+    println("Strumień wystartował!") 
+    for (i in 1..3) {
+        delay(1000) // Symulacja pracy/pobierania
+        emit(i)     // Emisja danych (klatka filmu)
+    }
+}
+
+// 2. UŻYCIE (Subskrybent 1)
+scope.launch {
+    println("Widz 1 naciska PLAY")
+    numberStream.collect { value -> 
+        println("Widz 1 otrzymał: $value") 
+    }
+}
+
+// 3. UŻYCIE (Subskrybent 2 - po chwili)
+scope.launch {
+    delay(1500)
+    println("Widz 2 naciska PLAY")
+    numberStream.collect { value -> 
+        println("Widz 2 otrzymał: $value") 
+    }
+}
+\end{minted}
+
+\textbf{Wynik w logach:}
+\begin{verbatim}
+Widz 1 naciska PLAY
+Strumień wystartował!
+Widz 1 otrzymał: 1
+Widz 2 naciska PLAY
+Strumień wystartował!  <-- Zauważ, że startuje drugi raz!
+Widz 1 otrzymał: 2
+Widz 2 otrzymał: 1     <-- Widz 2 otrzymuje pierwszą wartość, 
+                           mimo że Widz 1 jest już dalej
+\end{verbatim}
+
+Spójrzmy na wynik działania naszego programu. Logi ujawniają trzy mechanizmy działania \texttt{Flow}:
+
+\begin{enumerate}
+    \item \textbf{Wielokrotny start (Re-ewaluacja):}
+    Zauważmy, że komunikat \textit{"Strumień wystartował!"} pojawia się w logach \textbf{dwukrotnie}.
+    \\ \textit{Wniosek:} Blok kodu przekazany do funkcji builder'a \texttt{flow \{ ... \}} nie jest jednorazową inicjalizacją (jak konstruktor obiektu). Jest to instrukcja, która jest uruchamiana \textbf{od nowa dla każdego subskrybenta}.
+    \\ Gdybyśmy wewnątrz tego bloku umieścili zapytanie HTTP, to przy 10 subskrybentach wykonalibyśmy 10 identycznych zapytań do serwera.
+
+    \item \textbf{Niezależność Czasowa:}
+    Gdy \textit{Widz 1} jest już w trakcie oglądania (otrzymuje liczbę \texttt{2}), \textit{Widz 2} dopiero zaczyna i otrzymuje \texttt{1}.
+    \\ \textit{Wniosek:} Subskrybenci nie dzielą między sobą postępu. Każde wywołanie \texttt{collect()} tworzy całkowicie niezależną instancję przepływu danych. To tak, jakby każdy z nich otworzył ten sam plik wideo w osobnym oknie odtwarzacza.
+
+    \item \textbf{Brak Pamięci (State):}
+    Gdy \textit{Widz 2} dołącza do strumienia, nie ma dostępu do danych, które zostały wyemitowane wcześniej. Strumień zimny nie przechowuje historii - on ją produkuje na bieżąco.
+\end{enumerate}
+
+To zachowanie (restartowanie przy każdej subskrypcji) jest bardzo niebezpieczne w warstwie UI (Widoku). Wyobraź sobie, że użytkownik obraca telefon. System Android niszczy i tworzy na nowo Aktywność.
+\begin{itemize}
+    \item Stara Aktywność przestaje nasłuchiwać (\texttt{cancel}).
+    \item Nowa Aktywność zaczyna nasłuchiwać (\texttt{collect}).
+\end{itemize}
+W przypadku zwykłego \texttt{Flow}, spowoduje to \textbf{restart całego procesu pobierania danych} (np. ponowne zapytanie do API). Aby tego uniknąć i \textit{trzymać} dane między obrotami ekranu, potrzebujemy strumienia gorącego - \textbf{StateFlow}.
+
+\begin{enumerate}\addtocounter{enumi}{3}
+    \item \textbf{Leniwość (Laziness):} Jeśli stworzysz obiekt \texttt{Flow}, ale nigdy nie wywołasz \texttt{collect}, kod wewnątrz \texttt{flow \{ ... \}} nigdy się nie wykona. Nie zostanie wysłane żadne zapytanie do sieci ani do bazy danych.
+\end{enumerate}
+
+\subsection{Pełny kod przykładu}
+
+Poniżej znajduje się kompletny kod demonstrujący koncepcję zimnego strumienia. Aplikacja pozwala symulować dołączanie nowych "widzów" (subskrybentów) do tego samego źródła danych.
+
+Kod wizualizuje na ekranie logi, dzięki czemu widać moment startu strumienia dla każdego subskrybenta osobno.
+
+\begin{minted}[linenos, breaklines, frame=single, framesep=10pt]{kotlin}
+
+// 1. Definicja Zimnego Strumienia ("Film na serwerze")
+// Zauważ: Ta funkcja tylko zwraca przepis na strumień. Nie uruchamia go.
+fun numberStream(log: (String) -> Unit): Flow<Int> = flow {
+    val time = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+    log("[$time] Strumień (re)startuje!")
+    
+    for (i in 1..5) {
+        delay(1000) // Symulacja pobierania klatki filmu
+        emit(i)     // Emisja danych
+    }
+}
+
+@Composable
+fun ColdStreamScreen() {
+    // Lista do wyświetlania logów na ekranie
+    val logs = remember { mutableStateListOf<String>() }
+    // Helper do dodawania wpisów
+    fun addLog(msg: String) = logs.add(msg)
+
+    val scope = rememberCoroutineScope()
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text("Demonstracja Zimnego Flow")
+        
+        Spacer(Modifier.height(16.dp))
+
+        // Przycisk symulujący Widza 1
+        Button(onClick = {
+            scope.launch {
+                addLog("Widz 1 klika START")
+                // collect() uruchamia strumień OD ZERA
+                numberStream { msg -> addLog(msg) }.collect { value ->
+                    addLog("  Widz 1 ogląda: $value")
+                }
+            }
+        }) {
+            Text("Dołącz jako Widz 1")
+        }
+
+        // Przycisk symulujący Widza 2
+        Button(onClick = {
+            scope.launch {
+                addLog("Widz 2 klika START")
+                // collect() uruchamia OSOBNĄ instancję strumienia
+                numberStream { msg -> addLog(msg) }.collect { value ->
+                    addLog("  Widz 2 ogląda: $value")
+                }
+            }
+        }) {
+            Text("Dołącz jako Widz 2")
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Wyświetlanie logów
+        LazyColumn {
+            items(logs) { log ->
+                Text(text = log)
+            }
+        }
+    }
+}
+\end{minted}
+
+\section{StateFlow - Gorący Strumień}
+
+Wiemy już, że zwykły \texttt{Flow} jest strumieniem zimnym. Oznacza to, że każda subskrypcja uruchamia go od nowa. W kontekście warstwy danych (np. pobieranie pliku) jest to pożądane, ale w warstwie UI staje się poważnym problemem. W poprzednim rozdziale pojawił się przykład z wykorzystaniem Flow w warstwie UI i przypadku obrócenia urządzenia. Ponieważ Flow jest zimny, cały proces uruchamia się od początku. Potrzebujemy strumienia, który \textit{pamięta} ostatnią wartość i działa niezależnie od tego, czy ktoś patrzy na ekran, czy nie. Takim strumieniem jest \textbf{StateFlow}. Różni się od zimnego dwoma kluczowymi cechami:
+\begin{itemize}
+    \item \textbf{Istnieje niezależnie od subskrybentów:} Produkuje dane nawet wtedy, gdy nikt ich nie odbiera.
+    \item \textbf{Przechowuje stan (Replay = 1):} Zawsze pamięta \textbf{jedną, ostatnią} wyemitowaną wartość. Nowy subskrybent otrzymuje ją natychmiast po podłączeniu.
+\end{itemize}
+
+Dobrą analogią dla StateFlow jest transmisja na żywo (Twitch):
+
+\begin{itemize}
+    \item \textbf{Streamer (ViewModel):} Nadaje transmisję na żywo. Gra w grę, a licznik punktów i zdrowia zmienia się w czasie rzeczywistym. Transmisja trwa (\textit{dane płyną}) niezależnie od tego, czy na kanale jest 1000 widzów, czy 0.
+    
+    \item \textbf{Widz (Widok/UI):}
+    \begin{itemize}
+        \item Gdy nowy widz wchodzi na kanał, nie ogląda transmisji od początku (jak filmu na YouTube).
+        \item Widzi to, co dzieje się \textbf{dokładnie w tej chwili} (aktualny stan gry).
+        \item Jeśli widz zminimalizuje aplikację Twitcha (aplikacja w tle) i wróci po minucie, zobaczy bieżącą akcję. To, co działo się przez tę minutę, przepadło (interesuje nas stan \textit{Live}).
+    \end{itemize}
+    
+    \item \textbf{Wspólny Obraz:} Wszyscy widzowie oglądający ten sam kanał widzą dokładnie ten sam stan (np. ten sam obraz transmisji) w tym samym momencie.
+\end{itemize}
+
+Przejdźmy do przykładu:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class StreamerViewModel : ViewModel() {
+
+    // 1. Wersja prywatna, modyfikowalna (MutableStateFlow)
+    // WYMAGA wartości początkowej! Tablica wyników na starcie musi coś pokazywać (np. 0).
+    private val _viewerCount = MutableStateFlow(0)
+
+    // 2. Wersja publiczna, tylko do odczytu (StateFlow)
+    val viewerCount: StateFlow<Int> = _viewerCount.asStateFlow()
+
+    fun addViewer() {
+        // Aktualizacja stanu jest natychmiastowa
+        _viewerCount.value += 1
+    }
+}
+\end{minted}
+
+Warto zauważyć, że \texttt{MutableStateFlow} wymaga podania wartości początkowej w konstruktorze. Jest to logiczne - skoro StateFlow gwarantuje, że zawsze ma wartość (jak tablica wyników), to musi mieć ją od momentu stworzenia.
+
+\subsection{Pełny kod przykładu}
+
+Poniższy kod demonstruje działanie StateFlow. Mamy "Streamera" (ViewModel), który zarządza licznikiem widzów.
+Zwróć uwagę na zachowanie aplikacji:
+\begin{enumerate}
+    \item Klikaj \textit{Dodaj widza} w Panelu Streamera.
+    \item Następnie kliknij \textit{Dołącz do transmisji} jako Widz 1. Zobaczysz \textbf{aktualną} liczbę (np. 5), a nie 0.
+    \item Dołącz jako Widz 2. Otrzyma on tę samą wartość co Widz 1.
+\end{enumerate}
+
+\begin{minted}[linenos, breaklines, frame=single, framesep=10pt]{kotlin}
+
+// --- 1. ViewModel (Streamer) ---
+class StreamerViewModel : ViewModel() {
+    // Stan wewnętrzny (Gorący strumień, zawsze ma wartość)
+    private val _viewerCount = MutableStateFlow(0)
+    
+    // Stan publiczny (Tylko do odczytu)
+    val viewerCount: StateFlow<Int> = _viewerCount.asStateFlow()
+
+    fun addViewer() {
+        _viewerCount.value += 1
+    }
+}
+
+// --- 2. Widok (UI) ---
+@Composable
+fun StateFlowDemoScreen(
+    viewModel: StreamerViewModel = viewModel()
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Panel Streamera (StateFlow)")
+        
+        Spacer(Modifier.height(16.dp))
+        
+        // Panel Sterowania Streamera
+        Card() {
+            Column(
+              modifier = Modifier.padding(16.dp), 
+              horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Jesteś Streamerem")
+                Button(onClick = { viewModel.addViewer() }) {
+                    Text("Dodaj widza (+1)")
+                }
+            }
+        }
+
+        Spacer(Modifier.height(32.dp))
+
+        // Symulacja Widzów
+        // Każdy komponent ViewerScreen niezależnie subskrybuje 
+        // TEN SAM StateFlow
+        ViewerScreen(viewModel, "Widz 1")
+        Spacer(Modifier.height(8.dp))
+        ViewerScreen(viewModel, "Widz 2")
+    }
+}
+
+@Composable
+fun ViewerScreen(viewModel: StreamerViewModel, viewerName: String) {
+    // collectAsState() zamienia StateFlow w State z Compose
+    val count by viewModel.viewerCount.collectAsState()
+    
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(viewerName, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = "Widzi licznik: $count", 
+                style = MaterialTheme.typography.titleLarge
+            )
+        }
+    }
+}
+\end{minted}
+
+\section{SharedFlow: Obsługa Zdarzeń}
+
+Mamy już \texttt{StateFlow}, w któym przechowujemy stan (np. liczbą widzów). Jednak w aplikacjach mobilnych często mamy do czynienia z sytuacjami, które nie są \textit{stanem}, ale \textit{zdarzeniem}.
+
+Przykłady zdarzeń jednorazowych:
+\begin{itemize}
+    \item Wyświetlenie komunikatu \textit{Błąd połączenia z siecią} (Toast/Snackbar).
+    \item Nawigacja do innego ekranu po pomyślnym logowaniu.
+    \item Wibracja telefonu.
+\end{itemize}
+
+\textbf{Dlaczego StateFlow się tu nie nadaje?}
+Wyobraźmy sobie, że używamy StateFlow do obsługi błędów.
+\begin{enumerate}
+    \item Występuje błąd. Wpisujemy go do StateFlow: \texttt{state.value = "Error"}.
+    \item Widok wyświetla Toast z błędem.
+    \item Użytkownik obraca telefon.
+    \item Widok tworzy się na nowo i subskrybuje StateFlow.
+    \item Ponieważ StateFlow pamięta ostatnią wartość, nowy widok natychmiast otrzymuje \textit{Error} i wyświetla Toast ponownie.
+\end{enumerate}
+Zdarzenia powinny być \textit{skonsumowane} raz i zniknąć. Przykładowo: nie chcemy, aby dzwonek do drzwi dzwonił w nieskończoność przy każdym otwarciu drzwi. Do obsługi takich scenariuszy służy \textbf{SharedFlow}. Jest to również gorący strumień, ale skonfigurowany domyślnie tak, aby \textbf{nie pamiętać historii}.
+
+Wróćmy do naszej transmisji. O ile obraz wideo (StateFlow) musi być ciągły i dostępny dla każdego, o tyle powiadomienia działają inaczej.
+
+\begin{itemize}
+    \item \textbf{Alert o donacji (Zdarzenie):} Na ekranie pojawia się komunikat \textit{Widz1 wpłacił 5 zł}.
+    \item \textbf{Widz obecny (Subskrybent):} Widzi komunikat w momencie jego pojawienia się.
+    \item \textbf{Widz nieobecny (Aplikacja w tle):} Jeśli widza nie ma w pokoju w momencie donacji, to po powrocie \textbf{nie widzi} starego alertu.
+\end{itemize}
+
+Działa to jak dzwonek do drzwi: słyszysz go tylko wtedy, gdy naciska go kurier. Jeśli wrócisz do domu godzinę później, dzwonek nie zaczyna nagle dzwonić, informując, że \textit{ktoś był}.
+
+Zobaczmy przykład. Różnice względem StateFlow są kluczowe:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class StreamerViewModel : ViewModel() {
+
+    // 1. Brak wartości początkowej!
+    // SharedFlow nie musi mieć wartości, on je tylko "przepycha".
+    // replay = 0 (Domyślnie) -> Nowi subskrybenci NIE dostają starych zdarzeń.
+    private val _donations = MutableSharedFlow<String>(replay = 0)
+    
+    val donations = _donations.asSharedFlow()
+
+    fun sendDonationAlert(message: String) {
+        viewModelScope.launch {
+            // 2. Używamy emit(), a nie .value
+            // To operacja zawieszająca (suspend), bo bufor może być pełny
+            _donations.emit(message)
+        }
+    }
+}
+\end{minted}
+
+\begin{enumerate}
+    \item \textbf{Parametr \texttt{replay = 0}:} 
+    To istotna konfiguracja dla zdarzeń jednorazowych. Parametr ten określa, ile ostatnich wartości ma być przechowywanych w pamięci dla \textbf{nowych} subskrybentów.
+    \begin{itemize}
+        \item W \texttt{StateFlow} wartość ta jest sztywno ustawiona na \texttt{1} (dlatego stan odtwarza się po np. obrocie ekranu).
+        \item W \texttt{SharedFlow} ustawienie \texttt{0} gwarantuje, że zdarzenie wyemitowane w momencie $T_0$ nie zostanie dostarczone subskrybentowi, który rozpocznie nasłuchiwanie w momencie $T_1$. Zapobiega to błędowi ponownego wyświetlania komunikatów.
+    \end{itemize}
+
+    \item \textbf{Brak pola \texttt{.value}:}
+    Zauważmy, że \texttt{SharedFlow} nie posiada właściwości \texttt{value}. Można jedynie oczekiwać na nadchodzące emisje. Wymusza to na programiście podejście czysto reaktywne.
+
+    \item \textbf{Funkcja \texttt{emit()} jest \texttt{suspend}:}
+    W przeciwieństwie do ustawiania \texttt{state.value = ...}, metoda \texttt{emit()} w SharedFlow jest funkcją zawieszającą. 
+    SharedFlow obsługuje mechanizm \textbf{Backpressure}. Jeśli subskrybenci nie nadążają z przetwarzaniem zdarzeń, a bufor wewnętrzny się zapełni, funkcja \texttt{emit} zawiesi korutynę producenta do momentu zwolnienia miejsca w buforze. Zapewnia to bezpieczeństwo wątkowe i chroni przed zalaniem aplikacji nadmiarowymi danymi.
+\end{enumerate}
+
+\subsection{Pełny kod przykładu}
+
+Poniższy kod łączy oba światy. Mamy \texttt{StateFlow} dla licznika widzów (trwały) i \texttt{SharedFlow} dla alertów o donacjach (ulotny).
+
+Zwróć uwagę na użycie \texttt{LaunchedEffect} w widoku - to specjalny blok w Compose służący do obsługi jednorazowych zdarzeń z korutyn.
+
+\begin{minted}[linenos, breaklines, frame=single, framesep=10pt]{kotlin}
+
+// --- ViewModel ---
+class EventsViewModel : ViewModel() {
+    // Zdarzenia
+    private val _donationEvents = MutableSharedFlow<String>()
+    val donationEvents = _donationEvents.asSharedFlow()
+
+    fun triggerDonation() {
+        viewModelScope.launch {
+            _donationEvents.emit("Ktoś wpłacił 10 PLN!")
+        }
+    }
+}
+
+// --- Widok ---
+@Composable
+fun EventsDemoScreen(
+    viewModel: EventsViewModel = viewModel(),
+    snackbarHostState: SnackbarHostState // Komponent do wyświetlania Toastów/Snackbarów
+) {
+    // Odbieranie zdarzeń w Compose
+    // LaunchedEffect(Unit) uruchamia się RAZ przy wejściu na ekran.
+    // Jeśli obrócisz ekran, uruchomi się ponownie, 
+    // ale SharedFlow jest pusty (nie pamięta historii),
+    // więc stary komunikat się nie pojawi.
+    LaunchedEffect(Unit) {
+        viewModel.donationEvents.collect { message ->
+            // Reakcja na zdarzenie: Pokaż Snackbar
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Obsługa Zdarzeń (SharedFlow)")
+        Spacer(Modifier.height(32.dp))
+        
+        Button(onClick = { viewModel.triggerDonation() }) {
+            Text("Wyślij Donację (Zdarzenie)")
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        Text("Kliknij i obserwuj Snackbar. Po obrocie ekranu komunikat nie wróci.", 
+             textAlign = TextAlign.Center)
+    }
+}
+\end{minted}
+
+\section{Podsumowanie}
+
+Wybór odpowiedniego rodzaju strumienia jest istotny dla poprswnego funkcjonowania aplikacji. Częstym błędem jest używanie \texttt{StateFlow} do wszystkiego (również do zdarzeń), co prowadzi do błędów z powtarzającymi się komunikatami, lub używanie zwykłego \texttt{Flow} w UI, co powoduje niepotrzebne restartowanie zapytań sieciowych. Poniższa tabela zestawia najważniejsze różnice, wykorzystując nasze analogie multimedialne.
+
+\begin{table}[h]
+\centering
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{|p{3cm}|p{3.5cm}|p{3.5cm}|p{3.5cm}|}
+\hline
+\textbf{Cecha} & \textbf{Flow} & \textbf{StateFlow} & \textbf{SharedFlow} \\ \hline
+\textbf{Metafora} & \textbf{YouTube / VOD} \newline (Odtwarzanie od zera) & \textbf{Twitch Video} \newline (Transmisja Live) & \textbf{Twitch Czat} \newline (Ulotne wiadomości) \\ \hline
+\textbf{Rodzaj} & \textbf{Zimny (Cold)} \newline Startuje przy subskrypcji & \textbf{Gorący (Hot)} \newline Działa zawsze & \textbf{Gorący (Hot)} \newline Działa zawsze \\ \hline
+\textbf{Pamięć (Replay)} & Brak (Historia tworzona od nowa) & \textbf{Zawsze 1} \newline (Ostatni stan) & Domyślnie \textbf{0} \newline (Konfigurowalne) \\ \hline
+\textbf{Wartość inicjalna} & Nie & \textbf{Tak (Wymagana)} & Nie \\ \hline
+\textbf{Zastosowanie} & Warstwa Danych: \newline Baza danych (Room), Sieć (Retrofit) & Warstwa UI: \newline Stan ekranu, Dane formularza & Warstwa UI: \newline Toasty, Nawigacja, Sygnały \\ \hline
+\end{tabular}
+\caption{Porównanie strumieni w Kotlinie}
+\end{table}
+
+Kiedy piszesz kod i zastanawiasz się, czego użyć, zadaj sobie te pytania:
+\begin{itemize}
+    \item \textbf{Czy to jest stan, który widok musi widzieć zawsze (nawet po obrocie)?} $\rightarrow$ Użyj \texttt{StateFlow}.
+    \item \textbf{Czy to jest jednorazowy sygnał (np. "Zalogowano", "Błąd")?} $\rightarrow$ Użyj \texttt{SharedFlow}.
+    \item \textbf{Czy pobierasz dane z bazy/sieci i przetwarzasz je sekwencyjnie?} $\rightarrow$ Użyj zwykłego \texttt{Flow}.
+\end{itemize}
+
+\section{Bezpieczne pobieranie danych w UI}
+
+Na zakończenie musimy poruszyć temat wydajności. W świecie Androida aplikacja może znajdować się w tle (np. użytkownik przeszedł do innej aplikacji), ale wciąż być \textit{żywa} w pamięci.
+
+Jeśli w funkcji Composable użyjemy zwykłego \texttt{collect} lub \texttt{collectAsState()}, subskrypcja strumienia może pozostać aktywna nawet wtedy, gdy aplikacja jest w tle.
+Oznacza to, że jeśli ViewModel wciąż emituje dane (np. lokalizację GPS), aplikacja będzie przetwarzać te dane i zużywać baterię, mimo że użytkownik ich nie widzi. Zalecanym standardem jest używanie funkcji \texttt{collectAsStateWithLifecycle()} rozszerzającej dostarczanej przez bibliotekę \texttt{androidx.lifecycle:lifecycle-runtime-compose}.
+
+Funkcja ta jest \textbf{świadoma cyklu życia (Lifecycle-Aware)}:
+\begin{enumerate}
+    \item Gdy aplikacja przechodzi w stan \texttt{STOPPED} (tło) $\rightarrow$ Anuluje subskrypcję strumienia (zatrzymuje pobieranie danych).
+    \item Gdy aplikacja wraca do stanu \texttt{STARTED} (widoczna) $\rightarrow$ Ponawia subskrypcję i pobiera najnowszy stan.
+\end{enumerate}
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Wymagana zależność w build.gradle w bloku dependencies:
+// implementation("androidx.lifecycle:lifecycle-runtime-compose:...")
+
+@Composable
+fun UserProfileScreen(viewModel: UserViewModel) {
+    // mniej wydajnie:
+    // val state = viewModel.uiState.collectAsState()
+
+    // Standard:
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    Text(text = "Witaj, ${state.userName}!")
+}
+\end{minted}
+
+Dzięki temu prostemu zabiegowi nasza aplikacja jest nie tylko reaktywna, ale też oszczędna dla baterii użytkownika.

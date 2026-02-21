@@ -1,0 +1,441 @@
+\chapter{Podstawy Architektury Aplikacji (Wykład 4)}
+
+\section{Problem Monolitycznego Kodu}
+
+Na początku przygody z Jetpack Compose naturalnym odruchem jest pisanie całego kodu wewnątrz funkcji \texttt{@Composable}. Skoro UI to tylko funkcja, dlaczego nie umieścić w niej również pobierania danych z sieci czy logiki biznesowej?
+
+Spójrzmy na kod, który działa, ale łamie zasady inżynierii oprogramowania. Nazywamy to antywzorcem \textbf{"God Composable"} - funkcją, która wie i robi wszystko.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// KROK 1: Kod "naiwny"
+@Composable
+fun UserProfileScreen() {
+    // Stan UI + Logika w jednym miejscu
+    var userData by remember { mutableStateOf("Ładowanie...") }
+    val scope = rememberCoroutineScope() // Scope powiązany z cyklem życia UI
+
+    Column {
+        Button(onClick = {
+            // Operacja sieciowa bezpośrednio w UI
+            scope.launch {
+                try {
+                    val user = api.getUser() // Symulacja pobierania (2 sekundy)
+                    userData = user.name.uppercase() // Logika biznesowa
+                } catch (e: Exception) {
+                    userData = "Błąd!"
+                }
+            }
+        }) {
+            Text("Pobierz dane")
+        }
+        Text(userData)
+    }
+}
+\end{minted}
+
+Uruchamiamy aplikację, klikamy przycisk, dane się pobierają. Wszystko wygląda świetnie. Do momentu, gdy obrócimy telefon.
+Android przy zmianie konfiguracji (np. obrót ekranu) niszczy i tworzy aktywność od nowa. Funkcja \texttt{remember} traci pamięć. Użytkownik, który czekał na dane, nagle znów widzi ekran początkowy \texttt{Ładowanie...}.
+
+Rozwiązanie tego problemu już znamy z poprzedniego semestru. Spróbujmy więc naprawić nasz kod:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// rememberSaveable
+var userData by rememberSaveable { mutableStateOf("Ładowanie...") }
+\end{minted}
+
+Czy to rozwiązuje problem? Tylko pozornie i tylko w trywialnych przypadkach. Gdy spróbujemy zastosować to w większej aplikacji, napotkamy trzy krytyczne problemy, których \texttt{rememberSaveable} nie rozwiąże:
+
+\begin{itemize}
+    \item \textbf{Śmierć Korutyny:} \texttt{rememberCoroutineScope} jest ściśle powiązany z widokiem. Gdy obracasz ekran w trakcie pobierania danych (np. wolne WiFi), stary widok ginie, a wraz z nim \textbf{anulowana jest korutyna}. Pobieranie zostaje przerwane w połowie. Nowy ekran powstaje, ale nic nie wie o tym, że poprzedni coś pobierał. Użytkownik klika, czeka i nic nie dostaje.
+    
+    \item \textbf{Ograniczenia Pamięci (Bundle):} \texttt{rememberSaveable} zapisuje dane w systemowym \texttt{Bundle}. Jest on przeznaczony dla małych danych (tekst, liczby). Jeśli spróbojemy tam zapisać listę 500 obiektów JSON pobranych z API, aplikacja wyrzuci błąd \texttt{TransactionTooLargeException} i się zamknie.
+    
+    \item \textbf{Testowalność:} Jak przetestować, czy nazwisko jest poprawnie zamieniane na wielkie litery? W obecnym kodzie jest to niemożliwe bez uruchamiania emulatora, bo logika jest \textit{zabetonowana} wewnątrz przycisku.
+\end{itemize}
+
+Dochodzimy do wniosku, że funkcja \texttt{Composable} nie jest odpowiednim miejscem na trzymanie danych ani wykonywanie operacji. Potrzebujemy miejsca, które:
+\begin{enumerate}
+    \item Przeżyje rotację ekranu (nie jak \texttt{rememberSaveable}).
+    \item Pozwoli korutynom dokończyć pracę, nawet gdy widok jest niszczony.
+    \item Nie ma limitu wielkości danych (nie jak \texttt{Bundle}).
+\end{enumerate}
+
+Aby zrozumieć potrzebę architektury, posłużmy się analogią budowlaną:
+\begin{itemize}
+    \item \textbf{Budowanie budy dla psa (Brak architektury):} Możesz to zrobić sam. Jeśli wbijesz gwóźdź w złym miejscu, łatwo to poprawić. To są małe, proste aplikacje.
+    \item \textbf{Budowanie wieżowca (Z architekturą):} Tutaj potrzebujesz planu. Elektryk (Data Layer) nie maluje ścian, a malarz (UI Layer) nie kładzie instalacji gazowej. W dużym projekcie, jeśli Composable zajmuje się logiką API, to tak jakby malarz próbował naprawiać windę.
+\end{itemize}
+
+Potrzebujemy więc \textit{Kierownika Budowy}, który ma plany w biurze (bezpiecznym od remontów) i zarządza pracami. Tym kierownikiem będzie komponent, który za chwilę poznamy.
+
+\section{Ewolucja Wzorców Architektonicznych}
+
+Skoro wiemy już, że wrzucanie wszystkiego do jednego worka ("God Composable") jest nie najlepszym rozwiązaniem, musimy zastanowić się, jak podzielić aplikację. W inżynierii oprogramowania ten problem nie jest nowy. Przez dekady wykształciło się wiele różnych podejść do tego problemu. Jednym z nich jest rodzina wzorców MVx, które różnią się sposobem, w jaki warstwa danych komunikuje się z warstwą wizualną.
+
+Aby zrozumieć różnice między nimi, posłużymy się prostymi analogiami.
+
+\subsection{MVC (Model-View-Controller)}
+
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w04-g_mvc.png}
+    \caption{Wizualizacja wzorca Model-View-Controller.}
+    \label{fig:Figura MVC}
+\end{figure}
+
+Jest to najstarsze podejście, które można porównać do wizyty w tradycyjnym sklepie, gdzie towar podaje sprzedawca.
+
+\begin{itemize}
+    \item \textbf{Ty (View):} Stoisz przed ladą. Widzisz towar, ale jesteś pasywny - nie możesz go sam wziąć.
+    \item \textbf{Sprzedawca (Controller):} To on rządzi procesem. Mówisz mu: \textit{Poproszę chleb} (Interakcja).
+    \item \textbf{Magazyn (Model):} Sprzedawca idzie na zaplecze, sprawdza stan magazynowy i bierze towar.
+\end{itemize}
+
+\textbf{Wniosek:} W tym układzie Sprzedawca (Controller) decyduje o wszystkim. To on musi wiedzieć, jak wygląda magazyn i to on decyduje, co pokazać klientowi. Musi też być w stanie wskazać konkretnego klienta, któremu musi wydać towar.
+
+\subsection{MVP (Model-View-Presenter)}
+
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w04-g_mvp.png}
+    \caption{Wizualizacja wzorca Model-View-Presenter.}
+    \label{fig:Figura MVP}
+\end{figure}
+
+Druga odmiana wzorca z rodziny MVx.
+
+\begin{itemize}
+    \item \textbf{Klient przy stoliku (View):} Siedzisz i czekasz. Nie wiesz i nie interesuje Cię, co się dzieje w kuchni.
+    \item \textbf{Kelner (Presenter):} Przyjmuje zamówienie i idzie do kuchni (Model).
+    \item \textbf{Kluczowa cecha:} Kelner wraca z kuchni i \textbf{własnoręcznie stawia talerz na Twoim stole}.
+\end{itemize}
+
+W kodzie wygląda to tak, że Presenter (Kelner) posiada referencję do Widoku (Klienta). Wywołuje na nim konkretną metodę, np. \texttt{view.showDinner()}.
+\textbf{Problem:} Jest to sztywne połączenie 1:1. Kelner musi znać konkretny stolik. Jeśli Klient wyjdzie do toalety (Rotacja Ekranu/Zniszczenie Widoku), a Kelner wróci z talerzem i spróbuje go postawić na pustym miejscu, dojdzie do błędu (\texttt{NullPointerException}) - klient musi być dostępny.
+
+\subsection{MVVM (Model-View-ViewModel)}
+
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w04-g_mvvm.png}
+    \caption{Wizualizacja wzorca Model-View-ViewModel.}
+    \label{fig:Figura MVVM}
+\end{figure}
+
+To podejście jest często wykorzystywane we współczesnym Androidzie.
+
+\begin{itemize}
+    \item \textbf{Użytkownik (View):} Podchodzi do maszyny i naciska przycisk (Wysyła Event).
+    \item \textbf{Automat (ViewModel):} Odbiera sygnał, mieli kawę, pobiera wodę (komunikuje się z Repozytorium/Modelem).
+    \item \textbf{Wynik (State):} Automat wystawia kubek z kawą do szuflady odbiorczej (\textit{Emisja stanu}).
+\end{itemize}
+
+Kluczowa różnica - Reaktywność: Automatu nie obchodzi, kto ten kubek weźmie.
+\begin{itemize}
+    \item Automat tylko \textbf{wystawia stan}.
+    \item Jeśli nikt nie stoi przed maszyną - kubek (dane) po prostu czeka w szufladzie.
+    \item Jeśli użytkownik odejdzie (obróci ekran) i przyjdzie nowy (\texttt{Activity} zostanie stworzone na nowo) - kubek z kawą nadal tam jest. Nowy widok po prostu zagląda do szuflady i widzi gotowy napój.
+\end{itemize}
+
+W Compose tą \textit{szufladą} są strumienie danych, takie jak \texttt{StateFlow}. ViewModel aktualizuje \texttt{StateFlow}, a Widok (Composable) jedynie nasłuchuje zmian. To rozwiązuje nasz problem z rotacją ekranu - ViewModel trzyma \textit{napój}, niezależnie od tego, co dzieje się z \textit{klientem}.
+
+\subsection{MVI (Model-View-Intent)}
+
+\begin{figure}[htbp]
+    \includegraphics[width=0.7\textwidth]{fig/pum2-w04-g_mvi.png}
+    \caption{Wizualizacja wzorca Model-View-Intent.}
+    \label{fig:Figura MVI}
+\end{figure}
+
+Jest to ewolucja wzorca MVVM, która kładzie rygorystyczny nacisk na jednokierunkowy przepływ danych (Unidirectional Data Flow).
+
+\begin{itemize}
+    \item \textbf{View (Ekran kiosku):} Wyświetla aktualny stan zamówienia. Jest to \textit{tylko odczyt}.
+    \item \textbf{Intent (Zamiar/Akcja):} Gdy klikasz \textit{Dodaj frytki}, nie zmieniasz bezpośrednio zamówienia. Wysyłasz do systemu \textit{zamiar} (Intent) o treści: "Użytkownik chce dodać frytki".
+    \item \textbf{Model (System):} System bierze Twój \textit{aktualny paragon}, bierze Twój \textit{zamiar}, przetwarza je i wypluwa \textbf{zupełnie nowy, zaktualizowany paragon} (State).
+\end{itemize}
+
+\textbf{Kluczowa cecha - Cykliczność i Niezmienność:}
+W przeciwieństwie do MVVM, gdzie ViewModel może mieć wiele różnych strumieni danych (osobno imię, osobno lista, osobno błędy), w MVI dążymy do posiadania \textbf{jednego obiektu stanu} (np. \texttt{OrderUiState}).
+W naszej metaforze: Nie możesz wziąć długopisu i dopisać frytek do wydrukowanego paragonu. Musisz wysłać żądanie, a system wydrukuje Ci nowy, zaktualizowany paragon. To zapewnia przewidywalność aplikacji - zawsze wiemy, co doprowadziło do obecnego stanu ekranu.
+
+Naturalnie dążymy do MVI, używając pojedynczego \texttt{StateFlow<UiState>} w ViewModelu.
+
+\section{Implementacja MVVM: Analiza Techniczna}
+
+W tej sekcji przeanalizujemy implementację wzorca MVVM na prostym przykładzie. Skupimy się na separacji warstw oraz mechanizmie zachowania stanu przy zmianach konfiguracji.
+
+Klasa \texttt{ViewModel} pełni rolę zarządcy stanu. Zwróćmy uwagę na wzorzec \textbf{Backing Property}, który zapewnia pełną enkapsulację danych.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class WordViewModel : ViewModel() {
+    // 1. Stan wewnętrzny (Mutable) - prywatny
+    // Używamy mutableStateListOf, który jest implementacją SnapshotStateList.
+    // Dzięki temu Compose śledzi zmiany i wymusza rekompozycję.
+    private val _words = mutableStateListOf("Witaj", "Świecie", "Jetpack")
+    
+    // 2. Stan publiczny (Immutable) - tylko do odczytu
+    // Widok widzi tylko List<String>. Nie może jej modyfikować bezpośrednio.
+    // To wymusza Unidirectional Data Flow.
+    val words: List<String> get() = _words
+
+    // 3. Interfejs publiczny (Actions/Events)
+    // Jedyny sposób na zmianę stanu to wywołanie metody w ViewModelu.
+    fun addWord(newWord: String) {
+        _words.add(newWord)
+    }
+
+    fun clearList() {
+        _words.clear()
+    }
+}
+\end{minted}
+
+Zastosowanie \texttt{mutableStateListOf} zamiast standardowego \texttt{List} jest krytyczne dla \textbf{reaktywności}. W Jetpack Compose system nie obserwuje standardowych kolekcji Javy/Kotlina. Typy ze świata Compose (jak \texttt{State<T>}) implementują wzorzec Obserwatora, automatycznie powiadamiając subskrybentów (funkcje Composable) o zmianach.
+
+Widok (Composable) staje się tzw. \textbf{Passive View}. Nie posiada własnego stanu logicznego, a jedynie renderuje to, co dostarczy ViewModel.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable
+fun WordScreen(
+    // Wstrzykiwanie zależności (Dependency Injection)
+    // Funkcja viewModel() wykorzystuje ViewModelProvider do pobrania instancji.
+    viewModel: WordViewModel = viewModel()
+) {
+    Column {
+        // Odczyt stanu (State Observation)
+        LazyColumn {
+            items(viewModel.words) { word ->
+                Text(text = word, style = MaterialTheme.typography.headlineSmall)
+            }
+        }
+
+        // Delegacja zdarzeń (Event Propagation)
+        Button(onClick = { 
+            viewModel.addWord("Nowe Słowo") 
+        }) {
+            Text("Dodaj element")
+        }
+    }
+}
+\end{minted}
+
+Aby skorzystać z funkcji \texttt{viewmodel()} musimy dodać odpowiednią zależność do bloku \texttt{dependencies} w pliku konfiguracyjnym projektu.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
+\end{minted}
+
+Kluczową zaletą ViewModelu jest przetrwanie rotacji ekranu. Nie dzieje się to jednak w sposób magiczny, lecz wynika z architektonicznego cyklu życia komponentów Androida.
+
+Możemy myśleć o ViewModelu jak o \textbf{Singletonie zakresowym (Scoped Singleton)}.
+
+\begin{enumerate}
+    \item \textbf{ViewModelStore:} Każda Aktywność posiada obiekt \texttt{ViewModelStore}. Jest to mapa (HashMap), która przechowuje instancje ViewModeli.
+    
+    \item \textbf{Zmiana Konfiguracji (np. Rotacja):} 
+    Gdy użytkownik obraca ekran, system operacyjny niszczy obiekt \texttt{Activity} i tworzy nowy. Jednakże, obiekt \texttt{ViewModelStore} powiązany z tą aktywnością \textbf{nie jest niszczony}. Jest on cache'owany przez system w pamięci (w obiekcie \texttt{NonConfigurationInstances}).
+    
+    \item \textbf{Rekonstrukcja (Re-attach):}
+    Nowa instancja \texttt{Activity} startuje. Funkcja \texttt{viewModel()} prosi klasę \texttt{ViewModelProvider} o instancję \texttt{WordViewModel}.
+    \begin{itemize}
+        \item Provider zagląda do zachowanego \texttt{ViewModelStore}.
+        \item Znajduje tam istniejącą instancję \texttt{WordViewModel} (tę samą, która istniała przed obrotem).
+        \item Zwraca tę instancję do nowej Aktywności.
+    \end{itemize}
+\end{enumerate}
+
+Dzięki temu mechanizmowi, dane wewnątrz ViewModelu (nasza lista słów) pozostają w pamięci RAM nienaruszone, mimo że warstwa UI została całkowicie przebudowana. ViewModel ginie dopiero wtedy, gdy Aktywność zostanie trwale zakończona (np. przez przycisk Back lub \texttt{finish()}), co powoduje wywołanie metody \texttt{onCleared()} i wyczyszczenie \texttt{ViewModelStore}.
+
+\section{Warstwa Danych: Wzorzec Repozytorium}
+
+Do tej pory nasz ViewModel trzymał dane w pamięci. W większej aplikacji dane pochodzą z zewnętrznych źródeł: API (Retrofit), bazy danych SQL (Room), plików. Tutaj pojawia się pytanie: \textit{Czy ViewModel powinien wiedzieć, skąd pochodzą dane?}
+Zgodnie z zasadą \textbf{Separation of Concerns} - absolutnie nie.
+
+Wróćmy do metafory restauracji:
+\begin{itemize}
+    \item \textbf{ViewModel (Kelner):} Chce po prostu otrzymać gotowe danie. Nie interesuje go, czy składniki są z targu, czy z lodówki.
+    \item \textbf{Repozytorium (Kuchnia/Magazyn):} To tutaj zapadają decyzje \textit{skąd wziąć dane}.
+\end{itemize}
+
+Aby uniezależnić ViewModel od konkretnego źródła danych, używamy interfejsu.
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+// Kontrakt: Mówi CO można zamówić, ale nie JAK to zdobyć
+interface WordRepository {
+    suspend fun getWords(): List<String>
+}
+\end{minted}
+
+W prostym przykładzie Repozytorium może wydawać się zbędną warstwą ("przekazywaczem"). Jednak w większych aplikacjach, które będziemy budować na kolejnych wykładach, Repozytorium pełni kluczowe funkcje:
+
+\begin{itemize}
+    \item \textbf{1. Obsługa Trybu Offline (Caching):} 
+    To najważniejsze zastosowanie, zwane \textit{Single Source of Truth}. Repozytorium może sprawdzać: \textit{Czy mamy internet?}.
+    \begin{itemize}
+        \item \textit{Jest internet:} Pobierz dane z API, zapisz je w lokalnej bazie danych (Room), a następnie zwróć dane z bazy.
+        \item \textit{Brak internetu:} Zwróć dane zapisane w bazie z poprzedniej sesji.
+    \end{itemize}
+    Dla ViewModelu ten proces jest niewidoczny - on po prostu prosi o dane i je dostaje, niezależnie od stanu sieci.
+
+    \item \textbf{2. Agregacja Danych:}
+    Często jeden ekran potrzebuje danych z wielu źródeł. Np. ekran Profilu może wymagać danych użytkownika (z endpointa \texttt{/user}) oraz listy ostatnich zamówień (z endpointa \texttt{/orders}). Repozytorium pobiera oba te zasoby równolegle (korzystając z \texttt{async}), łączy je w jeden obiekt \texttt{UserProfile} i dopiero taki \textit{gotowy produkt} przekazuje ViewModelowi.
+
+    \item \textbf{3. Mapowanie i Czystość Danych:}
+    API często zwraca dane w formacie technicznym (\textit{brudnym}), np. \texttt{user\_id\_xq2}, daty w formacie timestamp itp. Repozytorium służy jako \textit{obierak} - przetwarza surowe obiekty JSON (DTO - Data Transfer Object) na czyste, czytelne obiekty domenowe, z których łatwo korzysta się w UI.
+\end{itemize}
+
+\section{Problem Konstruktora z Parametrem: ViewModelFactory}
+
+Dotarliśmy do ostatniego wyzwania technicznego. Stworzyliśmy \texttt{WordRepository} i chcemy przekazać je do naszego \texttt{WordViewModel}.
+
+Zmieniamy więc konstruktor:
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class WordViewModel(private val repository: WordRepository) : ViewModel() { ... }
+\end{minted}
+
+I tu pojawia się problem. Gdy w kodzie Composable wywołamy standardową funkcję:
+\texttt{val viewModel: WordViewModel = viewModel()}, aplikacja wyrzuci błąd \path{RuntimeException}.
+
+Funkcja biblioteczna \texttt{viewModel()} domyślnie potrafi tworzyć tylko obiekty posiadające pusty konstruktor (bez parametrów). Działa ona na zasadzie refleksji.
+
+Aby to zrozumieć, wyobraźmy sobie salon samochodowy:
+\begin{itemize}
+    \item \textbf{ViewModel bez parametrów (Samochód z placu):} Wchodzisz, mówisz \textit{Poproszę Passata}, sprzedawca daje Ci kluczyki do standardowego modelu stojącego na parkingu. Proste i szybkie.
+    \item \textbf{ViewModel z Repozytorium (Zamówienie Specjalne):} Mówisz \textit{Poproszę Passata, ale z silnikiem V6 (Repozytorium)}. Sprzedawca rozkłada ręce - nie ma takiego na placu. Musi wysłać zamówienie do \textbf{Fabryki}, podając dokładną specyfikację, jak ten samochód złożyć.
+\end{itemize}
+
+W programowaniu tą specyfikacją jest wzorzec \textbf{Factory}.
+
+Musimy dostarczyć \textit{instrukcję obsługi}, która powie systemowi: \textit{Jeśli ktoś poprosi Cię o WordViewModel, to najpierw stwórz Repozytorium, a potem włóż je do środka}.
+
+Współcześnie najczęściej implementujemy to za pomocą \texttt{companion object} wewnątrz klasy ViewModelu:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+class WordViewModel(private val repository: WordRepository) : ViewModel() {
+    
+    // ... kod ViewModelu ...
+
+    // Definicja Fabryki (Instrukcja tworzenia)
+    companion object {
+        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return WordViewModel(
+                    // Ręczne Wstrzykiwanie Zależności (Manual DI)
+                    repository = NetworkWordRepository()
+                ) as T
+            }
+        }
+    }
+}
+\end{minted}
+
+Metoda \texttt{create} to miejsce, w którym przejmujemy kontrolę nad tworzeniem obiektu. To my, a nie system, decydujemy, jaka implementacja repozytorium trafi do środka.
+
+Teraz, gdy mamy już naszą \textit{fabrykę}, musimy jej użyć w widoku. Zmieniamy wywołanie w funkcji \texttt{WordScreen}:
+
+\begin{minted}[frame=single,framesep=10pt]{kotlin}
+@Composable
+fun WordScreen(
+    // Przekazujemy fabrykę jako parametr 'factory'
+    viewModel: WordViewModel = viewModel(factory = WordViewModel.Factory)
+) {
+    // ... reszta kodu bez zmian ...
+}
+\end{minted}
+
+Dzięki temu drobnemu dodatkowi, Android \textit{wie}, jak skonstruować nasz złożony obiekt, zachowując jednocześnie wszystkie zalety cyklu życia ViewModelu (przeżycie rotacji ekranu).
+
+\textit{„Czy musimy pisać taki boilerplate (nadmiarowy kod) dla każdego ekranu?”}.
+Na tym etapie - tak. Jest to tzw. \textbf{Manual Dependency Injection}. Musimy rozumieć, jak obiekty są ze sobą łączone \textit{pod maską}.
+
+W \textbf{Wykładzie 11} wprowadzimy bibliotekę \textbf{Hilt}. Zrobi ona dokładnie to samo, co my teraz ręcznie, ale automatycznie - za pomocą jednej adnotacji \texttt{@HiltViewModel}. Hilt wygeneruje ten kod fabryki za nas w czasie kompilacji.
+
+\section{Pełny kod przykładu: WordApp}
+
+Poniżej znajduje się kompletna implementacja omawianego w tym rozdziale przykładu. Kod łączy w sobie wszystkie poznane elementy: wzorzec Repozytorium (interfejs i implementacja), ViewModel z obsługą stanu i korutyn, Fabrykę (ViewModelProvider.Factory) oraz warstwę widoku w Jetpack Compose.
+
+Możesz skopiować ten kod do jednego pliku (np. \texttt{WordApp.kt}) w swoim projekcie, aby przetestować działanie architektury MVVM.
+
+\begin{minted}[linenos, breaklines, frame=single,framesep=10pt]{kotlin}
+
+// ---------------------------------------------------------
+// 1. WARSTWA DANYCH (MODEL & REPOSITORY)
+// ---------------------------------------------------------
+
+// Kontrakt (Interfejs) - ViewModel wie tylko o tym
+interface WordRepository {
+    suspend fun getWords(): List<String>
+}
+
+// Konkretna implementacja (Symulacja sieci)
+class NetworkWordRepository : WordRepository {
+    override suspend fun getWords(): List<String> {
+        // Symulacja opóźnienia sieciowego (2 sekundy)
+        delay(2000)
+        return listOf("Architektura", "MVVM", "w", "Praktyce", "Jest", "Super")
+    }
+}
+
+// ---------------------------------------------------------
+// 2. WARSTWA LOGIKI (VIEWMODEL)
+// ---------------------------------------------------------
+
+class WordViewModel(private val repository: WordRepository) : ViewModel() {
+
+    // Stan prywatny (mutable)
+    private val _words = mutableStateListOf<String>("Kliknij przycisk...")
+    
+    // Stan publiczny (read-only)
+    val words: List<String> get() = _words
+
+    // Funkcja wywoływana przez Widok (Event)
+    fun loadData() {
+        viewModelScope.launch {
+            _words.clear()
+            _words.add("Ładowanie...")
+            
+            // Pobranie danych z repozytorium (zawieszenie korutyny)
+            val newWords = repository.getWords()
+            
+            _words.clear()
+            _words.addAll(newWords)
+        }
+    }
+
+    // Fabryka (ViewModel Factory) - Instrukcja tworzenia ViewModelu z parametrem
+    companion object {
+        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return WordViewModel(
+                    repository = NetworkWordRepository() // Wstrzykiwanie zależności
+                ) as T
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------
+// 3. WARSTWA PREZENTACJI (VIEW / COMPOSE)
+// ---------------------------------------------------------
+
+@Composable
+fun WordScreen(
+    // Wstrzyknięcie ViewModelu za pomocą Fabryki
+    viewModel: WordViewModel = viewModel(factory = WordViewModel.Factory)
+) {
+    Column(modifier = Modifier.padding(16.dp)) {
+        
+        // Przycisk wyzwalający akcję
+        Button(onClick = { viewModel.loadData() }) {
+            Text(text = "Pobierz słowa z serwera")
+        }
+
+        // Lista wyświetlająca stan
+        LazyColumn(modifier = Modifier.padding(top = 16.dp)) {
+            items(viewModel.words) { word ->
+                Text(text = "• $word")
+            }
+        }
+    }
+}
+\end{minted}
