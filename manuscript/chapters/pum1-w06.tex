@@ -64,6 +64,13 @@ println(EmptyState) // Wypisze "EmptyState" zamiast "EmptyState@1b2c3d"
 
 Jest to szczególnie przydatne przy \textbf{Sealed Classes/Interfaces}, gdzie część wariantów to klasy z danymi, a część to proste bezstanowe obiekty.
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w06-object.png}
+    \caption{Słowo kluczowe \texttt{object} w Kotlinie.}
+    \label{fig:object}
+\end{figure}
+
 \section{Interfejsy}
 
 Interfejs definiuje kontrakt – zestaw metod i właściwości, które klasa implementująca musi dostarczyć. W Kotlinie interfejsy są bardzo elastyczne: mogą zawierać metody abstrakcyjne oraz metody z domyślną implementacją.
@@ -161,6 +168,13 @@ Interfejsy pozwalają nadać wspólną cechę klasom, które nie są ze sobą po
 
 Jeśli interfejs posiada \textbf{dokładnie jedną metodę abstrakcyjną}, nazywamy go interfejsem funkcyjnym lub \textbf{SAM} (Single Abstract Method).
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w06-interfejsy.png}
+    \caption{Interfejsy w Kotlinie.}
+    \label{fig:interfejsy}
+\end{figure}
+
 W Kotlinie oznaczamy takie interfejsy słowem \texttt{fun interface}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -192,3 +206,10 @@ Skoro interfejsy mogą mieć metody z implementacją, czym różnią się od kla
     \item \textbf{Konstruktory}: Klasy abstrakcyjne mają konstruktory, interfejsy nie.
     \item \textbf{Wielodziedziczenie}: Klasa może dziedziczyć tylko po jednej klasie (abstrakcyjnej lub nie), ale może implementować \textbf{wiele} interfejsów.
 \end{enumerate}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w06-interface-abstract.png}
+    \caption{Klasa abstrakcyjna vs interfejs.}
+    \label{fig:interface-abstract}
+\end{figure}

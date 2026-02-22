@@ -4,7 +4,7 @@ Programowanie obiektowe (OOP) opiera się na koncepcji klas i obiektów. Klasa t
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.5\textwidth]{fig/pum1-w05-class_object.png}
+    \includegraphics[width=0.8\textwidth]{fig/pum1-w05-class_object.png}
     \caption{Klasa i obiekt}
     \label{fig:class_object}
 \end{figure}
@@ -182,6 +182,13 @@ val b = 100
 println(a === b) // true
 \end{minted}
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w05-identity.png}
+    \caption{Równość referencyjna vs strukturalna.}
+    \label{fig:identity}
+\end{figure}
+
 \section{Klasy Wyliczeniowe (Enum Classes)}
 
 Służą do definiowania stałego zbioru wartości (np. pory roku, stany zamówienia, kierunki świata).
@@ -238,6 +245,13 @@ class Another : Derived() {
 }
 \end{minted}
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w05-inheritance.png}
+    \caption{Dziedziczenie i nadpisywanie w Kotlinie.}
+    \label{fig:inheritance}
+\end{figure}
+
 \section{Klasy Abstrakcyjne}
 
 Klasa abstrakcyjna może zawierać metody bez implementacji (abstrakcyjne), które \textbf{muszą} zostać zaimplementowane w klasach pochodnych. Nie można utworzyć instancji klasy abstrakcyjnej.
@@ -265,6 +279,13 @@ W klasach abstrakcyjnych często mamy dylemat: użyć \texttt{abstract} czy \tex
     \item \textbf{\texttt{abstract fun}}: Nie ma ciała (implementacji). Klasa pochodna \textbf{musi} ją zaimplementować (chyba że sama jest abstrakcyjna). Używamy, gdy nie ma sensownej implementacji domyślnej (np. \texttt{calculateArea()} dla ogólnego kształtu).
     \item \textbf{\texttt{open fun}}: Ma ciało (implementację domyślną). Klasa pochodna \textbf{może} ją nadpisać, ale nie musi. Używamy, gdy istnieje sensowne zachowanie domyślne (np. \texttt{logError()} wypisujące na konsolę), które w specyficznych przypadkach chcemy zmienić (np. zapis do pliku).
 \end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w05-abstract.png}
+    \caption{Klasa abstrakcyjna i jej implementacja.}
+    \label{fig:abstract}
+\end{figure}
 
 \section{Klasy Zapieczętowane (Sealed Classes)}
 
@@ -340,6 +361,13 @@ class Outer {
 val outer = Outer()
 val inner = outer.Inner() // Musimy mieć instancję Outer, by stworzyć Inner
 \end{minted}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w05-nested.png}
+    \caption{Klasa zagnieżdżona i wewnętrzna.}
+    \label{fig:nested}
+\end{figure}
 
 \section{Obiekty Towarzyszące (Companion Object)}
 

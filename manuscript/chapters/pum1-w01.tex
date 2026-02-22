@@ -93,6 +93,13 @@ Ograniczenia:
 
 Kompilator traktuje \texttt{const val} jako stałą, którą \textit{wstrzykuje} (inline) bezpośrednio w miejsca jej użycia, co jest niezbędne np. przy definiowaniu parametrów adnotacji.
 
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w01-01.png}
+    \caption{val vs var}
+    \label{fig:val_vs_var}
+\end{figure}
+
 \section{Null Safety}
 
 Tony Hoare, twórca referencji \texttt{null}, nazwał to swoim \textit{błędem wartym miliard dolarów}. W Javie \texttt{NullPointerException} (NPE) to chleb powszedni – błąd ten występuje w momencie, gdy program próbuje odwołać się do metody lub pola obiektu za pomocą referencji, która w rzeczywistości nie wskazuje na żadne miejsce w pamięci (ma wartość \texttt{null}). Kotlin rozwiązuje ten problem na poziomie systemu typów, wprowadzając rygorystyczne rozróżnienie między referencjami, które mogą być \texttt{null}, a tymi, które muszą zawsze wskazywać na konkretny obiekt.

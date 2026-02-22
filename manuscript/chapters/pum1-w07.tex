@@ -37,6 +37,13 @@ if (::database.isInitialized) {
 }
 \end{minted}
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w07-lateinit.png}
+    \caption{Opóźniona inicjalizacja (lateinit).}
+    \label{fig:lateinit}
+\end{figure}
+
 \section{Delegaty (Delegated Properties)}
 
 Delegacja właściwości to mechanizm, w którym obsługa metod \texttt{get()} (i ew. \texttt{set()}) jest przekazywana do innego obiektu. Składnia wykorzystuje słowo kluczowe \texttt{by}.
@@ -91,6 +98,13 @@ fun main() {
 Delegat \texttt{lazy} domyślnie jest \textbf{bezpieczny wątkowo} (thread-safe). Oznacza to, że jeśli wiele wątków spróbuje jednocześnie odczytać właściwość \texttt{by lazy} po raz pierwszy, mechanizm synchronizacji zagwarantuje, że kod inicjalizujący wykona się \textbf{tylko raz}, a wszystkie wątki otrzymają tę samą instancję.
 
 Dzięki temu \texttt{by lazy} jest świetnym sposobem na implementację wzorca \textbf{Singleton} dla pojedynczej właściwości lub kosztownego zasobu. Nie musimy martwić się o ręczną synchronizację (jak w Javie \texttt{synchronized} czy \texttt{double-check locking}) – Kotlin robi to za nas.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w07-lazy.png}
+    \caption{Delegaty i inicjalizacja leniwa (lazy).}
+    \label{fig:lazy}
+\end{figure}
 
 \subsection{Obserwowanie zmian (\texttt{Delegates.observable})}
 
@@ -170,3 +184,10 @@ println(u.name) // "Jan"
 Wymogiem jest, aby klucze w mapie (\texttt{String}) odpowiadały dokładnie nazwom właściwości.
 
 Jeśli użyjemy \texttt{MutableMap}, możemy delegować również właściwości zmienne (\texttt{var}). Wtedy przypisanie wartości do właściwości zaktualizuje odpowiedni wpis w mapie.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w07-delegaty-obserwowalne-weryfikowalne.png}
+    \caption{Delegaty obserwowalne i weryfikowalne.}
+    \label{fig:delegaty-obserwowalne-weryfikowalne}
+\end{figure}

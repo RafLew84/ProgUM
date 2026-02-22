@@ -153,7 +153,14 @@ Kluczowe cechy i różnice względem lambd:
 
 To zestaw 5 funkcji standardowych: \texttt{let}, \texttt{run}, \texttt{with}, \texttt{apply}, \texttt{also}. Wszystkie robią coś bardzo podobnego: wykonują blok kodu na obiekcie. Różnią się tylko tym, jak ten obiekt jest dostępny w środku (\texttt{this} czy \texttt{it}) i co zwracają (sam obiekt czy wynik lambdy).
 
-Oto \textit{ściąga}, jak wybierać odpowiednią funkcję:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w03-funkcje-zakresu.png}
+    \caption{Funkcje zakresu w Kotlinie}
+    \label{fig:funkcje-zakresu}
+\end{figure}
+
+\textit{śŚciąga}, jak wybierać odpowiednią funkcję:
 
 \begin{enumerate}
     \item \textbf{\texttt{apply}}: Konfiguracja obiektu. Dostęp przez \texttt{this}, zwraca \textbf{obiekt}.
@@ -218,7 +225,6 @@ Wyobraź sobie, że piszesz książkę (program).
     \item Funkcja \texttt{inline} to operacja \textbf{Znajdź i Zamień} w edytorze. Edytor bierze treść ze strony 45 i fizycznie wkleja ją w każde miejsce, gdzie było odesłanie. Książka robi się grubsza (więcej kodu bajtowego), ale czyta się ją płynnie, bez ciągłego skakania po stronach.
 \end{itemize}
 
-\paragraph{noinline}
  Czasami funkcja \texttt{inline} przyjmuje kilka lambd, ale tylko niektóre z nich chcemy \textit{wkleić}. Inne mogą być np. przekazywane dalej do innych funkcji (które nie są inline) lub zapisywane w polach klas. W takiej sytuacji, \textit{wklejenie jest niemożliwe} – musimy mieć fizyczny obiekt lambdy. Używamy wtedy modyfikatora \texttt{noinline}.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -233,7 +239,7 @@ inline fun manyOperations(
 
 Załóżmy, że mamy dwa dokumenty. Jeden przepisujemy ręcznie do głównego zeszytu (\texttt{inline}), ale drugi musimy włożyć do koperty i wysłać pocztą do urzędu (\texttt{noinline}). Nie możesz wysłać \textit{przepisanej treści} – urząd wymaga oryginału (obiektu w kopercie).
 
-\paragraph{crossinline}
+
 Jak wspomnieliśmy, w funkcjach \texttt{inline} dozwolony jest \texttt{return} (powrót nielokalny). Czasami jednak lambda jest wykonywana w innym kontekście (np. wewnątrz zagnieżdżonej funkcji lub innego wątku), gdzie nagłe przerwanie funkcji zewnętrznej byłoby niebezpieczne lub niemożliwe.
 
 Słowo kluczowe \texttt{crossinline} blokuje możliwość użycia \texttt{return} w lambdzie, mimo że funkcja jest \texttt{inline}. Pozwala to na bezpieczne użycie lambdy w zagnieżdżonych kontekstach.
@@ -252,6 +258,13 @@ Załóżmy że jesteśmy w pokoju (funkcja).
     \item Zwykły \texttt{return} to wyjście głównymi drzwiami.
     \item Lambda \texttt{crossinline} to wejście do mniejszej, zamkniętej kabiny wewnątrz tego pokoju. Obiecujemy kompilatorowi (\texttt{crossinline}), że nie spróbujemy \textit{wyskoczyć przez okno} (return) bezpośrednio z kabiny na zewnątrz budynku, pomijając drzwi pokoju. Możemy zakończyć tylko zadanie w kabinie (\texttt{return@label}).
 \end{itemize}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w03-inline.png}
+    \caption{Funkcje inline w Kotlinie}
+    \label{fig:inline}
+\end{figure}
 
 \subsection{Rekursja ogonowa (tailrec)}
 Rekursja grozi przepełnieniem stosu (\texttt{StackOverflowError}). Kotlin oferuje optymalizację: jeśli wywołanie rekurencyjne jest \textbf{ostatnią} operacją w funkcji, możemy dodać modyfikator \texttt{tailrec}. Kompilator zamieni wtedy rekurencję na zwykłą pętlę, co zapobiega przepełnieniu stosu.
@@ -312,6 +325,13 @@ Posłużmy się analogią:
     \item Zwykłe generyki to list w zaklejonej kopercie. Listonosz (runtime) wie, że niesie \textit{List}, ale nie wie co jest w środku (String czy Int), bo koperta jest nieprzezroczysta (\textit{erasure}).
     \item \texttt{reified} w funkcji \texttt{inline} to sytuacja, w której nadawca (kompilator) otwiera kopertę tuż przed wręczeniem jej tobie w miejscu odbioru. Widzisz zawartość, więc wiesz dokładnie, co to za typ.
 \end{itemize}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w03-reified.png}
+    \caption{Funkcje reified w Kotlinie}
+    \label{fig:reified}
+\end{figure}
 
 \section{Przeciążanie Operatorów (operator fun)}
 

@@ -106,6 +106,13 @@ Proces zachowania stanu opiera się na trzech kluczowych punktach:
 
 Współcześnie, w architekturze polecanej przez Google, większość stanu interfejsu powinna być przechowywana w \texttt{ViewModel}, który przetrwa proste zmiany konfiguracji (jak obrót ekranu). Jednak \texttt{Bundle} (często poprzez \texttt{SavedStateHandle} w ViewModelu) pozostaje niezbędny do obsługi sytuacji, w której system zabija proces aplikacji z powodu braku zasobów.
 
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w08-bundle.png}
+    \caption{Proces zachowania i przywracania stanu aktywności}
+    \label{fig:bundle}
+\end{figure}
+
 \section{Kontekst (Context)}
 
 \texttt{Context} to klasa abstrakcyjna, która jest \textit{uchwytem} do środowiska, w którym działa aplikacja. Daje dostęp do zasobów systemowych (pliki, bazy danych, preferencje, launchery).
@@ -194,6 +201,13 @@ Kiedy wywołujemy \texttt{startActivity} z intencją niejawną, system wykonuje 
         \item Jeśli nie zostanie znaleziona żadna pasująca aktywność, aplikacja rzuca wyjątek \texttt{ActivityNotFoundException}.
     \end{itemize}
 \end{enumerate}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{fig/pum1-w08-intent.png}
+    \caption{Mechanizm Intent w Androidzie}
+    \label{fig:intent}
+\end{figure}
 
 \section{Pełny Przykład Niejawnej Intencji}
 

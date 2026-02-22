@@ -60,3 +60,9 @@
 
 \usepackage{xurl} % albo: \usepackage{url}
 \urlstyle{same}
+
+% Wymuszenie wyrównania do góry dla stron zawierających tylko rysunki (tzw. float pages)
+\makeatletter
+\setlength{\@fptop}{0pt}
+\setlength{\@fpbot}{0pt plus 1fil}
+\makeatother
