@@ -217,6 +217,12 @@ Dzięki \texttt{flowOn} możemy bezpiecznie wykonywać operacje bazodanowe lub s
 
 \section{Porównanie withContext i flowOn}
 
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w06-przelaczanie.png}
+    \caption{Zarządzanie wątkami.}
+    \label{fig:zarzadzanie}
+\end{figure}
+
 Podsumujmy różnice między tymi dwoma mechanizmami:
 
 \begin{table}[h]
@@ -332,6 +338,12 @@ Różnice względem \texttt{stateIn}:
     \item Pozwala konfigurować parametr \texttt{replay} (ile starych zdarzeń pamiętać dla nowych subskrybentów).
 \end{enumerate}
 
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w06-statein_sharedin.png}
+    \caption{Operatory stateIn i sharedIn.}
+    \label{fig:operatory}
+\end{figure}
+
 Wyobraźmy sobie strumień alertów z serwera. Chcemy, aby te alerty trafiały do wszystkich ekranów w aplikacji, ale nie chcemy, aby nowy ekran po otwarciu wyświetlał stare, nieaktualne komunikaty.
 
 \begin{minted}[frame=single,framesep=10pt]{kotlin}
@@ -362,6 +374,12 @@ Podsumujmy:
 \section{Łączenie danych: Operator combine}
 
 W aplikacjach stan ekranu (UI State) rzadko pochodzi z jednego źródła. Często musimy połączyć dane z dwóch lub więcej niezależnych strumieni.
+
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w06-combine.png}
+    \caption{Operatory combine.}
+    \label{fig:combine}
+\end{figure}
 
 Typowe scenariusze:
 \begin{itemize}

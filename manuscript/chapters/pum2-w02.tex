@@ -262,6 +262,12 @@ val job = scope.launch {... }
 \item Dzięki Job możesz programowo zapytać: \texttt{job.isActive} (czy jeszcze pracujemy?) lub \texttt{job.isCancelled}.
 \end{itemize}
 
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w02-coroutine_scope.png}
+    \caption{Coroutines.}
+    \label{fig:figura-coroutine-scope}
+\end{figure}
+
 W świecie korutyn każdy \texttt{Job} może mieć rodzica i dzieci. Kiedy tworzysz \texttt{CoroutineScope}, ma on w sobie \textit{Główny Job} (Szefa Zmiany). Kiedy w tym \texttt{Scope} uruchamiasz \texttt{launch}, powstaje nowy \texttt{Job}, który automatycznie staje się dzieckiem \textit{Głównego Joba}. Tworzy to \textbf{nierozerwalne drzewo zależności}. Działają tu dwie żelazne zasady \textbf{Ustrukturyzowanej Współbieżności}:
 \begin{itemize}
 \item \textbf{Zasada Anulowania (W dół)}: Jeśli anulujesz Rodzica (np. zamkniesz ekran i anulujesz \texttt{coroutineScope}), wszystkie \textit{dzieci} są automatycznie anulowane (Canceled). Szef Zmiany mówi: \textit{Zamykamy kuchnię!}, więc wszyscy kucharze natychmiast przestają gotować swoje dania. Nikt nie zostaje w pracy po godzinach.
@@ -305,6 +311,12 @@ Wewnątrz \texttt{Composable} (\texttt{CoroutineSolutionScreen}) pojawia się no
 Jest to niezbędne, ponieważ funkcja \texttt{onClick} przycisku jest zwykłą funkcją (nie jest \texttt{suspend}). Nie możemy z niej bezpośrednio wywołać \texttt{fetchDataFromServer} ani \texttt{delay}. Potrzebujemy \textit{bramy} lub \textit{pomostu}, który pozwoli nam wejść w świat asynchroniczny. Tym pomostem jest CoroutineScope powiązany z cyklem życia tego ekranu.
 
 Warto zauważyć, że \texttt{CoroutineScope} uzyskany przez \texttt{rememberCoroutineScope()} w Jetpack Compose domyślnie wykorzystuje \texttt{Dispatchers.Main} (a konkretnie \texttt{Main.immediate}). Oznacza to, że kod wewnątrz \texttt{launch} wykonuje się \textbf{na wątku głównym}.
+
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w02-blocking_ui.png}
+    \caption{Blokowanie wątku ui.}
+    \label{fig:figura-blocking-ui}
+\end{figure}
 
 Zakres \texttt{rememberCoroutineScope()} jest ściśle powiązany z punktem w kompozycji, w którym został wywołany. Jeśli użytkownik opuści ten ekran (komponent zostanie usunięty z drzewa UI), \texttt{scope} zostanie automatycznie anulowany. Dzięki temu wszelkie trwające w nim operacje (np. nasze 10-sekundowe pobieranie danych) zostaną natychmiast przerwane, zapobiegając wyciekom pamięci i marnowaniu zasobów.
 

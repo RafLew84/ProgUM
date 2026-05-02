@@ -50,6 +50,12 @@ Oba zadania startują niemal w tym samym momencie, co oznacza, że nie czekamy z
 
 Rozwiązaniem problemu wyścigu (race condition) jest funkcja \texttt{join()}. Z technicznego punktu widzenia jest to funkcja zawieszająca (\texttt{suspend function}), która służy do synchronizacji cyklu życia korutyn. Kiedy korutyna nadrzędna (rodzic) napotyka instrukcję \texttt{jobWarzywa.join()}, jej wykonanie zostaje zawieszone. Należy wyraźnie podkreślić różnicę między zawieszeniem a zablokowaniem: wątek obsługujący tę korutynę nie jest blokowany i może w tym czasie wykonywać inne operacje systemowe. Mechanizm \texttt{join} wprowadza korutynę wywołującą w stan oczekiwania, który trwa dopóki obserwowany obiekt \texttt{Job} nie osiągnie stanu końcowego (Completed lub Cancelled). Dopiero gdy podzadanie faktycznie zakończy swoje działanie, maszyna stanów wznawia korutynę rodzica od kolejnej linii kodu. Dzięki jawnemu wywołaniu \texttt{join()} na obu obiektach \texttt{Job}, realizujemy kontrakt Ustrukturyzowanej Współbieżności, w którym rodzic świadomie koordynuje pracę swoich dzieci i gwarantuje, że żadna operacja nie zostanie zakończona przedwcześnie, zapewniając spójność danych i przewidywalność przepływu aplikacji.
 
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w03-job_cancel.png}
+    \caption{Ustrukturyzowana współbieżność.}
+    \label{fig:figura-job-cancel}
+\end{figure}
+
 Warto zatrzymać się przy aspekcie, który czyni ustrukturyzowaną współbieżność \textit{bezpieczną} - jest to \textbf{automatyczna propagacja anulowania} - wpominaliśmy już o tym wcześniej. Ale omówmy to jeszcze raz.
 
 Wyobraźmy sobie, że nasz Szef Kuchni (rodzic) otrzymuje informację, że klient anulował zamówienie i wychodzi z restauracji. W świecie \textbf{ustrukturyzowanej współbieżności} Szef nie musi biegać po kuchni i osobiście prosić każdego pomocnika o przerwanie pracy. Wywołanie \texttt{job.cancel()} na korutynie-rodzicu \textbf{automatycznie} przesyła sygnał anulowania do wszystkich dzieci (\texttt{jobMieso}, \texttt{jobWarzywa}). Jeśli pomocnicy wykonują funkcje zawieszające (takie jak \texttt{delay}), natychmiast przerwą pracę.
@@ -128,6 +134,12 @@ Wyobraź sobie strumień kodu asynchronicznego jako płynącą rzekę - korutyny
     \item Cały nurt zostaje zatrzymany tak długo, aż praca wewnątrz tamy nie zostanie ukończona. 
     \item Dopiero gdy ostatnia korutyna w bloku \texttt{runBlocking} skończy działanie, tama zostaje otwarta i wątek może kontynuować wykonywanie kolejnych linii kodu pod blokiem. 
 \end{itemize}
+
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w03-deferred.png}
+    \caption{Odbieranie wyników.}
+    \label{fig:figura-deferred}
+\end{figure}
 
 \subsection{Zastosowanie} 
 Ponieważ \texttt{runBlocking} blokuje wątek, wywołanie go na wątku UI spowoduje natychmiastowe zamrożenie interfejsu użytkownika na cały czas trwania operacji wewnątrz bloku. Jest to powrót do problemu, który korutyny miały rozwiązać.

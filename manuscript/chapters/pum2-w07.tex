@@ -114,6 +114,12 @@ launch {
 
 Kanał jest koncepcyjnie \textit{otwarty} tak długo, jak go nie zamkniemy. W przeciwieństwie do \texttt{Flow}, który kończy się naturalnie po wykonaniu bloku kodu, Kanał może działać w nieskończoność.
 
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w07-kanaly.png}
+    \caption{Kanały.}
+    \label{fig:channels}
+\end{figure}
+
 Metoda \texttt{close()} wysyła specjalny sygnał \textit{koniec transmisji}.
 \begin{itemize}
     \item Próba wysłania (\texttt{send}) na zamknięty kanał rzuci wyjątek \texttt{ClosedSendChannelException}.
@@ -168,6 +174,12 @@ Kanał z buforem opartym na liście łączonej (\texttt{LinkedList}), która ro�
     \item \textbf{Zachowanie:} \texttt{send()} \textbf{nigdy} się nie zawiesza (chyba że braknie pamięci RAM).
     \item \textbf{Ostrzeżenie:} Używanie tego kanału jest ryzykowne. Jeśli nadawca jest szybszy od odbiorcy, program w końcu wyrzuci błąd \texttt{OutOfMemoryError}.
 \end{itemize}
+
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w07-channels_types.png}
+    \caption{Rodzaje kanałów.}
+    \label{fig:channels_types}
+\end{figure}
 
 \subsection{Przykład konfiguracji}
 

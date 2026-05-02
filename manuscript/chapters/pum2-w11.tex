@@ -77,6 +77,12 @@ val gamingComputer = Computer(GamingMouseRGB())
 
 \end{itemize}
 
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w11-di.png}
+    \caption{Wstrzykiwanie zależności.}
+    \label{fig:di}
+\end{figure}
+
 \section{Odwrócenie Sterowania}
 
 Aby DI działało w dużej skali, potrzebujemy kogoś, kto będzie zarządzał tymi wszystkimi zależnościami - \textit{kontenera}, który wie, jak stworzyć wszystkie niezbędne elementy i jak dostarczyć go do komputera. Tę koncepcję nazywamy \textbf{Odwróceniem Sterowania (Inversion of Control)}. Zamiast: \textit{Ja (Activity) tworzę Repozytorium}, mówimy: \textit{Ja (Activity) potrzebuję Repozytorium, dostarcz mi je}.

@@ -125,6 +125,12 @@ Spójrzmy na wynik działania naszego programu. Logi ujawniają trzy mechanizmy 
     Gdy \textit{Widz 2} dołącza do strumienia, nie ma dostępu do danych, które zostały wyemitowane wcześniej. Strumień zimny nie przechowuje historii - on ją produkuje na bieżąco.
 \end{enumerate}
 
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w05-cold_stream.png}
+    \caption{Zimny strumień.}
+    \label{fig:figura-cold_stream}
+\end{figure}
+
 To zachowanie (restartowanie przy każdej subskrypcji) jest bardzo niebezpieczne w warstwie UI (Widoku). Wyobraź sobie, że użytkownik obraca telefon. System Android niszczy i tworzy na nowo Aktywność.
 \begin{itemize}
     \item Stara Aktywność przestaje nasłuchiwać (\texttt{cancel}).
@@ -230,6 +236,12 @@ Dobrą analogią dla StateFlow jest transmisja na żywo (Twitch):
     
     \item \textbf{Wspólny Obraz:} Wszyscy widzowie oglądający ten sam kanał widzą dokładnie ten sam stan (np. ten sam obraz transmisji) w tym samym momencie.
 \end{itemize}
+
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w05-hot_stream.png}
+    \caption{Gorący strumień.}
+    \label{fig:figura-hot_stream}
+\end{figure}
 
 Przejdźmy do przykładu:
 
@@ -403,6 +415,12 @@ class StreamerViewModel : ViewModel() {
     W przeciwieństwie do ustawiania \texttt{state.value = ...}, metoda \texttt{emit()} w SharedFlow jest funkcją zawieszającą. 
     SharedFlow obsługuje mechanizm \textbf{Backpressure}. Jeśli subskrybenci nie nadążają z przetwarzaniem zdarzeń, a bufor wewnętrzny się zapełni, funkcja \texttt{emit} zawiesi korutynę producenta do momentu zwolnienia miejsca w buforze. Zapewnia to bezpieczeństwo wątkowe i chroni przed zalaniem aplikacji nadmiarowymi danymi.
 \end{enumerate}
+
+\begin{figure}[htbp]
+    \includegraphics[width=1.0\textwidth]{fig/pum2-w05-shared_flow.png}
+    \caption{Shared Flow.}
+    \label{fig:figura-shared_flow}
+\end{figure}
 
 \subsection{Pełny kod przykładu}
 
